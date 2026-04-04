@@ -57,6 +57,7 @@ struct Skyline : Module {
 struct SkylineWidget : ModuleWidget {
     SkylineWidget(Skyline* module) {
         setModule(module);
+        box.size = Vec(4 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
         setPanel(createPanel(asset::plugin(pluginInstance, "res/Skyline.svg")));
 
         addParam(createParamCentered<RoundBlackKnob>(Vec(30, 123), module, Skyline::LEVEL_PARAM));
