@@ -112,9 +112,9 @@ struct SkylineWidget : ModuleWidget {
     PanelThemeHelper panelThemeHelper;
 
     SkylineWidget(Skyline* module) {
-        setModule(module);
-        box.size = Vec(4 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
-        panelThemeHelper.init(this, "Skyline", module ? &module->panelContrast : nullptr);
+    setModule(module);
+    panelThemeHelper.init(this, "Skyline", module ? &module->panelContrast : nullptr);
+    box.size = Vec(4 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
 
         // Title
         addChild(new TextLabel(Vec(0, 1), Vec(box.size.x, 14), "maybe", 10.f, nvgRGB(255, 200, 0), false));
