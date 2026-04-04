@@ -1,22 +1,14 @@
-#include "plugin.hpp"
+#pragma once
+#include <rack.hpp>
 
-Plugin* pluginInstance;
+using namespace rack;
 
-float maybeDefaultContrast = 255.0f;
-int maybeDefaultTheme = -1;
+extern Plugin* pluginInstance;
+extern Model* modelSkyline;
 
-void maybeLoadSettings() {}
-void maybeSaveSettings() {}
+extern float maybeDefaultContrast;
+extern int maybeDefaultTheme;
 
-void maybeApplyContrastToAll(float contrast) {
-    maybeDefaultContrast = contrast;
-}
-
-void maybeApplyThemeToAll(int theme) {
-    maybeDefaultTheme = theme;
-}
-
-void init(Plugin* p) {
-    pluginInstance = p;
-    p->addModel(modelSkyline);
-}
+void maybeSaveSettings();
+void maybeApplyContrastToAll(float contrast);
+void maybeApplyThemeToAll(int theme);
