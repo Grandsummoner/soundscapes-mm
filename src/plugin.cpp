@@ -7,5 +7,5 @@ void init(Plugin* p) {
 
     // Register one line per module — must match plugin.json slugs
     // Example: p->addModel(modelMyModule);
-    p->addModel(modelMyModule);
+    p->addModel(modelSkyline);
 }
