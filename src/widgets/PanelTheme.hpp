@@ -37,7 +37,6 @@ struct PanelThemeHelper {
 
     void init(ModuleWidget* widget, const std::string& baseName, float* contrastSrc = nullptr) {
         sashimiPanel = createPanel(asset::plugin(pluginInstance, "res/" + baseName + "_Sashimi.svg"));
-        widget->setPanel(sashimiPanel);
 
         auto loadPanel = [&](SvgPanel*& panel, const std::string& name) {
             std::shared_ptr<Svg> svg = Svg::load(asset::plugin(pluginInstance, "res/" + name));
