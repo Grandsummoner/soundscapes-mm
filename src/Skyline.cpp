@@ -321,15 +321,24 @@ struct Skyline : Module {
         }
 
         // ================================================================
-        // 3. HOLD STEP BUTTON = RECORD SLIDER TO THAT STEP
-        // Only in normal (no mode active) or always? Manual says hold step
-        // while adjusting slider to set that step's value.
-        // We allow it whenever no mode is active.
+        // 3. SLIDER → STEP CV RECORDING  (manual p.6 and p.8)
         // ================================================================
-        if (!muteMode && !lengthMode && !shiftMode && !scaleMode &&
-            !saveMode && !recallMode) {
+        // Method A — HOLD STEP BUTTON + move slider:
+        //   While holding step button i, slider of selectedChan writes to stepCV[selectedChan][i]
+        //   Works in normal mode only (no mode button active)
+        // Method B — LIVE RECORDING on clock tick:
+        //   Each clock tick, each channel's slider value is written to the step that just
+        //   became active. Manual p.6: "as you move the slider the changes are recorded."
+        //   Only active when no mode button is held (to avoid accidents).
+        // ================================================================
+        bool noMode = !muteMode && !lengthMode && !shiftMode &&
+                      !scaleMode && !saveMode && !recallMode;
+
+        // Method A: hold step button → write slider to that step immediately
+        if (noMode) {
             for (int i = 0; i < 16; i++) {
                 if (params[STEP_PARAMS + i].getValue() > 0.5f) {
+                    // Step button held: record selectedChan's slider to step i
                     stepCV[selectedChan][i] =
                         params[SLIDER_PARAMS + selectedChan].getValue();
                 }
@@ -389,12 +398,12 @@ struct Skyline : Module {
             for (int ch = 0; ch < 8; ch++) {
                 if (frozen[ch]) continue;
                 advanceChannel(ch);
-                // Live recording: if slider moved, record to current step
-                // (only when not in a mode combo to avoid accidents)
-                if (!muteMode && !lengthMode && !shiftMode &&
-                    !scaleMode && !saveMode && !recallMode) {
-                    // Un-comment the line below to enable live record:
-                    // stepCV[ch][seqPos[ch]] = params[SLIDER_PARAMS+ch].getValue();
+                // Method B: live recording — write each channel's slider to its
+                // newly-active step on every clock tick (manual p.6).
+                // Only when no mode button is active.
+                if (noMode) {
+                    stepCV[ch][seqPos[ch]] =
+                        params[SLIDER_PARAMS + ch].getValue();
                 }
             }
         }
