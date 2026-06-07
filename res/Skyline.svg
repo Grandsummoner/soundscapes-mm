@@ -1,326 +1,196 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!--
-  Skyline VCV Rack Panel  —  20HP  (300 × 380 px)
-  Redesigned: even 8-column grid, labels repositioned, no overflow
-  SVG uses only basic primitives (nanosvg compatible)
+  Skyline VCV Rack Panel - 20HP (300 x 380 px)
+  Pixel coords derived from: scale = 300/101.6 = 2.9528 px/mm
+  Channel X px: 21, 58, 95, 132, 169, 205, 242, 279
 -->
 <svg xmlns="http://www.w3.org/2000/svg"
      width="300" height="380"
      viewBox="0 0 300 380" version="1.1">
 
-  <!-- ══════════════════════════════════════
-       BACKGROUND
-  ══════════════════════════════════════ -->
-  <rect width="300" height="380" fill="#c8c5be"/>
-  <rect x="4" y="4" width="292" height="372" fill="#e8e5de" rx="2"/>
+  <!-- BACKGROUND -->
+  <rect width="300" height="380" fill="#c0bdb6"/>
+  <rect x="3" y="3" width="294" height="374" fill="#e4e1da" rx="2"/>
 
-  <!-- subtle texture strips -->
-  <rect x="4" y="4" width="292" height="26" fill="#dddad3" rx="2"/>
-  <rect x="4" y="350" width="292" height="26" fill="#dddad3" rx="2"/>
+  <!-- SCREWS -->
+  <circle cx="15" cy="15" r="7" fill="#b8b5ae" stroke="#999" stroke-width="1.2"/>
+  <circle cx="285" cy="15" r="7" fill="#b8b5ae" stroke="#999" stroke-width="1.2"/>
+  <circle cx="15" cy="365" r="7" fill="#b8b5ae" stroke="#999" stroke-width="1.2"/>
+  <circle cx="285" cy="365" r="7" fill="#b8b5ae" stroke="#999" stroke-width="1.2"/>
+  <line x1="11" y1="15" x2="19" y2="15" stroke="#888" stroke-width="1"/>
+  <line x1="15" y1="11" x2="15" y2="19" stroke="#888" stroke-width="1"/>
+  <line x1="281" y1="15" x2="289" y2="15" stroke="#888" stroke-width="1"/>
+  <line x1="285" y1="11" x2="285" y2="19" stroke="#888" stroke-width="1"/>
+  <line x1="11" y1="365" x2="19" y2="365" stroke="#888" stroke-width="1"/>
+  <line x1="15" y1="361" x2="15" y2="369" stroke="#888" stroke-width="1"/>
+  <line x1="281" y1="365" x2="289" y2="365" stroke="#888" stroke-width="1"/>
+  <line x1="285" y1="361" x2="285" y2="369" stroke="#888" stroke-width="1"/>
 
-  <!-- ══════════════════════════════════════
-       MOUNTING SCREWS
-  ══════════════════════════════════════ -->
-  <circle cx="15" cy="15" r="8" fill="#c0bdb6" stroke="#999" stroke-width="1.5"/>
-  <circle cx="15" cy="15" r="2" fill="#888"/>
-  <line x1="11" y1="15" x2="19" y2="15" stroke="#777" stroke-width="1"/>
-  <line x1="15" y1="11" x2="15" y2="19" stroke="#777" stroke-width="1"/>
+  <!-- TITLE -->
+  <text x="150" y="16" font-family="sans-serif" font-size="11" font-weight="bold"
+        fill="#111" text-anchor="middle" letter-spacing="3">SKYLINE</text>
+  <text x="150" y="28" font-family="sans-serif" font-size="7" fill="#888"
+        text-anchor="middle" letter-spacing="1.5">8 CHANNEL CV SEQUENCER</text>
 
-  <circle cx="285" cy="15" r="8" fill="#c0bdb6" stroke="#999" stroke-width="1.5"/>
-  <circle cx="285" cy="15" r="2" fill="#888"/>
-  <line x1="281" y1="15" x2="289" y2="15" stroke="#777" stroke-width="1"/>
-  <line x1="285" y1="11" x2="285" y2="19" stroke="#777" stroke-width="1"/>
-
-  <circle cx="15" cy="365" r="8" fill="#c0bdb6" stroke="#999" stroke-width="1.5"/>
-  <circle cx="15" cy="365" r="2" fill="#888"/>
-  <line x1="11" y1="365" x2="19" y2="365" stroke="#777" stroke-width="1"/>
-  <line x1="15" y1="361" x2="15" y2="369" stroke="#777" stroke-width="1"/>
-
-  <circle cx="285" cy="365" r="8" fill="#c0bdb6" stroke="#999" stroke-width="1.5"/>
-  <circle cx="285" cy="365" r="2" fill="#888"/>
-  <line x1="281" y1="365" x2="289" y2="365" stroke="#777" stroke-width="1"/>
-  <line x1="285" y1="361" x2="285" y2="369" stroke="#777" stroke-width="1"/>
-
-  <!-- ══════════════════════════════════════
-       TITLE AREA  y=4–32
-  ══════════════════════════════════════ -->
-  <text x="150" y="17" font-family="sans-serif" font-size="11"
-        font-weight="bold" fill="#111111"
-        text-anchor="middle" dominant-baseline="middle"
-        letter-spacing="2">SKYLINE</text>
-  <text x="150" y="27" font-family="sans-serif" font-size="7"
-        fill="#777777" text-anchor="middle" dominant-baseline="middle"
-        letter-spacing="1.5">8 CHANNEL CV SEQUENCER</text>
-
-  <!-- ══════════════════════════════════════
-       SECTION DIVIDERS
-  ══════════════════════════════════════ -->
-  <!-- below title -->
-  <line x1="8" y1="33" x2="292" y2="33" stroke="#bbb" stroke-width="0.75"/>
-  <!-- below outputs / channel numbers -->
-  <line x1="8" y1="115" x2="292" y2="115" stroke="#bbb" stroke-width="0.75"/>
+  <!-- SECTION LINES -->
+  <!-- below channel outputs -->
+  <line x1="6" y1="109" x2="294" y2="109" stroke="#bbb" stroke-width="0.75"/>
   <!-- below controls -->
-  <line x1="8" y1="200" x2="292" y2="200" stroke="#bbb" stroke-width="0.75"/>
+  <line x1="6" y1="198" x2="294" y2="198" stroke="#bbb" stroke-width="0.75"/>
   <!-- below sliders -->
-  <line x1="8" y1="292" x2="292" y2="292" stroke="#bbb" stroke-width="0.75"/>
+  <line x1="6" y1="279" x2="294" y2="279" stroke="#bbb" stroke-width="0.75"/>
 
-  <!-- ══════════════════════════════════════
-       8 CV OUTPUT JACKS  y=68
-       x: 14, 53, 92, 131, 170, 208, 247, 286
-  ══════════════════════════════════════ -->
-  <!-- Channel number labels  y=40 -->
-  <text x="14"  y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">1</text>
-  <text x="53"  y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">2</text>
-  <text x="92"  y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">3</text>
-  <text x="131" y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">4</text>
-  <text x="170" y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">5</text>
-  <text x="208" y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">6</text>
-  <text x="247" y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">7</text>
-  <text x="286" y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">8</text>
+  <!-- ===== CHANNEL NUMBERS  y=40px ===== -->
+  <text x="21"  y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">1</text>
+  <text x="58"  y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">2</text>
+  <text x="95"  y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">3</text>
+  <text x="132" y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">4</text>
+  <text x="169" y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">5</text>
+  <text x="205" y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">6</text>
+  <text x="242" y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">7</text>
+  <text x="279" y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#333" text-anchor="middle">8</text>
 
-  <!-- Output jacks  y=68, r=13 -->
-  <circle cx="14"  cy="68" r="13" fill="#a8a5a0" stroke="#888" stroke-width="1.5"/>
-  <circle cx="14"  cy="68" r="8"  fill="#111"/>
-  <circle cx="14"  cy="68" r="2.5" fill="#555"/>
+  <!-- ===== OUTPUT JACKS  y=66px, r=12 ===== -->
+  <circle cx="21"  cy="66" r="12" fill="#a0a09a" stroke="#777" stroke-width="1.5"/>
+  <circle cx="21"  cy="66" r="7"  fill="#111"/><circle cx="21"  cy="66" r="2" fill="#555"/>
+  <circle cx="58"  cy="66" r="12" fill="#a0a09a" stroke="#777" stroke-width="1.5"/>
+  <circle cx="58"  cy="66" r="7"  fill="#111"/><circle cx="58"  cy="66" r="2" fill="#555"/>
+  <circle cx="95"  cy="66" r="12" fill="#a0a09a" stroke="#777" stroke-width="1.5"/>
+  <circle cx="95"  cy="66" r="7"  fill="#111"/><circle cx="95"  cy="66" r="2" fill="#555"/>
+  <circle cx="132" cy="66" r="12" fill="#a0a09a" stroke="#777" stroke-width="1.5"/>
+  <circle cx="132" cy="66" r="7"  fill="#111"/><circle cx="132" cy="66" r="2" fill="#555"/>
+  <circle cx="169" cy="66" r="12" fill="#a0a09a" stroke="#777" stroke-width="1.5"/>
+  <circle cx="169" cy="66" r="7"  fill="#111"/><circle cx="169" cy="66" r="2" fill="#555"/>
+  <circle cx="205" cy="66" r="12" fill="#a0a09a" stroke="#777" stroke-width="1.5"/>
+  <circle cx="205" cy="66" r="7"  fill="#111"/><circle cx="205" cy="66" r="2" fill="#555"/>
+  <circle cx="242" cy="66" r="12" fill="#a0a09a" stroke="#777" stroke-width="1.5"/>
+  <circle cx="242" cy="66" r="7"  fill="#111"/><circle cx="242" cy="66" r="2" fill="#555"/>
+  <circle cx="279" cy="66" r="12" fill="#a0a09a" stroke="#777" stroke-width="1.5"/>
+  <circle cx="279" cy="66" r="7"  fill="#111"/><circle cx="279" cy="66" r="2" fill="#555"/>
 
-  <circle cx="53"  cy="68" r="13" fill="#a8a5a0" stroke="#888" stroke-width="1.5"/>
-  <circle cx="53"  cy="68" r="8"  fill="#111"/>
-  <circle cx="53"  cy="68" r="2.5" fill="#555"/>
+  <!-- CHANNEL LED PLACEHOLDERS  y=92px -->
+  <circle cx="21"  cy="92" r="4" fill="#661010"/>
+  <circle cx="58"  cy="92" r="4" fill="#661010"/>
+  <circle cx="95"  cy="92" r="4" fill="#661010"/>
+  <circle cx="132" cy="92" r="4" fill="#661010"/>
+  <circle cx="169" cy="92" r="4" fill="#661010"/>
+  <circle cx="205" cy="92" r="4" fill="#661010"/>
+  <circle cx="242" cy="92" r="4" fill="#661010"/>
+  <circle cx="279" cy="92" r="4" fill="#661010"/>
 
-  <circle cx="92"  cy="68" r="13" fill="#a8a5a0" stroke="#888" stroke-width="1.5"/>
-  <circle cx="92"  cy="68" r="8"  fill="#111"/>
-  <circle cx="92"  cy="68" r="2.5" fill="#555"/>
+  <!-- ===== CONTROLS SECTION  y=109-198px ===== -->
 
-  <circle cx="131" cy="68" r="13" fill="#a8a5a0" stroke="#888" stroke-width="1.5"/>
-  <circle cx="131" cy="68" r="8"  fill="#111"/>
-  <circle cx="131" cy="68" r="2.5" fill="#555"/>
+  <!-- Labels row  y=120px -->
+  <text x="21"  y="120" font-family="sans-serif" font-size="7" fill="#555" text-anchor="middle">CLK/CV</text>
+  <text x="86"  y="120" font-family="sans-serif" font-size="7" fill="#555" text-anchor="middle">OFFSET</text>
+  <text x="140" y="120" font-family="sans-serif" font-size="7" fill="#555" text-anchor="middle">ATTEN</text>
+  <text x="195" y="120" font-family="sans-serif" font-size="7" fill="#555" text-anchor="middle">DIVIDE</text>
+  <text x="235" y="120" font-family="sans-serif" font-size="7" fill="#555" text-anchor="middle">MUTE</text>
+  <text x="258" y="120" font-family="sans-serif" font-size="7" fill="#555" text-anchor="middle">LEN</text>
+  <text x="282" y="120" font-family="sans-serif" font-size="7" fill="#555" text-anchor="middle">SHIFT</text>
 
-  <circle cx="170" cy="68" r="13" fill="#a8a5a0" stroke="#888" stroke-width="1.5"/>
-  <circle cx="170" cy="68" r="8"  fill="#111"/>
-  <circle cx="170" cy="68" r="2.5" fill="#555"/>
+  <!-- CLK jack placeholder  y=137px -->
+  <circle cx="21" cy="137" r="12" fill="#a0a09a" stroke="#777" stroke-width="1.5"/>
+  <circle cx="21" cy="137" r="7"  fill="#111"/><circle cx="21" cy="137" r="2" fill="#555"/>
 
-  <circle cx="208" cy="68" r="13" fill="#a8a5a0" stroke="#888" stroke-width="1.5"/>
-  <circle cx="208" cy="68" r="8"  fill="#111"/>
-  <circle cx="208" cy="68" r="2.5" fill="#555"/>
+  <!-- Switch placeholder  x=42-58 y=124-166px -->
+  <rect x="42" y="124" width="16" height="42" rx="3" fill="#c8c5be" stroke="#999" stroke-width="1"/>
+  <rect x="45" y="127" width="10" height="14" rx="2" fill="#111"/>
+  <rect x="45" y="144" width="10" height="14" rx="2" fill="#aaa"/>
 
-  <circle cx="247" cy="68" r="13" fill="#a8a5a0" stroke="#888" stroke-width="1.5"/>
-  <circle cx="247" cy="68" r="8"  fill="#111"/>
-  <circle cx="247" cy="68" r="2.5" fill="#555"/>
+  <!-- RST label  y=164px -->
+  <text x="21" y="164" font-family="sans-serif" font-size="7" fill="#555" text-anchor="middle">RST/HLD</text>
 
-  <circle cx="286" cy="68" r="13" fill="#a8a5a0" stroke="#888" stroke-width="1.5"/>
-  <circle cx="286" cy="68" r="8"  fill="#111"/>
-  <circle cx="286" cy="68" r="2.5" fill="#555"/>
+  <!-- RST jack placeholder  y=176px -->
+  <circle cx="21" cy="176" r="12" fill="#a0a09a" stroke="#777" stroke-width="1.5"/>
+  <circle cx="21" cy="176" r="7"  fill="#111"/><circle cx="21" cy="176" r="2" fill="#555"/>
 
-  <!-- Channel LEDs  y=93 -->
-  <circle cx="14"  cy="93" r="5" fill="#991515"/>
-  <circle cx="53"  cy="93" r="5" fill="#991515"/>
-  <circle cx="92"  cy="93" r="5" fill="#991515"/>
-  <circle cx="131" cy="93" r="5" fill="#991515"/>
-  <circle cx="170" cy="93" r="5" fill="#991515"/>
-  <circle cx="208" cy="93" r="5" fill="#991515"/>
-  <circle cx="247" cy="93" r="5" fill="#991515"/>
-  <circle cx="286" cy="93" r="5" fill="#991515"/>
+  <!-- Knob placeholders  y=158px, r=17 -->
+  <circle cx="86"  cy="158" r="17" fill="#ccc" stroke="#999" stroke-width="1"/>
+  <circle cx="86"  cy="158" r="12" fill="#1e1e1e" stroke="#444" stroke-width="0.75"/>
+  <line x1="86"  y1="143" x2="86"  y2="150" stroke="#ddd" stroke-width="2"/>
+  <circle cx="140" cy="158" r="17" fill="#ccc" stroke="#999" stroke-width="1"/>
+  <circle cx="140" cy="158" r="12" fill="#1e1e1e" stroke="#444" stroke-width="0.75"/>
+  <line x1="140" y1="143" x2="140" y2="150" stroke="#ddd" stroke-width="2"/>
+  <circle cx="195" cy="158" r="17" fill="#ccc" stroke="#999" stroke-width="1"/>
+  <circle cx="195" cy="158" r="12" fill="#1e1e1e" stroke="#444" stroke-width="0.75"/>
+  <line x1="195" y1="143" x2="195" y2="150" stroke="#ddd" stroke-width="2"/>
 
-  <!-- LED glow rings -->
-  <circle cx="14"  cy="93" r="5" fill="none" stroke="#cc3030" stroke-width="1"/>
-  <circle cx="53"  cy="93" r="5" fill="none" stroke="#cc3030" stroke-width="1"/>
-  <circle cx="92"  cy="93" r="5" fill="none" stroke="#cc3030" stroke-width="1"/>
-  <circle cx="131" cy="93" r="5" fill="none" stroke="#cc3030" stroke-width="1"/>
-  <circle cx="170" cy="93" r="5" fill="none" stroke="#cc3030" stroke-width="1"/>
-  <circle cx="208" cy="93" r="5" fill="none" stroke="#cc3030" stroke-width="1"/>
-  <circle cx="247" cy="93" r="5" fill="none" stroke="#cc3030" stroke-width="1"/>
-  <circle cx="286" cy="93" r="5" fill="none" stroke="#cc3030" stroke-width="1"/>
+  <!-- Mode button placeholders row 1  y=137px, r=12 -->
+  <circle cx="235" cy="137" r="12" fill="#ccc" stroke="#aaa" stroke-width="1"/>
+  <circle cx="258" cy="137" r="12" fill="#ccc" stroke="#aaa" stroke-width="1"/>
+  <circle cx="282" cy="137" r="12" fill="#ccc" stroke="#aaa" stroke-width="1"/>
 
-  <!-- ══════════════════════════════════════
-       CONTROLS SECTION  y=116–200
-       Left: CLK/CV jack, switch, RST/HLD jack
-       Mid: OFFSET, ATTEN, DIVIDE knobs
-       Right: 2×3 mode buttons
-  ══════════════════════════════════════ -->
+  <!-- Labels between button rows  y=155px -->
+  <text x="235" y="155" font-family="sans-serif" font-size="7" fill="#555" text-anchor="middle">SCALE</text>
+  <text x="258" y="155" font-family="sans-serif" font-size="7" fill="#555" text-anchor="middle">SAVE</text>
+  <text x="282" y="155" font-family="sans-serif" font-size="7" fill="#555" text-anchor="middle">RECALL</text>
 
-  <!-- ── Left: CLK/CV jack y=140 ── -->
-  <text x="22" y="122" font-family="sans-serif" font-size="7.5" fill="#444"
-        text-anchor="middle">CLK/CV</text>
-  <circle cx="22" cy="138" r="12" fill="#a8a5a0" stroke="#888" stroke-width="1.5"/>
-  <circle cx="22" cy="138" r="7.5" fill="#111"/>
-  <circle cx="22" cy="138" r="2"   fill="#555"/>
+  <!-- Mode button placeholders row 2  y=176px, r=12 -->
+  <circle cx="235" cy="176" r="12" fill="#ccc" stroke="#aaa" stroke-width="1"/>
+  <circle cx="258" cy="176" r="12" fill="#ccc" stroke="#aaa" stroke-width="1"/>
+  <circle cx="282" cy="176" r="12" fill="#ccc" stroke="#aaa" stroke-width="1"/>
 
-  <!-- ── Switch  (CLK / CV / SLAVE) x=44–60 y=125–170 ── -->
-  <rect x="44" y="125" width="18" height="45" rx="4"
-        fill="#c8c5be" stroke="#999" stroke-width="1.2"/>
-  <!-- upper position knob (CLK = up) -->
-  <rect x="47" y="128" width="12" height="16" rx="2.5" fill="#111"/>
-  <!-- lower ghost -->
-  <rect x="47" y="147" width="12" height="16" rx="2.5" fill="#b0ada6"/>
+  <!-- ===== SLIDERS  y=205-270px ===== -->
+  <!-- Tracks -->
+  <rect x="17"  y="205" width="8" height="65" rx="4" fill="#b8b5ae" stroke="#999" stroke-width="0.75"/>
+  <rect x="54"  y="205" width="8" height="65" rx="4" fill="#b8b5ae" stroke="#999" stroke-width="0.75"/>
+  <rect x="91"  y="205" width="8" height="65" rx="4" fill="#b8b5ae" stroke="#999" stroke-width="0.75"/>
+  <rect x="128" y="205" width="8" height="65" rx="4" fill="#b8b5ae" stroke="#999" stroke-width="0.75"/>
+  <rect x="165" y="205" width="8" height="65" rx="4" fill="#b8b5ae" stroke="#999" stroke-width="0.75"/>
+  <rect x="201" y="205" width="8" height="65" rx="4" fill="#b8b5ae" stroke="#999" stroke-width="0.75"/>
+  <rect x="238" y="205" width="8" height="65" rx="4" fill="#b8b5ae" stroke="#999" stroke-width="0.75"/>
+  <rect x="275" y="205" width="8" height="65" rx="4" fill="#b8b5ae" stroke="#999" stroke-width="0.75"/>
 
-  <!-- ── RST/HLD jack y=174 ── -->
-  <text x="22" y="161" font-family="sans-serif" font-size="7.5" fill="#444"
-        text-anchor="middle">RST/HLD</text>
-  <circle cx="22" cy="177" r="12" fill="#a8a5a0" stroke="#888" stroke-width="1.5"/>
-  <circle cx="22" cy="177" r="7.5" fill="#111"/>
-  <circle cx="22" cy="177" r="2"   fill="#555"/>
+  <!-- ===== STEP BUTTONS  y=279+ ===== -->
+  <!-- Step LED row 1  y=291px -->
+  <circle cx="21"  cy="291" r="4" fill="#661010"/>
+  <circle cx="58"  cy="291" r="4" fill="#661010"/>
+  <circle cx="95"  cy="291" r="4" fill="#661010"/>
+  <circle cx="132" cy="291" r="4" fill="#661010"/>
+  <circle cx="169" cy="291" r="4" fill="#661010"/>
+  <circle cx="205" cy="291" r="4" fill="#661010"/>
+  <circle cx="242" cy="291" r="4" fill="#661010"/>
+  <circle cx="279" cy="291" r="4" fill="#661010"/>
 
-  <!-- ── OFFSET knob x=91 y=158 ── -->
-  <text x="91" y="122" font-family="sans-serif" font-size="7.5" fill="#444"
-        text-anchor="middle">OFFSET</text>
-  <circle cx="91"  cy="158" r="19" fill="#ccc" stroke="#999" stroke-width="1.2"/>
-  <circle cx="91"  cy="158" r="14" fill="#1e1e1e" stroke="#444" stroke-width="1"/>
-  <line x1="91"  y1="141" x2="91"  y2="149" stroke="#ddd" stroke-width="2.5"/>
+  <!-- Step buttons row 1  y=312px, r=12 -->
+  <circle cx="21"  cy="312" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
+  <circle cx="58"  cy="312" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
+  <circle cx="95"  cy="312" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
+  <circle cx="132" cy="312" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
+  <circle cx="169" cy="312" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
+  <circle cx="205" cy="312" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
+  <circle cx="242" cy="312" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
+  <circle cx="279" cy="312" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
 
-  <!-- ── ATTEN knob x=150 y=158 ── -->
-  <text x="150" y="122" font-family="sans-serif" font-size="7.5" fill="#444"
-        text-anchor="middle">ATTEN</text>
-  <circle cx="150" cy="158" r="19" fill="#ccc" stroke="#999" stroke-width="1.2"/>
-  <circle cx="150" cy="158" r="14" fill="#1e1e1e" stroke="#444" stroke-width="1"/>
-  <line x1="150" y1="141" x2="150" y2="149" stroke="#ddd" stroke-width="2.5"/>
+  <!-- Step LED row 2  y=333px -->
+  <circle cx="21"  cy="333" r="4" fill="#661010"/>
+  <circle cx="58"  cy="333" r="4" fill="#661010"/>
+  <circle cx="95"  cy="333" r="4" fill="#661010"/>
+  <circle cx="132" cy="333" r="4" fill="#661010"/>
+  <circle cx="169" cy="333" r="4" fill="#661010"/>
+  <circle cx="205" cy="333" r="4" fill="#661010"/>
+  <circle cx="242" cy="333" r="4" fill="#661010"/>
+  <circle cx="279" cy="333" r="4" fill="#661010"/>
 
-  <!-- ── DIVIDE knob x=200 y=158 ── -->
-  <text x="200" y="122" font-family="sans-serif" font-size="7.5" fill="#444"
-        text-anchor="middle">DIVIDE</text>
-  <circle cx="200" cy="158" r="19" fill="#ccc" stroke="#999" stroke-width="1.2"/>
-  <circle cx="200" cy="158" r="14" fill="#1e1e1e" stroke="#444" stroke-width="1"/>
-  <line x1="200" y1="141" x2="200" y2="149" stroke="#ddd" stroke-width="2.5"/>
+  <!-- Step buttons row 2  y=354px, r=12 (bottom edge = 366, safe) -->
+  <circle cx="21"  cy="354" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
+  <circle cx="58"  cy="354" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
+  <circle cx="95"  cy="354" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
+  <circle cx="132" cy="354" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
+  <circle cx="169" cy="354" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
+  <circle cx="205" cy="354" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
+  <circle cx="242" cy="354" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
+  <circle cx="279" cy="354" r="12" fill="#383838" stroke="#222" stroke-width="1"/>
 
-  <!-- ── MODE BUTTONS 2×3 right cluster ── -->
-  <!-- label row above: x 237 258 281, y=122 -->
-  <text x="237" y="122" font-family="sans-serif" font-size="7.5" fill="#444" text-anchor="middle">MUTE</text>
-  <text x="261" y="122" font-family="sans-serif" font-size="7.5" fill="#444" text-anchor="middle">LEN</text>
-  <text x="284" y="122" font-family="sans-serif" font-size="7.5" fill="#444" text-anchor="middle">SHIFT</text>
-
-  <!-- Row 1 buttons  y=138 r=14 -->
-  <circle cx="237" cy="138" r="14" fill="#d2cfca" stroke="#aaa" stroke-width="1.2"/>
-  <circle cx="237" cy="138" r="9"  fill="#bbb9b4"/>
-  <circle cx="261" cy="138" r="14" fill="#d2cfca" stroke="#aaa" stroke-width="1.2"/>
-  <circle cx="261" cy="138" r="9"  fill="#bbb9b4"/>
-  <circle cx="284" cy="138" r="14" fill="#d2cfca" stroke="#aaa" stroke-width="1.2"/>
-  <circle cx="284" cy="138" r="9"  fill="#bbb9b4"/>
-
-  <!-- label row between: y=158 -->
-  <text x="237" y="158" font-family="sans-serif" font-size="7.5" fill="#444" text-anchor="middle">SCALE</text>
-  <text x="261" y="158" font-family="sans-serif" font-size="7.5" fill="#444" text-anchor="middle">SAVE</text>
-  <text x="284" y="158" font-family="sans-serif" font-size="7.5" fill="#444" text-anchor="middle">RECALL</text>
-
-  <!-- Row 2 buttons  y=175 r=14 -->
-  <circle cx="237" cy="175" r="14" fill="#d2cfca" stroke="#aaa" stroke-width="1.2"/>
-  <circle cx="237" cy="175" r="9"  fill="#bbb9b4"/>
-  <circle cx="261" cy="175" r="14" fill="#d2cfca" stroke="#aaa" stroke-width="1.2"/>
-  <circle cx="261" cy="175" r="9"  fill="#bbb9b4"/>
-  <circle cx="284" cy="175" r="14" fill="#d2cfca" stroke="#aaa" stroke-width="1.2"/>
-  <circle cx="284" cy="175" r="9"  fill="#bbb9b4"/>
-
-  <!-- ══════════════════════════════════════
-       8 SLIDERS  y=205–285
-  ══════════════════════════════════════ -->
-  <!-- Track backgrounds -->
-  <rect x="10"  y="205" width="8" height="80" rx="4" fill="#bdb9b2" stroke="#999" stroke-width="0.75"/>
-  <rect x="49"  y="205" width="8" height="80" rx="4" fill="#bdb9b2" stroke="#999" stroke-width="0.75"/>
-  <rect x="88"  y="205" width="8" height="80" rx="4" fill="#bdb9b2" stroke="#999" stroke-width="0.75"/>
-  <rect x="127" y="205" width="8" height="80" rx="4" fill="#bdb9b2" stroke="#999" stroke-width="0.75"/>
-  <rect x="166" y="205" width="8" height="80" rx="4" fill="#bdb9b2" stroke="#999" stroke-width="0.75"/>
-  <rect x="204" y="205" width="8" height="80" rx="4" fill="#bdb9b2" stroke="#999" stroke-width="0.75"/>
-  <rect x="243" y="205" width="8" height="80" rx="4" fill="#bdb9b2" stroke="#999" stroke-width="0.75"/>
-  <rect x="282" y="205" width="8" height="80" rx="4" fill="#bdb9b2" stroke="#999" stroke-width="0.75"/>
-
-  <!-- Red fill (lower half, indicating mid value) -->
-  <rect x="10"  y="245" width="8" height="40" rx="0" fill="#992020"/>
-  <rect x="49"  y="245" width="8" height="40" rx="0" fill="#992020"/>
-  <rect x="88"  y="245" width="8" height="40" rx="0" fill="#992020"/>
-  <rect x="127" y="245" width="8" height="40" rx="0" fill="#992020"/>
-  <rect x="166" y="245" width="8" height="40" rx="0" fill="#992020"/>
-  <rect x="204" y="245" width="8" height="40" rx="0" fill="#992020"/>
-  <rect x="243" y="245" width="8" height="40" rx="0" fill="#992020"/>
-  <rect x="282" y="245" width="8" height="40" rx="0" fill="#992020"/>
-
-  <!-- Slider handles (mid position y=240) -->
-  <rect x="5"   y="240" width="18" height="10" rx="2.5" fill="#2e2e2e" stroke="#1a1a1a" stroke-width="0.75"/>
-  <rect x="44"  y="240" width="18" height="10" rx="2.5" fill="#2e2e2e" stroke="#1a1a1a" stroke-width="0.75"/>
-  <rect x="83"  y="240" width="18" height="10" rx="2.5" fill="#2e2e2e" stroke="#1a1a1a" stroke-width="0.75"/>
-  <rect x="122" y="240" width="18" height="10" rx="2.5" fill="#2e2e2e" stroke="#1a1a1a" stroke-width="0.75"/>
-  <rect x="161" y="240" width="18" height="10" rx="2.5" fill="#2e2e2e" stroke="#1a1a1a" stroke-width="0.75"/>
-  <rect x="199" y="240" width="18" height="10" rx="2.5" fill="#2e2e2e" stroke="#1a1a1a" stroke-width="0.75"/>
-  <rect x="238" y="240" width="18" height="10" rx="2.5" fill="#2e2e2e" stroke="#1a1a1a" stroke-width="0.75"/>
-  <rect x="277" y="240" width="18" height="10" rx="2.5" fill="#2e2e2e" stroke="#1a1a1a" stroke-width="0.75"/>
-
-  <!-- Centre grip lines on handles -->
-  <line x1="8"   y1="245" x2="20"  y2="245" stroke="#666" stroke-width="0.75"/>
-  <line x1="47"  y1="245" x2="59"  y2="245" stroke="#666" stroke-width="0.75"/>
-  <line x1="86"  y1="245" x2="98"  y2="245" stroke="#666" stroke-width="0.75"/>
-  <line x1="125" y1="245" x2="137" y2="245" stroke="#666" stroke-width="0.75"/>
-  <line x1="164" y1="245" x2="176" y2="245" stroke="#666" stroke-width="0.75"/>
-  <line x1="202" y1="245" x2="214" y2="245" stroke="#666" stroke-width="0.75"/>
-  <line x1="241" y1="245" x2="253" y2="245" stroke="#666" stroke-width="0.75"/>
-  <line x1="280" y1="245" x2="292" y2="245" stroke="#666" stroke-width="0.75"/>
-
-  <!-- ══════════════════════════════════════
-       STEP BUTTONS  y=300–370
-       Row 1 (steps 1–8): LEDs y=298, buttons y=315 r=13
-       Row 2 (steps 9–16): labels y=343, buttons y=357 r=12
-  ══════════════════════════════════════ -->
-
-  <!-- Step LEDs row 1  y=298 -->
-  <circle cx="14"  cy="298" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-  <circle cx="53"  cy="298" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-  <circle cx="92"  cy="298" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-  <circle cx="131" cy="298" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-  <circle cx="170" cy="298" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-  <circle cx="208" cy="298" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-  <circle cx="247" cy="298" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-  <circle cx="286" cy="298" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-
-  <!-- Row 1 buttons  y=315, r=13 -->
-  <circle cx="14"  cy="315" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="14"  cy="315" r="8"  fill="#363636"/>
-  <circle cx="53"  cy="315" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="53"  cy="315" r="8"  fill="#363636"/>
-  <circle cx="92"  cy="315" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="92"  cy="315" r="8"  fill="#363636"/>
-  <circle cx="131" cy="315" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="131" cy="315" r="8"  fill="#363636"/>
-  <circle cx="170" cy="315" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="170" cy="315" r="8"  fill="#363636"/>
-  <circle cx="208" cy="315" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="208" cy="315" r="8"  fill="#363636"/>
-  <circle cx="247" cy="315" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="247" cy="315" r="8"  fill="#363636"/>
-  <circle cx="286" cy="315" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="286" cy="315" r="8"  fill="#363636"/>
-
-  <!-- Step LEDs row 2  y=333 -->
-  <circle cx="14"  cy="333" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-  <circle cx="53"  cy="333" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-  <circle cx="92"  cy="333" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-  <circle cx="131" cy="333" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-  <circle cx="170" cy="333" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-  <circle cx="208" cy="333" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-  <circle cx="247" cy="333" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-  <circle cx="286" cy="333" r="4" fill="#991515" stroke="#cc3030" stroke-width="0.75"/>
-
-  <!-- Row 2 buttons  y=349, r=13 -->
-  <circle cx="14"  cy="349" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="14"  cy="349" r="8"  fill="#363636"/>
-  <circle cx="53"  cy="349" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="53"  cy="349" r="8"  fill="#363636"/>
-  <circle cx="92"  cy="349" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="92"  cy="349" r="8"  fill="#363636"/>
-  <circle cx="131" cy="349" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="131" cy="349" r="8"  fill="#363636"/>
-  <circle cx="170" cy="349" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="170" cy="349" r="8"  fill="#363636"/>
-  <circle cx="208" cy="349" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="208" cy="349" r="8"  fill="#363636"/>
-  <circle cx="247" cy="349" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="247" cy="349" r="8"  fill="#363636"/>
-  <circle cx="286" cy="349" r="13" fill="#404040" stroke="#2a2a2a" stroke-width="1.2"/>
-  <circle cx="286" cy="349" r="8"  fill="#363636"/>
-
-  <!-- Row 2 step function labels  y=368 -->
-  <text x="14"  y="368" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">CLEAR</text>
-  <text x="53"  y="368" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">SMOOTH</text>
-  <text x="92"  y="368" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">RND</text>
-  <text x="131" y="368" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">FREEZE</text>
-  <text x="170" y="368" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">FWD</text>
-  <text x="208" y="368" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">REV</text>
-  <text x="247" y="368" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">PEND</text>
-  <text x="286" y="368" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">RND SEQ</text>
+  <!-- Step function labels  y=371px -->
+  <text x="21"  y="371" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">CLEAR</text>
+  <text x="58"  y="371" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">SMOOTH</text>
+  <text x="95"  y="371" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">RND</text>
+  <text x="132" y="371" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">FREEZE</text>
+  <text x="169" y="371" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">FWD</text>
+  <text x="205" y="371" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">REV</text>
+  <text x="242" y="371" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">PEND</text>
+  <text x="279" y="371" font-family="sans-serif" font-size="6.5" fill="#444" text-anchor="middle">RND SEQ</text>
 
 </svg>
