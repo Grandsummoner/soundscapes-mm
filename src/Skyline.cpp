@@ -59,7 +59,8 @@ struct Skyline : Module {
     enum InputIds  { CLOCK_INPUT, RESET_INPUT, NUM_INPUTS };
     enum OutputIds { ENUMS(CV_OUTPUTS, 8), NUM_OUTPUTS };
     enum LightIds  {
-        ENUMS(STEP_LIGHTS, 16),
+        ENUMS(STEP_LIGHTS, 16),    // red  — playhead position
+        ENUMS(EDIT_LIGHTS, 16),    // yellow — editStep lock indicator
         ENUMS(CHANNEL_LIGHTS, 8),
         MUTE_LIGHT, LENGTH_LIGHT, SHIFT_LIGHT,
         SCALE_LIGHT, SAVE_LIGHT, RECALL_LIGHT,
@@ -82,6 +83,16 @@ struct Skyline : Module {
     // Live recording enable per channel (right-click toggle)
     bool liveRecord[8] = {};
 
+    // Slider values captured when LENGTH mode is first latched.
+    // seqLength only updates if slider moves > deadband from snapshot.
+    float lengthSliderSnapshot[8] = {-1.f,-1.f,-1.f,-1.f,-1.f,-1.f,-1.f,-1.f};
+    static constexpr float LENGTH_DEADBAND = 0.15f;  // ~0.5 steps
+
+    // Slider value captured when SCALE mode is first latched.
+    // scaleIndex only updates if slider moves > deadband from snapshot.
+    float scaleSliderSnapshot = -1.f;
+    static constexpr float SCALE_DEADBAND = 0.15f;  // ~0.5 scale steps
+
     // ── Presets ───────────────────────────────────────────────
     float presetCV[16][8][16] = {};
     int   presetLen[16][8]    = {};
@@ -100,6 +111,7 @@ struct Skyline : Module {
     // click it again to unlock. While locked, all 8 sliders immediately
     // write to stepCV[ch][editStep] for all 8 channels every frame.
     int editStep = -1;
+    int prevSelectedChan = 0;  // track channel changes for SCALE re-snapshot
 
     // ── Triggers ─────────────────────────────────────────────
     dsp::SchmittTrigger clockTrig, resetTrig, stepTrig[16];
@@ -184,6 +196,27 @@ struct Skyline : Module {
                             (!prevSaveMode   && saveMode)   ||
                             (!prevRecallMode && recallMode);
         if (anyActivated) editStep = -1;
+
+        // Capture slider positions the moment LENGTH is latched —
+        // length only changes if user moves slider AWAY from that position
+        if (!prevLengthMode && lengthMode) {
+            for (int ch = 0; ch < 8; ch++)
+                lengthSliderSnapshot[ch] = params[SLIDER_PARAMS + ch].getValue();
+        }
+        if (prevLengthMode && !lengthMode) {
+            for (int ch = 0; ch < 8; ch++)
+                lengthSliderSnapshot[ch] = -1.f;
+        }
+
+        // Same deadband protection for SCALE.
+        // Re-snapshot whenever: SCALE is first latched, OR selectedChan changes
+        // while SCALE is already active (so switching channels doesn't jump).
+        bool scaleChannelChanged = scaleMode && (selectedChan != prevSelectedChan);
+        if ((!prevScaleMode && scaleMode) || scaleChannelChanged)
+            scaleSliderSnapshot = params[SLIDER_PARAMS + selectedChan].getValue();
+        if (prevScaleMode && !scaleMode)
+            scaleSliderSnapshot = -1.f;
+        prevSelectedChan = selectedChan;
 
         bool anyReleased = (prevMuteMode   && !muteMode)   ||
                            (prevLengthMode && !lengthMode) ||
@@ -313,25 +346,32 @@ struct Skyline : Module {
 
         // ============================================================
         // 4. LENGTH MODE — sliders set per-channel length
-        // Manual p.5: "adjust a step slider to control amount of steps"
-        // Slider range 0–5V → 1–16 steps
-        // Each channel's slider controls its own length independently.
+        // Only updates if slider has moved > LENGTH_DEADBAND from the
+        // position it was at when LENGTH was latched. This prevents
+        // the length from jumping the instant LENGTH is clicked.
         // ============================================================
         if (lengthMode) {
             for (int ch = 0; ch < 8; ch++) {
                 float sv = params[SLIDER_PARAMS + ch].getValue();
-                int newLen = clamp((int)(sv / 5.0f * 16.f) + 1, 1, 16);
-                seqLength[ch] = newLen;
-                if (seqPos[ch] >= seqLength[ch]) seqPos[ch] = 0;
+                float snap = lengthSliderSnapshot[ch];
+                if (snap < 0.f || std::abs(sv - snap) > LENGTH_DEADBAND) {
+                    int newLen = clamp((int)(sv / 5.0f * 16.f) + 1, 1, 16);
+                    seqLength[ch] = newLen;
+                    if (seqPos[ch] >= seqLength[ch]) seqPos[ch] = 0;
+                }
             }
         }
 
         // ============================================================
         // 5. SCALE MODE — selected channel's slider sets its scale
+        // Only updates if slider has moved > SCALE_DEADBAND from snapshot.
         // ============================================================
         if (scaleMode) {
-            float sv = params[SLIDER_PARAMS + selectedChan].getValue();
-            scaleIndex[selectedChan] = clamp((int)(sv / 5.0f * 15.5f), 0, 15);
+            float sv   = params[SLIDER_PARAMS + selectedChan].getValue();
+            float snap = scaleSliderSnapshot;
+            if (snap < 0.f || std::abs(sv - snap) > SCALE_DEADBAND) {
+                scaleIndex[selectedChan] = clamp((int)(sv / 5.0f * 15.5f), 0, 15);
+            }
         }
 
         // ============================================================
@@ -415,27 +455,26 @@ struct Skyline : Module {
 
         // ============================================================
         // 9. STEP LIGHTS
-        // Full bright red  = current playhead position
-        // Blinking yellow  = editStep locked for editing (override color
-        //                    by setting brightness > 1.0 — VCV clamps but
-        //                    we use a separate approach: just full bright)
-        // Dim red          = in-length, not current
-        // Off              = outside sequence length
-        // Muted            = very dim
+        // STEP_LIGHTS (red)    = playhead position for selectedChan
+        // EDIT_LIGHTS (yellow) = editStep locked for editing
+        // Separate overlapping lights so colours never conflict.
         // ============================================================
         for (int i = 0; i < 16; i++) {
             bool isCurrent = (i == seqPos[selectedChan]);
             bool isEdit    = (i == editStep);
             bool isMuted   = stepMuted[selectedChan][i];
             bool inLen     = (i < seqLength[selectedChan]);
-            float b;
-            if      (isEdit && isCurrent) b = 1.0f;   // both: full bright
-            else if (isEdit)              b = 0.6f;   // edit lock: medium bright
-            else if (isCurrent)          b = 1.0f;   // playhead: full bright
-            else if (!inLen)             b = 0.0f;
-            else if (isMuted)            b = 0.04f;
-            else                         b = 0.15f;
-            lights[STEP_LIGHTS + i].setBrightness(b);
+
+            // Red playhead light
+            float rb;
+            if      (isCurrent)  rb = 1.0f;
+            else if (!inLen)     rb = 0.0f;
+            else if (isMuted)    rb = 0.04f;
+            else                 rb = 0.12f;
+            lights[STEP_LIGHTS + i].setBrightness(rb);
+
+            // Yellow edit-lock light (independent)
+            lights[EDIT_LIGHTS + i].setBrightness(isEdit ? 0.8f : 0.0f);
         }
     }
 
@@ -534,7 +573,9 @@ struct Skyline : Module {
             frozen[ch]=false; glideCV[ch]=0.f;
             liveRecord[ch]=false;
         }
-        selectedChan=0; divCount=0; editStep=-1;
+        selectedChan=0; prevSelectedChan=0; divCount=0; editStep=-1;
+        scaleSliderSnapshot = -1.f;
+        for (int ch=0; ch<8; ch++) lengthSliderSnapshot[ch] = -1.f;
     }
 };
 
@@ -658,6 +699,11 @@ struct SkylineWidget : ModuleWidget {
             addParam(createLightParamCentered<VCVLightButton<MediumSimpleLight<RedLight>>>(
                 mm2px(Vec(cX[i],yS2)),module,
                 Skyline::STEP_PARAMS+8+i,Skyline::STEP_LIGHTS+8+i));
+            // Yellow edit-lock lights overlaid on same positions
+            addChild(createLightCentered<SmallLight<YellowLight>>(
+                mm2px(Vec(cX[i],yS1)),module,Skyline::EDIT_LIGHTS+i));
+            addChild(createLightCentered<SmallLight<YellowLight>>(
+                mm2px(Vec(cX[i],yS2)),module,Skyline::EDIT_LIGHTS+8+i));
         }
 
         // Panel labels
