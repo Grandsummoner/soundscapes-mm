@@ -51,14 +51,39 @@ struct Skyline : Module {
     enum InputIds  { CLOCK_INPUT, RESET_INPUT, NUM_INPUTS };
     enum OutputIds { ENUMS(CV_OUTPUTS, 8), NUM_OUTPUTS };
     enum LightIds  {
-        ENUMS(STEP_LIGHTS,     16),  // tiny LED above button = playhead scanner
-        ENUMS(BUTTON_LIGHTS,   16),  // button LED = step under edit
-        ENUMS(CHANNEL_LIGHTS,   8),  // channel output activity
-        ENUMS(EDIT_RING_LIGHTS, 8),  // yellow glow ring = channel in edit mode
-        MUTE_LIGHT, LENGTH_LIGHT, SHIFT_LIGHT,
-        SCALE_LIGHT, SAVE_LIGHT, RECALL_LIGHT,
+        // RGB lights — each uses 3 consecutive IDs (R, G, B)
+        ENUMS(STEP_LIGHTS,     16*3),  // tiny LED above button = playhead (RGB)
+        ENUMS(BUTTON_LIGHTS,   16*3),  // button LED = mode colour (RGB)
+        ENUMS(CHANNEL_LIGHTS,   8*3),  // channel output LED (RGB)
+        ENUMS(EDIT_RING_LIGHTS,  8),   // yellow glow ring (single float, NanoVG)
+        ENUMS(MUTE_LIGHT,   3),        // latch button LEDs (RGB)
+        ENUMS(LENGTH_LIGHT, 3),
+        ENUMS(SHIFT_LIGHT,  3),
+        ENUMS(SCALE_LIGHT,  3),
+        ENUMS(SAVE_LIGHT,   3),
+        ENUMS(RECALL_LIGHT, 3),
         NUM_LIGHTS
     };
+
+    // ── RGB helper ───────────────────────────────────────────
+    void setRGB(int baseId, float r, float g, float b) {
+        lights[baseId + 0].setBrightness(r);
+        lights[baseId + 1].setBrightness(g);
+        lights[baseId + 2].setBrightness(b);
+    }
+    void clearRGB(int baseId) { setRGB(baseId, 0.f, 0.f, 0.f); }
+
+    // ── Flash system for SAVE/RECALL ─────────────────────────
+    struct FlashEvent {
+        int   buttonIdx  = -1;
+        float timer      = 0.f;
+        float period     = 0.15f;  // seconds per half-flash
+        int   flashCount = 0;      // counts half-periods (on+off)
+        int   maxFlashes = 6;      // 3 on + 3 off
+        bool  isSave     = true;   // true=amber, false=cyan
+        bool  active     = false;
+    };
+    FlashEvent flashEvent;
 
     // ── Sequencer state ──────────────────────────────────────
     float stepCV[8][16]     = {};
@@ -163,10 +188,14 @@ struct Skyline : Module {
         if(!presetValid[slot]) return;
         for(int ch=0;ch<8;ch++){
             for(int s=0;s<16;s++) stepCV[ch][s]=presetCV[slot][ch][s];
-            seqLength[ch]=presetLen[slot][ch];
+            seqLength[ch] =presetLen[slot][ch];
             scaleIndex[ch]=presetScale[slot][ch];
-            direction[ch]=presetDir[slot][ch];
-            if(seqPos[ch]>=seqLength[ch]) seqPos[ch]=0;
+            direction[ch] =presetDir[slot][ch];
+            // Clamp seqPos only if genuinely out of bounds — do NOT reset to 0.
+            // Letting the sequence continue from its current position avoids
+            // the audible pause/jump that a hard reset causes.
+            if(seqPos[ch] >= seqLength[ch])
+                seqPos[ch] = seqLength[ch] - 1;
         }
     }
 
@@ -238,12 +267,19 @@ struct Skyline : Module {
         prevMuteMode=muteMode; prevLengthMode=lengthMode; prevShiftMode=shiftMode;
         prevScaleMode=scaleMode; prevSaveMode=saveMode; prevRecallMode=recallMode;
 
-        lights[MUTE_LIGHT].setBrightness(muteMode   ?1.f:0.f);
-        lights[LENGTH_LIGHT].setBrightness(lengthMode?1.f:0.f);
-        lights[SHIFT_LIGHT].setBrightness(shiftMode  ?1.f:0.f);
-        lights[SCALE_LIGHT].setBrightness(scaleMode  ?1.f:0.f);
-        lights[SAVE_LIGHT].setBrightness(saveMode    ?1.f:0.f);
-        lights[RECALL_LIGHT].setBrightness(recallMode ?1.f:0.f);
+        // Latch button LEDs — each its own colour
+        if (muteMode)   setRGB(MUTE_LIGHT,   0.6f,0.f,1.f);   // Purple
+        else            clearRGB(MUTE_LIGHT);
+        if (lengthMode) setRGB(LENGTH_LIGHT, 0.f,1.f,0.f);    // Green
+        else            clearRGB(LENGTH_LIGHT);
+        if (shiftMode)  setRGB(SHIFT_LIGHT,  1.f,1.f,1.f);    // White
+        else            clearRGB(SHIFT_LIGHT);
+        if (scaleMode)  setRGB(SCALE_LIGHT,  0.f,0.4f,1.f);   // Blue
+        else            clearRGB(SCALE_LIGHT);
+        if (saveMode)   setRGB(SAVE_LIGHT,   1.f,0.6f,0.f);   // Amber
+        else            clearRGB(SAVE_LIGHT);
+        if (recallMode) setRGB(RECALL_LIGHT, 0.f,1.f,1.f);    // Cyan
+        else            clearRGB(RECALL_LIGHT);
 
         bool noMode = !muteMode&&!lengthMode&&!shiftMode&&!scaleMode&&!saveMode&&!recallMode;
 
@@ -259,10 +295,14 @@ struct Skyline : Module {
             if (saveMode) {
                 savePreset(i);
                 params[SAVE_PARAM].setValue(0.f);
+                // Trigger amber flash on saved slot button
+                flashEvent = {i, 0.f, 0.15f, 0, 6, true, true};
             }
             else if (recallMode) {
                 recallPreset(i);
                 params[RECALL_PARAM].setValue(0.f);
+                // Trigger cyan flash on recalled slot button
+                flashEvent = {i, 0.f, 0.15f, 0, 6, false, true};
             }
             else if (muteMode) {
                 if (i < 8) {
@@ -436,43 +476,90 @@ struct Skyline : Module {
 
         // ============================================================
         // 9. STEP LIGHTS
-        // STEP_LIGHTS  → tiny LED above button = playhead scanner
-        //   Full bright on current step, dim on in-length steps, off outside
-        // BUTTON_LIGHTS → button LED = step under edit
-        //   Lit only when editChan is active AND this step is being edited
-        //   (either locked step or current playhead if following)
-        //   Off otherwise — buttons have no meaning outside edit mode
         // ============================================================
-        for(int i=0;i<16;i++){
-            bool isCurrent = (i == seqPos[selectedChan]);
-            bool isMuted   = stepMuted[selectedChan][i];
-            bool inLen     = (i < seqLength[selectedChan]);
+        // 9. STEP LIGHTS, BUTTON LIGHTS, CHANNEL LIGHTS — full RGB
+        // ============================================================
 
-            // Tiny LED: playhead only
+        // ── Flash event tick ──
+        bool flashOn = false;
+        if (flashEvent.active) {
+            flashEvent.timer += args.sampleTime;
+            if (flashEvent.timer >= flashEvent.period) {
+                flashEvent.timer = 0.f;
+                flashEvent.flashCount++;
+                if (flashEvent.flashCount >= flashEvent.maxFlashes)
+                    flashEvent.active = false;
+            }
+            flashOn = (flashEvent.flashCount % 2 == 0); // even = on, odd = off
+        }
+
+        for (int i = 0; i < 16; i++) {
+            bool isCurrent = (i == seqPos[editChan]);
+            bool isMuted   = stepMuted[editChan][i];
+            bool inLen     = (i < seqLength[editChan]);
+
+            // ── Tiny LED above button: playhead (always red) ──
             float tiny;
             if      (isCurrent) tiny = 1.0f;
             else if (!inLen)    tiny = 0.0f;
             else if (isMuted)   tiny = 0.04f;
             else                tiny = 0.10f;
-            lights[STEP_LIGHTS + i].setBrightness(tiny);
+            setRGB(STEP_LIGHTS + i*3, tiny, 0.f, 0.f);
 
-            // Button LED
-            float btnBright = 0.f;
-            if (lengthMode) {
-                // LENGTH: show step count for editChan (the glowing channel)
-                bool inEditLen = (i < seqLength[editChan]);
-                if      (i == seqLength[editChan] - 1) btnBright = 1.0f;
-                else if (inEditLen)                    btnBright = 0.4f;
-                else                                   btnBright = 0.0f;
-            } else {
-                // Normal: only the selected editStep is lit
-                btnBright = (i == editStep) ? 1.0f : 0.0f;
+            // ── Button LED: colour depends on active mode ──
+            // Flash event overrides everything for save/recall slot
+            if (flashEvent.active && flashEvent.buttonIdx == i && flashOn) {
+                if (flashEvent.isSave)
+                    setRGB(BUTTON_LIGHTS + i*3, 1.f, 0.6f, 0.f);  // Amber
+                else
+                    setRGB(BUTTON_LIGHTS + i*3, 0.f, 1.f, 1.f);   // Cyan
             }
-            lights[BUTTON_LIGHTS + i].setBrightness(btnBright);
+            else if (muteMode) {
+                // Purple: lit = muted
+                float b = (i < 8) ? (chanMuted[i] ? 1.f : 0.f)
+                                  : (stepMuted[editChan][i] ? 1.f : 0.f);
+                setRGB(BUTTON_LIGHTS + i*3, 0.6f*b, 0.f, 1.f*b);  // Purple
+            }
+            else if (lengthMode) {
+                // Green: show length boundary
+                bool inEditLen = (i < seqLength[editChan]);
+                float b = (i == seqLength[editChan]-1) ? 1.f : (inEditLen ? 0.4f : 0.f);
+                setRGB(BUTTON_LIGHTS + i*3, 0.f, b, 0.f);          // Green
+            }
+            else if (scaleMode) {
+                // Blue: light up selected scale button
+                float b = (i == scaleIndex[editChan]) ? 1.f : 0.f;
+                setRGB(BUTTON_LIGHTS + i*3, 0.f, 0.4f*b, 1.f*b);  // Blue
+            }
+            else if (shiftMode) {
+                // White: bottom-row buttons glow to show accessible functions
+                float b = (i >= 8) ? 0.3f : 0.f;
+                setRGB(BUTTON_LIGHTS + i*3, b, b, b);              // White dim
+            }
+            else {
+                // Normal: red on editStep only
+                float b = (i == editStep) ? 1.f : 0.f;
+                setRGB(BUTTON_LIGHTS + i*3, b, 0.f, 0.f);          // Red
+            }
+        }
+
+        // ── Channel LEDs: red=active, purple=muted, white=frozen ──
+        for (int ch = 0; ch < 8; ch++) {
+            int pos = seqPos[ch];
+            bool muted  = chanMuted[ch] || stepMuted[ch][pos];
+            bool frz    = frozen[ch];
+            float bright = (ch == editChan) ? 1.0f : 0.3f;
+
+            if (muted)
+                setRGB(CHANNEL_LIGHTS + ch*3, 0.6f*bright, 0.f, 1.f*bright); // Purple
+            else if (frz)
+                setRGB(CHANNEL_LIGHTS + ch*3, bright, bright, bright);        // White
+            else
+                setRGB(CHANNEL_LIGHTS + ch*3, bright, 0.f, 0.f);             // Red
         }
 
         // ============================================================
-        // 10. EDIT RING LIGHTS — slow glow, always one channel active
+        // 10. EDIT RING LIGHTS — slow yellow glow, always one channel
         // ============================================================
         glowPhase += args.sampleTime * 1.5f;
         if (glowPhase > 2.f * M_PI) glowPhase -= 2.f * M_PI;
@@ -712,9 +799,9 @@ struct SkylineWidget : ModuleWidget {
             ring->box.pos   = mm2px(Vec(cX[ch],yLed)).minus(ring->box.size.div(2.f));
             addChild(ring);
 
-            // Channel LED (red, small, on top of ring)
-            addChild(createLightCentered<SmallLight<RedLight>>(
-                mm2px(Vec(cX[ch],yLed)),module,Skyline::CHANNEL_LIGHTS+ch));
+            // Channel LED — RGB (red/purple/white states)
+            addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(
+                mm2px(Vec(cX[ch],yLed)),module,Skyline::CHANNEL_LIGHTS+ch*3));
         }
 
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xJack,yClk)),module,Skyline::CLOCK_INPUT));
@@ -724,17 +811,18 @@ struct SkylineWidget : ModuleWidget {
         addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(xK2,yKnob)),module,Skyline::ATTENUATE_PARAM));
         addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(xK3,yKnob)),module,Skyline::DIVIDE_PARAM));
 
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
+        // Latch buttons — RGB for per-mode colour
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<RedGreenBlueLight>>>(
             mm2px(Vec(xB1,yB1)),module,Skyline::MUTE_PARAM,  Skyline::MUTE_LIGHT));
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<RedGreenBlueLight>>>(
             mm2px(Vec(xB2,yB1)),module,Skyline::LENGTH_PARAM,Skyline::LENGTH_LIGHT));
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<RedGreenBlueLight>>>(
             mm2px(Vec(xB3,yB1)),module,Skyline::SHIFT_PARAM, Skyline::SHIFT_LIGHT));
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<RedGreenBlueLight>>>(
             mm2px(Vec(xB1,yB2)),module,Skyline::SCALE_PARAM, Skyline::SCALE_LIGHT));
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<RedGreenBlueLight>>>(
             mm2px(Vec(xB2,yB2)),module,Skyline::SAVE_PARAM,  Skyline::SAVE_LIGHT));
-        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
+        addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<RedGreenBlueLight>>>(
             mm2px(Vec(xB3,yB2)),module,Skyline::RECALL_PARAM,Skyline::RECALL_LIGHT));
 
         for(int ch=0;ch<8;ch++)
@@ -742,30 +830,26 @@ struct SkylineWidget : ModuleWidget {
                 mm2px(Vec(cX[ch]-2.37f,ySld)),module,Skyline::SLIDER_PARAMS+ch));
 
         // ── Step buttons ─────────────────────────────────────
-        // Top row (1-8): ChannelStepButton — single-click selects channel,
-        //   double-click toggles editChan (yellow glow ring on channel LED)
-        // Bottom row (9-16): standard step buttons
         for(int i=0;i<8;i++){
-            // Small red LED above top-row button = playhead indicator
-            addChild(createLightCentered<SmallLight<RedLight>>(
-                mm2px(Vec(cX[i],yS1-6.5f)),module,Skyline::STEP_LIGHTS+i));
+            // RGB tiny LED above top-row button = playhead
+            addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(
+                mm2px(Vec(cX[i],yS1-6.5f)),module,Skyline::STEP_LIGHTS+i*3));
 
-            // Top-row: ChannelStepButton handles both single-click (stepTrig)
-            // and double-click (editChan toggle) — no overlay needed
+            // Top-row: ChannelStepButton with RGB button light
             auto* csb = createLightParamCentered<ChannelStepButton>(
                 mm2px(Vec(cX[i],yS1)), module,
-                Skyline::STEP_PARAMS+i, Skyline::BUTTON_LIGHTS+i);
+                Skyline::STEP_PARAMS+i, Skyline::BUTTON_LIGHTS+i*3);
             csb->chanIndex = i;
             addParam(csb);
 
-            // Small red LED above bottom-row button = playhead indicator
-            addChild(createLightCentered<SmallLight<RedLight>>(
-                mm2px(Vec(cX[i],yS2-6.5f)),module,Skyline::STEP_LIGHTS+8+i));
+            // RGB tiny LED above bottom-row button = playhead
+            addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(
+                mm2px(Vec(cX[i],yS2-6.5f)),module,Skyline::STEP_LIGHTS+(8+i)*3));
 
-            // Bottom-row: standard light button (step lock / combo functions)
-            addParam(createLightParamCentered<VCVLightButton<MediumSimpleLight<RedLight>>>(
+            // Bottom-row: RGB button light
+            addParam(createLightParamCentered<VCVLightButton<MediumSimpleLight<RedGreenBlueLight>>>(
                 mm2px(Vec(cX[i],yS2)),module,
-                Skyline::STEP_PARAMS+8+i, Skyline::BUTTON_LIGHTS+8+i));
+                Skyline::STEP_PARAMS+8+i, Skyline::BUTTON_LIGHTS+(8+i)*3));
         }
 
         // Panel labels
