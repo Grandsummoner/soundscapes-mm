@@ -396,7 +396,7 @@ struct Skyline : Module {
             float sv   = params[SLIDER_PARAMS + editChan].getValue();
             float snap = lengthSliderSnapshot[editChan];
             if (snap < 0.f || std::abs(sv - snap) > LENGTH_DEADBAND) {
-                int newLen = clamp((int)(sv / 4.0f * 16.f) + 1, 1, 16);
+                int newLen = clamp((int)std::round(sv / 4.0f * 16.f), 1, 16);
                 seqLength[editChan] = newLen;
                 if (seqPos[editChan] >= seqLength[editChan]) seqPos[editChan] = 0;
             }
