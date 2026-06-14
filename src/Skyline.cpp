@@ -73,17 +73,17 @@ struct Skyline : Module {
     }
     void clearRGB(int baseId) { setRGB(baseId, 0.f, 0.f, 0.f); }
 
-    // ── Flash system for SAVE/RECALL ─────────────────────────
-    struct FlashEvent {
-        int   buttonIdx  = -1;
-        float timer      = 0.f;
-        float period     = 0.15f;  // seconds per half-flash
-        int   flashCount = 0;      // counts half-periods (on+off)
-        int   maxFlashes = 6;      // 3 on + 3 off
-        bool  isSave     = true;   // true=amber, false=cyan
-        bool  active     = false;
+    // ── Save/Recall animation ─────────────────────────────────
+    // SAVE: progressive amber fill buttons 0→savedSlot over 0.8s
+    // RECALL: show saved slots in amber, recalled slot in cyan briefly
+    struct SaveAnimation {
+        bool  active    = false;
+        int   slot      = -1;      // which slot was saved/recalled
+        float timer     = 0.f;
+        float duration  = 0.8f;    // total fill time
+        bool  isRecall  = false;
     };
-    FlashEvent flashEvent;
+    SaveAnimation saveAnim;
 
     // ── Sequencer state ──────────────────────────────────────
     float stepCV[8][16]     = {};
@@ -102,10 +102,11 @@ struct Skyline : Module {
     // is always selected. Default = 0 (channel 1). Cannot be cleared to -1.
     // Switch by double-clicking a DIFFERENT channel button.
     int   editChan          = 0;
-    // editStep: which step is selected for slider editing. ALWAYS >= 0
-    // within the active channel. Default = 0 (step 1).
-    // Single-click a step button to select it. Clicking same step = no change.
+    // editStep: which step slider writes to.
+    // When editStepLocked=false: follows seqPos[editChan] (OG live record)
+    // When editStepLocked=true:  locked to a specific step (step button clicked)
     int   editStep          = 0;
+    bool  editStepLocked    = false;
 
     // Glow animation phase for edit ring
     float glowPhase         = 0.f;
@@ -295,14 +296,12 @@ struct Skyline : Module {
             if (saveMode) {
                 savePreset(i);
                 params[SAVE_PARAM].setValue(0.f);
-                // Trigger amber flash on saved slot button
-                flashEvent = {i, 0.f, 0.15f, 0, 6, true, true};
+                saveAnim = {true, i, 0.f, 0.8f, false};
             }
             else if (recallMode) {
                 recallPreset(i);
                 params[RECALL_PARAM].setValue(0.f);
-                // Trigger cyan flash on recalled slot button
-                flashEvent = {i, 0.f, 0.15f, 0, 6, false, true};
+                saveAnim = {true, i, 0.f, 0.4f, true};
             }
             else if (muteMode) {
                 if (i < 8) {
@@ -346,33 +345,46 @@ struct Skyline : Module {
                 // Scale applies to editChan via slider
             }
             else {
-                // Normal mode — step buttons select which step to edit
-                // editChan stays fixed (only changes via double-click)
-                if (i < 8) {
-                    if (editStep != i) { editStep = i; prevSlider[editChan] = -1.f; }
+                // Normal mode — step buttons lock/unlock editStep
+                // Click a step = lock to that step (red LED stays on it)
+                // Click same step again = unlock (follow playhead = OG live record)
+                if (editStepLocked && editStep == i) {
+                    // Same step: unlock, go back to live record
+                    editStepLocked = false;
+                    editStep = seqPos[editChan];
+                    prevSlider[editChan] = -1.f;
                 } else {
-                    if (editStep != i) { editStep = i; prevSlider[editChan] = -1.f; }
+                    // Different step or not locked: lock to this step
+                    editStep = i;
+                    editStepLocked = true;
+                    prevSlider[editChan] = -1.f;
                 }
             }
         }
 
         // ============================================================
-        // 3. EDIT MODE — slider writes to stepCV[editChan][editStep]
-        //    ONLY when the slider has actually moved since last frame.
-        //    This keeps each step's CV independent — advancing the
-        //    playhead to a new step does NOT overwrite it with the
-        //    current slider position.
+        // 3. EDIT MODE — slider writes to editChan's CV
+        //
+        // OG behaviour: wiggling slider while playhead moves writes to
+        // the CURRENT PLAYING STEP (live recording).
+        //
+        // Our addition: if user has clicked a step button (editStep >= 0
+        // and != seqPos[editChan]), writes go to that locked step instead.
+        //
+        // Only writes when slider actually moves (delta > threshold) so
+        // advancing to a new step never overwrites its stored value.
         // ============================================================
         if (noMode) {
             float sv = params[SLIDER_PARAMS + editChan].getValue();
-            if (prevSlider[editChan] < 0.f)
-                prevSlider[editChan] = sv;  // first frame: initialise, don't write
-            else if (std::abs(sv - prevSlider[editChan]) > 0.001f) {
-                stepCV[editChan][editStep] = sv;
+            if (prevSlider[editChan] < 0.f) {
+                prevSlider[editChan] = sv;
+            } else if (std::abs(sv - prevSlider[editChan]) > 0.001f) {
+                // OG behaviour: write to current playing step unless locked
+                int targetStep = editStepLocked ? editStep : seqPos[editChan];
+                stepCV[editChan][targetStep] = sv;
                 prevSlider[editChan] = sv;
             }
         } else {
-            // Reset prevSlider when leaving noMode so re-entry doesn't skip first move
             for (int ch = 0; ch < 8; ch++) prevSlider[ch] = -1.f;
         }
 
@@ -437,10 +449,10 @@ struct Skyline : Module {
                 if (noMode && liveRecord[ch])
                     stepCV[ch][seqPos[ch]]=params[SLIDER_PARAMS+ch].getValue();
                 advanceChannel(ch);
-                // Reset prevSlider on every step advance for editChan so that
-                // direction reversals and any seqPos jump never leave the slider
-                // stuck — first move after advance always registers
-                if (ch == editChan) prevSlider[editChan] = -1.f;
+                if (ch == editChan) {
+                    prevSlider[editChan] = -1.f;
+                    if (!editStepLocked) editStep = seqPos[editChan]; // follow playhead
+                }
             }
         }
 
@@ -480,18 +492,18 @@ struct Skyline : Module {
         // 9. STEP LIGHTS, BUTTON LIGHTS, CHANNEL LIGHTS — full RGB
         // ============================================================
 
-        // ── Flash event tick ──
-        bool flashOn = false;
-        if (flashEvent.active) {
-            flashEvent.timer += args.sampleTime;
-            if (flashEvent.timer >= flashEvent.period) {
-                flashEvent.timer = 0.f;
-                flashEvent.flashCount++;
-                if (flashEvent.flashCount >= flashEvent.maxFlashes)
-                    flashEvent.active = false;
-            }
-            flashOn = (flashEvent.flashCount % 2 == 0); // even = on, odd = off
+        // ── Save animation tick ──
+        if (saveAnim.active) {
+            saveAnim.timer += args.sampleTime;
+            if (saveAnim.timer >= saveAnim.duration) saveAnim.active = false;
         }
+        float animProgress = saveAnim.active
+            ? clamp(saveAnim.timer / saveAnim.duration, 0.f, 1.f)
+            : -1.f;
+        // How many buttons filled so far (0–16)
+        int animFill = saveAnim.active
+            ? (int)std::floor(animProgress * (saveAnim.slot + 1))
+            : -1;
 
         for (int i = 0; i < 16; i++) {
             bool isCurrent = (i == seqPos[editChan]);
@@ -506,39 +518,61 @@ struct Skyline : Module {
             else                tiny = 0.10f;
             setRGB(STEP_LIGHTS + i*3, tiny, 0.f, 0.f);
 
-            // ── Button LED: colour depends on active mode ──
-            // Flash event overrides everything for save/recall slot
-            if (flashEvent.active && flashEvent.buttonIdx == i && flashOn) {
-                if (flashEvent.isSave)
-                    setRGB(BUTTON_LIGHTS + i*3, 1.f, 0.6f, 0.f);  // Amber
+            // ── Button LED ──
+            if (saveAnim.active && !saveAnim.isRecall) {
+                // SAVE progressive fill: amber sweeps left→right up to saved slot
+                if (i <= saveAnim.slot && i <= animFill)
+                    setRGB(BUTTON_LIGHTS + i*3, 1.f, 0.6f, 0.f);    // Amber fill
                 else
-                    setRGB(BUTTON_LIGHTS + i*3, 0.f, 1.f, 1.f);   // Cyan
+                    clearRGB(BUTTON_LIGHTS + i*3);
+            }
+            else if (saveMode) {
+                // SAVE latched: all buttons dim amber — any can be a save slot
+                // Slots with saved data are brighter
+                float b = presetValid[i] ? 0.7f : 0.15f;
+                setRGB(BUTTON_LIGHTS + i*3, b, b*0.6f, 0.f);        // Amber dim/bright
+            }
+            else if (saveAnim.active && saveAnim.isRecall) {
+                // RECALL animation: recalled slot flashes cyan, others dim
+                if (i == saveAnim.slot)
+                    setRGB(BUTTON_LIGHTS + i*3, 0.f, 1.f, 1.f);     // Cyan bright
+                else if (presetValid[i])
+                    setRGB(BUTTON_LIGHTS + i*3, 0.f, 0.4f, 0.4f);   // Cyan dim
+                else
+                    clearRGB(BUTTON_LIGHTS + i*3);
+            }
+            else if (recallMode) {
+                // RECALL latched: show which slots have saved data in cyan
+                float b = presetValid[i] ? 0.8f : 0.05f;
+                setRGB(BUTTON_LIGHTS + i*3, 0.f, b, b);              // Cyan
             }
             else if (muteMode) {
                 // Purple: lit = muted
                 float b = (i < 8) ? (chanMuted[i] ? 1.f : 0.f)
                                   : (stepMuted[editChan][i] ? 1.f : 0.f);
-                setRGB(BUTTON_LIGHTS + i*3, 0.6f*b, 0.f, 1.f*b);  // Purple
+                setRGB(BUTTON_LIGHTS + i*3, 0.6f*b, 0.f, 1.f*b);   // Purple
             }
             else if (lengthMode) {
-                // Green: show length boundary
-                bool inEditLen = (i < seqLength[editChan]);
-                float b = (i == seqLength[editChan]-1) ? 1.f : (inEditLen ? 0.4f : 0.f);
-                setRGB(BUTTON_LIGHTS + i*3, 0.f, b, 0.f);          // Green
+                // Green: show length of editChan
+                float b = (i == seqLength[editChan]-1) ? 1.f
+                        : (inLen ? 0.4f : 0.f);
+                setRGB(BUTTON_LIGHTS + i*3, 0.f, b, 0.f);           // Green
             }
             else if (scaleMode) {
-                // Blue: light up selected scale button
+                // Blue: selected scale button
                 float b = (i == scaleIndex[editChan]) ? 1.f : 0.f;
-                setRGB(BUTTON_LIGHTS + i*3, 0.f, 0.4f*b, 1.f*b);  // Blue
+                setRGB(BUTTON_LIGHTS + i*3, 0.f, 0.4f*b, 1.f*b);   // Blue
             }
             else if (shiftMode) {
-                // White: bottom-row buttons glow to show accessible functions
+                // White dim: bottom-row shows accessible functions
                 float b = (i >= 8) ? 0.3f : 0.f;
-                setRGB(BUTTON_LIGHTS + i*3, b, b, b);              // White dim
+                setRGB(BUTTON_LIGHTS + i*3, b, b, b);               // White
             }
             else {
-                // Normal: red on editStep only
-                float b = (i == editStep) ? 1.f : 0.f;
+                // Normal: locked = bright red, live playhead = dim red
+                float b = 0.f;
+                if (editStepLocked && i == editStep)                b = 1.0f;
+                else if (!editStepLocked && i == seqPos[editChan]) b = 0.4f;
                 setRGB(BUTTON_LIGHTS + i*3, b, 0.f, 0.f);          // Red
             }
         }
@@ -549,7 +583,6 @@ struct Skyline : Module {
             bool muted  = chanMuted[ch] || stepMuted[ch][pos];
             bool frz    = frozen[ch];
             float bright = (ch == editChan) ? 1.0f : 0.3f;
-
             if (muted)
                 setRGB(CHANNEL_LIGHTS + ch*3, 0.6f*bright, 0.f, 1.f*bright); // Purple
             else if (frz)
@@ -610,6 +643,7 @@ struct Skyline : Module {
             for(int ch=0;ch<8;ch++) json_array_append_new(a,json_boolean(liveRecord[ch]));
         });
         json_object_set_new(root,"selectedChan",json_integer(selectedChan));
+        json_object_set_new(root,"divideParam",json_real(params[DIVIDE_PARAM].getValue()));
         return root;
     }
 
@@ -630,6 +664,8 @@ struct Skyline : Module {
         idx=0; for(int ch=0;ch<8;ch++) for(int s=0;s<16;s++) stepSmooth[ch][s]=getB("stepSmooth",idx++);
         json_t* sc=json_object_get(root,"selectedChan");
         if(sc) selectedChan=(int)json_integer_value(sc);
+        json_t* dv=json_object_get(root,"divideParam");
+        if(dv) params[DIVIDE_PARAM].setValue((float)json_real_value(dv));
     }
 
     void onRandomize(const RandomizeEvent& e) override {
@@ -644,7 +680,7 @@ struct Skyline : Module {
             glideCV[ch]=0.f;liveRecord[ch]=false;
         }
         selectedChan=0;prevSelectedChan=0;divCount=0;
-        editChan=0; editStep=0; glowPhase=0.f;
+        editChan=0; editStep=0; editStepLocked=false; glowPhase=0.f;
         scaleSliderSnapshot=-1.f;
         for(int ch=0;ch<8;ch++) lengthSliderSnapshot[ch]=-1.f;
     }
@@ -755,10 +791,11 @@ struct ChannelStepButton : VCVLightButton<MediumSimpleLight<RedLight>> {
         // Double-clicking the currently glowing channel is ignored —
         // there must always be exactly one channel in edit.
         if (m->editChan != chanIndex) {
-            m->prevSlider[chanIndex] = -1.f;  // reset delta for new channel
-            m->editChan = chanIndex;
-            m->editStep = 0;
-            m->selectedChan = chanIndex;
+            m->prevSlider[chanIndex] = -1.f;
+            m->editChan       = chanIndex;
+            m->editStep       = 0;
+            m->editStepLocked = false;  // return to live record on channel switch
+            m->selectedChan   = chanIndex;
         }
         // Same channel double-click: do nothing
         e.consume(this);
