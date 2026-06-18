@@ -112,7 +112,8 @@ struct Skyline : Module {
     float glowPhase         = 0.f;
 
     // Live recording per channel (right-click opt-in)
-    bool  liveRecord[8]     = {};
+    // Live recording is now always-on per channel (no opt-in needed) —
+    // each slider independently records to its own channel's sequence.
 
     // Deadband snapshots
     float lengthSliderSnapshot[8] = {-1.f,-1.f,-1.f,-1.f,-1.f,-1.f,-1.f,-1.f};
@@ -365,25 +366,34 @@ struct Skyline : Module {
         }
 
         // ============================================================
-        // 3. EDIT MODE — slider writes to editChan's CV
-        // Uses lastSeqPos (step that just played) during hold window
-        // so the user can wiggle the slider right after a step fires
-        // and still hit that step accurately. After hold window expires,
-        // writes to current seqPos (the new step).
+        // 3. LIVE RECORDING — all 8 sliders independently, no selection needed
+        //
+        // Each channel's slider ALWAYS live-records to that channel's own
+        // sequence, regardless of which channel is glowing (editChan).
+        // Slider 1 → channel 1, slider 2 → channel 2, simultaneously.
+        //
+        // editChan/editStep/editStepLocked are now used ONLY for precision
+        // step-locking on the currently glowing channel — if that channel
+        // has a step locked, ITS slider writes to the locked step instead
+        // of the live playhead. All OTHER channels always live-record to
+        // their current playing step (using lastSeqPos during hold window
+        // for accurate boundary timing).
         // ============================================================
         if (noMode) {
-            float sv = params[SLIDER_PARAMS + editChan].getValue();
-            if (std::abs(sv - prevSlider[editChan]) > 0.0001f) {
-                int targetStep;
-                if (editStepLocked) {
-                    targetStep = editStep;
-                } else if (stepHoldTimer > 0.f) {
-                    targetStep = lastSeqPos[editChan]; // write to step that just played
-                } else {
-                    targetStep = seqPos[editChan];     // write to current step
+            for (int ch = 0; ch < 8; ch++) {
+                float sv = params[SLIDER_PARAMS + ch].getValue();
+                if (std::abs(sv - prevSlider[ch]) > 0.0001f) {
+                    int targetStep;
+                    if (ch == editChan && editStepLocked) {
+                        targetStep = editStep;             // precision lock
+                    } else if (stepHoldTimer > 0.f) {
+                        targetStep = lastSeqPos[ch];        // step that just played
+                    } else {
+                        targetStep = seqPos[ch];            // current step
+                    }
+                    stepCV[ch][targetStep] = sv;
+                    prevSlider[ch] = sv;
                 }
-                stepCV[editChan][targetStep] = sv;
-                prevSlider[editChan] = sv;
             }
         } else {
             for (int ch = 0; ch < 8; ch++)
@@ -448,8 +458,6 @@ struct Skyline : Module {
         if (clocked) {
             for(int ch=0;ch<8;ch++){
                 if(frozen[ch]) continue;
-                if (noMode && liveRecord[ch])
-                    stepCV[ch][seqPos[ch]]=params[SLIDER_PARAMS+ch].getValue();
                 lastSeqPos[ch] = seqPos[ch]; // capture BEFORE advance
                 advanceChannel(ch);
                 if (ch == editChan && !editStepLocked)
@@ -650,9 +658,6 @@ struct Skyline : Module {
         arrF("frozen",[&](json_t* a){
             for(int ch=0;ch<8;ch++) json_array_append_new(a,json_boolean(frozen[ch]));
         });
-        arrF("liveRecord",[&](json_t* a){
-            for(int ch=0;ch<8;ch++) json_array_append_new(a,json_boolean(liveRecord[ch]));
-        });
         arrF("presetDivide",[&](json_t* a){
             for(int s=0;s<16;s++) json_array_append_new(a,json_real(presetDivide[s]));
         });
@@ -673,7 +678,6 @@ struct Skyline : Module {
         for(int ch=0;ch<8;ch++) scaleIndex[ch] =getI("scaleIndex",ch);
         for(int ch=0;ch<8;ch++) chanMuted[ch]  =getB("chanMuted",ch);
         for(int ch=0;ch<8;ch++) frozen[ch]      =getB("frozen",ch);
-        for(int ch=0;ch<8;ch++) liveRecord[ch] =getB("liveRecord",ch);
         for(int s=0;s<16;s++)  presetDivide[s]=getF("presetDivide",s);
         idx=0; for(int ch=0;ch<8;ch++) for(int s=0;s<16;s++) stepMuted[ch][s] =getB("stepMuted",idx++);
         idx=0; for(int ch=0;ch<8;ch++) for(int s=0;s<16;s++) stepSmooth[ch][s]=getB("stepSmooth",idx++);
@@ -692,7 +696,7 @@ struct Skyline : Module {
             for(int s=0;s<16;s++){stepCV[ch][s]=0.f;stepMuted[ch][s]=false;stepSmooth[ch][s]=false;}
             seqLength[ch]=16;seqPos[ch]=0;direction[ch]=0;pendDir[ch]=1;
             scaleIndex[ch]=0;chanMuted[ch]=false;frozen[ch]=false;
-            glideCV[ch]=0.f;liveRecord[ch]=false;
+            glideCV[ch]=0.f;
         }
         selectedChan=0;prevSelectedChan=0;divCount=0;
         editChan=0; editStep=0; editStepLocked=false; glowPhase=0.f;
@@ -926,20 +930,6 @@ struct SkylineWidget : ModuleWidget {
         lbl(xB1,54.5f,"SCALE",7.5f); lbl(xB2,54.5f,"SAVE",7.5f); lbl(xB3,54.5f,"RECALL",7.5f);
         const char* fn[8]={"CLEAR","SMOOTH","RND","FREEZE","FWD","REV","PEND","RNDSEQ"};
         for(int i=0;i<8;i++) lbl(cX[i],ySLbl,fn[i],7.f);
-    }
-
-    void appendContextMenu(Menu* menu) override {
-        Skyline* m = dynamic_cast<Skyline*>(module);
-        if (!m) return;
-        menu->addChild(new MenuSeparator);
-        menu->addChild(createMenuLabel("Live Record (slider follows clock)"));
-        for(int ch=0;ch<8;ch++){
-            menu->addChild(createBoolMenuItem(
-                string::f("Channel %d",ch+1),"",
-                [=]{return m->liveRecord[ch];},
-                [=](bool v){m->liveRecord[ch]=v;}
-            ));
-        }
     }
 };
 
