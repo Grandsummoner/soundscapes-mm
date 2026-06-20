@@ -13,8 +13,8 @@
   "donateUrl": "",
   "modules": [
     {
-      "slug": "Skyline",
-      "name": "Skyline-MM", 
+      "slug": "SkylineMM",
+      "name": "Skyline-MM",
       "description": "8-Channel CV Sequencer",
       "tags": [
         "Sequencer",
