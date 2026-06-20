@@ -1,16 +1,5 @@
 {
   "MetaModuleBrandName": "maybe",
   "MetaModulePluginMaintainer": "YourName",
-  "MetaModulePluginMaintainerEmail": "your-email@example.com",
-  "MetaModuleHardwareMappings": {
-    "Skyline": {
-      "AutoMap": [
-        "SLIDER_PARAMS",
-        "DIVIDE_PARAM",
-        "ATTENUATE_PARAM",
-        "OFFSET_PARAM",
-        "CLK_SWITCH_PARAM"
-      ]
-    }
-  }
+  "MetaModulePluginMaintainerEmail": "your-email@example.com"
 }
