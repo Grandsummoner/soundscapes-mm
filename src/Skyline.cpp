@@ -41,13 +41,11 @@ static float quantizeVoltage(float v, int scaleIdx) {
 // ============================================================
 struct Skyline : Module {
 // ============================================================
+    // REVERTED TO ORIGINAL WORKING DESKTOP ENUM ORDER TO PRESERVE PATCH STATE
     enum ParamIds {
-        ENUMS(SLIDER_PARAMS, 8),      // Sliders 1-6 -> Knobs A-F; Sliders 7-8 -> Trimmers y, z
-        DIVIDE_PARAM,                 // Trimmer u
-        OFFSET_PARAM,                 // Trimmer v
-        ATTENUATE_PARAM,              // Trimmer w
-        CLK_SWITCH_PARAM,             // Trimmer x
+        DIVIDE_PARAM, ATTENUATE_PARAM, OFFSET_PARAM, CLK_SWITCH_PARAM,
         MUTE_PARAM, LENGTH_PARAM, SHIFT_PARAM, SCALE_PARAM, SAVE_PARAM, RECALL_PARAM,
+        ENUMS(SLIDER_PARAMS, 8),
         ENUMS(STEP_PARAMS, 16),
         NUM_PARAMS
     };
@@ -74,7 +72,6 @@ struct Skyline : Module {
     }
     void clearRGB(int baseId) { setRGB(baseId, 0.f, 0.f, 0.f); }
 
-    // Struct optimized to avoid C++11 aggregate initialization issues
     struct SaveAnimation {
         bool  active    = false;
         int   slot      = -1;
@@ -612,15 +609,15 @@ struct Skyline : Module {
 };
 
 // ============================================================
-// SlimFader (MAPPED TO GENERIC WIDGET TO BYPASS HARDWARE PARAM AUTO-RENDERING)
+// SlimFader (MAPPED TO GENERIC WIDGET TO FORCE DRAWING ON HARDWARE DISPLAY)
 // ============================================================
-struct SlimFader : widget::Widget { // Inherits from Widget so draw() is strictly called
+struct SlimFader : widget::Widget { // Inherits from Widget so draw() is strictly called by MM
     static const int TW=6,TH=60,HW=14,HH=8;
     bool dragging=false; float dragStartY=0.f,dragStartVal=0.f;
     int  chanIndex=-1;
     Skyline* skyModule=nullptr;
     SlimFader(){box.size=Vec(HW,TH+HH);}
-    
+
     void draw(const DrawArgs& args) override {
         // Read directly from the parameter slot via module pointer
         float fillVal = 0.f;
@@ -690,6 +687,7 @@ struct EditRingLight : widget::Widget {
 
     EditRingLight() { box.size = Vec(22, 22); }
 
+    // CHANGED TO STANDARD DRAW() TO COMPLY WITH METAMODULE DISPLAY LIMITS
     void draw(const DrawArgs& args) override {
         if (!skyModule) return;
         float brightness = skyModule->lights[lightId].getBrightness();
