@@ -41,11 +41,14 @@ static float quantizeVoltage(float v, int scaleIdx) {
 // ============================================================
 struct Skyline : Module {
 // ============================================================
-    // REVERTED TO ORIGINAL WORKING DESKTOP ENUM ORDER TO PRESERVE PATCH STATE
+    // OPTIMIZED ENUM MOVED TO THE ABSOLUTE TOP FOR HARDWARE AUTO-MAPPING
     enum ParamIds {
-        DIVIDE_PARAM, ATTENUATE_PARAM, OFFSET_PARAM, CLK_SWITCH_PARAM,
+        ENUMS(SLIDER_PARAMS, 8),      // Sliders 1-6 -> Knobs A-F; Sliders 7-8 -> Trimmers y, z
+        DIVIDE_PARAM,                 // Trimmer u
+        OFFSET_PARAM,                 // Trimmer v
+        ATTENUATE_PARAM,              // Trimmer w
+        CLK_SWITCH_PARAM,             // Trimmer x
         MUTE_PARAM, LENGTH_PARAM, SHIFT_PARAM, SCALE_PARAM, SAVE_PARAM, RECALL_PARAM,
-        ENUMS(SLIDER_PARAMS, 8),
         ENUMS(STEP_PARAMS, 16),
         NUM_PARAMS
     };
@@ -609,108 +612,14 @@ struct Skyline : Module {
 };
 
 // ============================================================
-// SlimFader (MAPPED TO GENERIC WIDGET TO FORCE DRAWING ON HARDWARE DISPLAY)
+// FaderParam (EMPTY, INVISIBLE PARAMWIDGET FOR PERFORMANCE AUTOMAP DETECTION)
 // ============================================================
-struct SlimFader : widget::Widget { // Inherits from Widget so draw() is strictly called by MM
-    static const int TW=6,TH=60,HW=14,HH=8;
-    bool dragging=false; float dragStartY=0.f,dragStartVal=0.f;
-    int  chanIndex=-1;
-    Skyline* skyModule=nullptr;
-    SlimFader(){box.size=Vec(HW,TH+HH);}
-
+struct FaderParam : app::ParamWidget {
+    FaderParam() {
+        box.size = Vec(14, 68); // Exact physical dragging box size for mouse control
+    }
     void draw(const DrawArgs& args) override {
-        // Read directly from the parameter slot via module pointer
-        float fillVal = 0.f;
-        if (skyModule) {
-            fillVal = skyModule->params[Skyline::SLIDER_PARAMS + chanIndex].getValue();
-        }
-        float handleY=(1.f-fillVal)*TH, tx=(box.size.x-TW)*0.5f;
-
-        bool isTarget = skyModule && chanIndex >= 0 && chanIndex == skyModule->editChan &&
-            (skyModule->muteMode || skyModule->lengthMode ||
-             skyModule->scaleMode || skyModule->shiftMode);
-        if (isTarget) {
-            nvgBeginPath(args.vg);
-            nvgRoundedRect(args.vg, tx-3.f, HH*0.5f-3.f, TW+6.f, TH+6.f, 5.f);
-            nvgFillColor(args.vg, nvgRGBAf(0.1f,0.25f,0.6f,0.35f));
-            nvgFill(args.vg);
-        }
-
-        nvgBeginPath(args.vg); nvgRoundedRect(args.vg,tx,HH*0.5f,TW,TH,3.f);
-        nvgFillColor(args.vg,nvgRGB(0xb8,0xb5,0xae)); nvgFill(args.vg);
-        nvgBeginPath(args.vg); nvgRect(args.vg,tx,HH*0.5f+handleY,TW,TH-handleY);
-        nvgFillColor(args.vg,nvgRGB(0x99,0x20,0x20)); nvgFill(args.vg);
-        float hx=(box.size.x-HW)*0.5f;
-        nvgBeginPath(args.vg); nvgRoundedRect(args.vg,hx,handleY,HW,HH,2.f);
-        nvgFillColor(args.vg,nvgRGB(0x30,0x30,0x30)); nvgFill(args.vg);
-        nvgBeginPath(args.vg);
-        nvgMoveTo(args.vg,hx+2.f,handleY+HH*0.5f); nvgLineTo(args.vg,hx+HW-2.f,handleY+HH*0.5f);
-        nvgStrokeColor(args.vg,nvgRGB(0x80,0x80,0x80)); nvgStrokeWidth(args.vg,1.f); nvgStroke(args.vg);
-    }
-    
-    void onButton(const ButtonEvent& e) override {
-        if(e.action==GLFW_PRESS&&e.button==GLFW_MOUSE_BUTTON_LEFT){
-            dragging=true; dragStartY=e.pos.y;
-            if (skyModule) {
-                dragStartVal = skyModule->params[Skyline::SLIDER_PARAMS + chanIndex].getValue();
-            } else {
-                dragStartVal = 0.f;
-            }
-            e.consume(this);
-        }
-        if(e.action==GLFW_RELEASE) dragging=false;
-    }
-    
-    void onDragMove(const DragMoveEvent& e) override {
-        if(!dragging||!skyModule) return;
-        float sensitivity = (APP->window->getMods() & RACK_MOD_CTRL) ? (float)TH*4 : (float)TH/2;
-        float delta = -e.mouseDelta.y / sensitivity;
-        dragStartVal = clamp(dragStartVal + delta, 0.f, 1.f);
-        
-        // Write parameter directly into memory so auto-mapping and DSP process read it instantly
-        skyModule->params[Skyline::SLIDER_PARAMS + chanIndex].setValue(dragStartVal);
-    }
-    
-    void onDoubleClick(const DoubleClickEvent& e) override {
-        if (skyModule) {
-            skyModule->params[Skyline::SLIDER_PARAMS + chanIndex].setValue(0.f);
-        }
-    }
-};
-
-// ============================================================
-// EditRingLight
-// ============================================================
-struct EditRingLight : widget::Widget {
-    int     lightId  = 0;
-    Module* skyModule = nullptr;
-
-    EditRingLight() { box.size = Vec(22, 22); }
-
-    // CHANGED TO STANDARD DRAW() TO COMPLY WITH METAMODULE DISPLAY LIMITS
-    void draw(const DrawArgs& args) override {
-        if (!skyModule) return;
-        float brightness = skyModule->lights[lightId].getBrightness();
-        if (brightness <= 0.001f) return;
-
-        Vec centre = box.size.div(2.f);
-        float r = 9.5f;
-        const float NR = 0.1f, NG = 0.25f, NB = 0.6f;
-
-        NVGpaint glow = nvgRadialGradient(args.vg,
-            centre.x, centre.y, r * 0.7f, r * 1.6f,
-            nvgRGBAf(NR, NG, NB, brightness * 0.55f),
-            nvgRGBAf(NR, NG, NB, 0.f));
-        nvgBeginPath(args.vg);
-        nvgCircle(args.vg, centre.x, centre.y, r * 1.6f);
-        nvgFillPaint(args.vg, glow);
-        nvgFill(args.vg);
-
-        nvgBeginPath(args.vg);
-        nvgCircle(args.vg, centre.x, centre.y, r);
-        nvgStrokeColor(args.vg, nvgRGBAf(NR, NG, NB, brightness * 0.9f));
-        nvgStrokeWidth(args.vg, 1.8f);
-        nvgStroke(args.vg);
+        // Draw nothing! The parent SkylineWidget::draw() will draw the graphics centrally.
     }
 };
 
@@ -734,12 +643,6 @@ struct SkylineWidget : ModuleWidget {
         for(int ch=0;ch<8;ch++){
             addOutput(createOutputCentered<PJ301MPort>(
                 mm2px(Vec(cX[ch],yOut)),module,Skyline::CV_OUTPUTS+ch));
-
-            auto* ring = new EditRingLight;
-            ring->skyModule = module;
-            ring->lightId   = Skyline::EDIT_RING_LIGHTS + ch;
-            ring->box.pos   = mm2px(Vec(cX[ch],yLed)).minus(ring->box.size.div(2.f));
-            addChild(ring);
 
             addChild(createLightCentered<SmallLight<RedGreenBlueLight>>(
                 mm2px(Vec(cX[ch],yLed)),module,Skyline::CHANNEL_LIGHTS+ch*3));
@@ -765,13 +668,10 @@ struct SkylineWidget : ModuleWidget {
         addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<RedGreenBlueLight>>>(
             mm2px(Vec(xB3,yB2)),module,Skyline::RECALL_PARAM,Skyline::RECALL_LIGHT));
 
-        // Added as general Widget children instead of paramWidgets to bypass 4ms native display hiding
+        // REGISTER AS STANDARD PARAMETERS SO THE METAMODULE HARDWARE AUTO-MAPPER DETECTS THEM
         for(int ch=0;ch<8;ch++){
-            auto* sf = new SlimFader();
-            sf->box.pos = mm2px(Vec(cX[ch]-2.37f,ySld));
-            sf->chanIndex  = ch;
-            sf->skyModule  = module;
-            addChild(sf);
+            auto* fp = createParamCentered<FaderParam>(mm2px(Vec(cX[ch], ySld + 30.f)), module, Skyline::SLIDER_PARAMS + ch);
+            addParam(fp);
         }
 
         for(int i=0;i<8;i++){
@@ -810,6 +710,94 @@ struct SkylineWidget : ModuleWidget {
         lbl(xB1,54.5f,"SCALE",7.5f); lbl(xB2,54.5f,"SAVE",7.5f); lbl(xB3,54.5f,"RECALL",7.5f);
         const char* fn[8] = {"CLEAR","SMOOTH","RND","FREEZE","FWD","REV","PEND","RNDSEQ"};
         for(int i=0;i<8;i++) lbl(cX[i],ySLbl,fn[i],7.f);
+    }
+
+    // CENTRALIZED DRAWING METHOD: GUARANTEED TO BE EXECUTED NATIVELY BY THE METAMODULE DISPLAY GRAPHICS
+    void draw(const DrawArgs& args) override {
+        // Draw the background panel PNG first
+        ModuleWidget::draw(args);
+
+        // Get pointer to our module
+        Skyline* skyModule = dynamic_cast<Skyline*>(module);
+        if (!skyModule) return;
+
+        const float cX[8]={7.00f,19.51f,32.03f,44.54f,57.06f,69.57f,82.09f,94.60f};
+        const float ySld=70.0f, yLed=31.0f;
+        const int TW=6,TH=60,HW=14,HH=8;
+
+        // 1. Draw glowing Edit Ring around the active channel LED
+        float brightness = skyModule->lights[Skyline::EDIT_RING_LIGHTS + skyModule->editChan].getBrightness();
+        if (brightness > 0.001f) {
+            Vec ledPos = mm2px(Vec(cX[skyModule->editChan], yLed));
+            float r = 9.5f;
+            const float NR = 0.1f, NG = 0.25f, NB = 0.6f;
+
+            NVGpaint glow = nvgRadialGradient(args.vg,
+                ledPos.x, ledPos.y, r * 0.7f, r * 1.6f,
+                nvgRGBAf(NR, NG, NB, brightness * 0.55f),
+                nvgRGBAf(NR, NG, NB, 0.f));
+            nvgBeginPath(args.vg);
+            nvgCircle(args.vg, ledPos.x, ledPos.y, r * 1.6f);
+            nvgFillPaint(args.vg, glow);
+            nvgFill(args.vg);
+
+            nvgBeginPath(args.vg);
+            nvgCircle(args.vg, ledPos.x, ledPos.y, r);
+            nvgStrokeColor(args.vg, nvgRGBAf(NR, NG, NB, brightness * 0.9f));
+            nvgStrokeWidth(args.vg, 1.8f);
+            nvgStroke(args.vg);
+        }
+
+        // 2. Draw fader tracks, fill levels, and grips
+        for (int ch = 0; ch < 8; ch++) {
+            float fillVal = skyModule->params[Skyline::SLIDER_PARAMS + ch].getValue(); // read value (0-4V)
+            fillVal = fillVal / 4.f; // scale 0-4V to 0-1
+            float faderX = cX[ch];
+            
+            // Convert coordinate center to pixels
+            Vec faderPos = mm2px(Vec(faderX, ySld));
+            
+            // Draw fader track (grey background)
+            float tx = faderPos.x - TW*0.5f;
+            float ty = faderPos.y;
+            nvgBeginPath(args.vg);
+            nvgRoundedRect(args.vg, tx, ty, TW, TH, 3.f);
+            nvgFillColor(args.vg, nvgRGB(0xb8,0xb5,0xae));
+            nvgFill(args.vg);
+
+            // Draw target navy blue highlight if in edit mode
+            bool isTarget = ch == skyModule->editChan &&
+                (skyModule->muteMode || skyModule->lengthMode ||
+                 skyModule->scaleMode || skyModule->shiftMode);
+            if (isTarget) {
+                nvgBeginPath(args.vg);
+                nvgRoundedRect(args.vg, tx-3.f, ty-3.f, TW+6.f, TH+6.f, 5.f);
+                nvgFillColor(args.vg, nvgRGBAf(0.1f,0.25f,0.6f,0.35f));
+                nvgFill(args.vg);
+            }
+
+            // Draw red active fill bar
+            float handleY = (1.f - fillVal) * TH;
+            nvgBeginPath(args.vg);
+            nvgRect(args.vg, tx, ty + handleY, TW, TH - handleY);
+            nvgFillColor(args.vg, nvgRGB(0x99,0x20,0x20));
+            nvgFill(args.vg);
+
+            // Draw fader handle (dark grey grip with silver center line)
+            float hx = faderPos.x - HW*0.5f;
+            float hy = ty + handleY - HH*0.5f;
+            nvgBeginPath(args.vg);
+            nvgRoundedRect(args.vg, hx, hy, HW, HH, 2.f);
+            nvgFillColor(args.vg, nvgRGB(0x30,0x30,0x30));
+            nvgFill(args.vg);
+            
+            nvgBeginPath(args.vg);
+            nvgMoveTo(args.vg, hx + 2.f, hy + HH*0.5f);
+            nvgLineTo(args.vg, hx + HW - 2.f, hy + HH*0.5f);
+            nvgStrokeColor(args.vg, nvgRGB(0x80,0x80,0x80));
+            nvgStrokeWidth(args.vg, 1.f);
+            nvgStroke(args.vg);
+        }
     }
 };
 
