@@ -68,7 +68,7 @@ To edit advanced parameters, use the **six mode buttons** on the right side of t
 - Pressing any of the **16 Step Buttons** saves all sequences, lengths, scales, directions, and clock divisions to that slot.
 - *Visual Indicator:* Slots containing valid presets glow dim amber; empty slots are unlit. When saved, a progressive amber sweep animation fills the step buttons left-to-right up to the saved slot.
 
-### 6. 🔵 RECALL Mode (Cyan)
+### 6. 🩵 RECALL Mode (Cyan)
 - Pressing any of the **16 Step Buttons** instantly recalls the saved preset slot.
 - *Visual Indicator:* Occupied slots glow dim cyan. On selection, the active slot briefly flashes bright cyan.
 
