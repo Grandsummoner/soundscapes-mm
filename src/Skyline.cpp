@@ -814,32 +814,20 @@ struct SkylineWidget : ModuleWidget {
                 Skyline::STEP_PARAMS+8+i, Skyline::BUTTON_LIGHTS+(8+i)*3));
         }
 
-        struct PanelLabel : widget::Widget {
-            std::string text; float fontSize; NVGcolor color;
-            PanelLabel(Vec c,std::string t,float sz,NVGcolor col)
-                :text(t),fontSize(sz),color(col){box.pos=c.minus(Vec(40,8));box.size=Vec(80,16);}
-            void draw(const DrawArgs& args) override {
-                nvgFontSize(args.vg, fontSize);
-                nvgFontFaceId(args.vg, APP->window->uiFont->handle);
-                nvgTextAlign(args.vg, NVG_ALIGN_CENTER|NVG_ALIGN_MIDDLE);
-                nvgFillColor(args.vg, color); // FIXED NATIVE DRAW PARSING
-                nvgText(args.vg, box.size.x*.5f,     box.size.y*.5f,     text.c_str(), nullptr);
-                nvgText(args.vg, box.size.x*.5f+0.3f,box.size.y*.5f,     text.c_str(), nullptr);
-            }
-        };
-        auto lbl=[&](float x,float y,const char* t,float sz=8.f,
-                     NVGcolor c=nvgRGB(0x33,0x33,0x33)){
-            addChild(new PanelLabel(mm2px(Vec(x,y)),t,sz,c));
-        };
-        lbl(50.8f,5.0f,"SKYLINE",12.f,nvgRGB(0x11,0x11,0x11));
-        lbl(50.8f,9.5f,"8 CHANNEL CV SEQUENCER",7.f,nvgRGB(0x77,0x77,0x77));
-        for(int i=0;i<8;i++) lbl(cX[i],14.5f,std::to_string(i+1).c_str(),9.f);
-        lbl(xJack,38.5f,"CLK/CV",7.5f); lbl(xJack,66.5f,"RST/HLD",7.5f);
-        lbl(xK1,38.5f,"OFFSET",7.5f); lbl(xK2,38.5f,"ATTEN",7.5f); lbl(xK3,38.5f,"DIVIDE",7.5f);
-        lbl(xB1,38.5f,"MUTE",7.5f); lbl(xB2,38.5f,"LEN",7.5f); lbl(xB3,38.5f,"SHIFT",7.5f);
-        lbl(xB1,54.5f,"SCALE",7.5f); lbl(xB2,54.5f,"SAVE",7.5f); lbl(xB3,54.5f,"RECALL",7.5f);
-        const char* fn[8] = {"CLEAR","SMOOTH","RND","FREEZE","FWD","REV","PEND","RNDSEQ"};
-        for(int i=0;i<8;i++) lbl(cX[i],ySLbl,fn[i],7.f);
+        // All panel text (title, channel numbers, OFFSET/ATTEN/DIVIDE,
+        // MUTE/LEN/SHIFT, SCALE/SAVE/RECALL, the SHIFT-function labels)
+        // is already baked into the panel SVG/PNG as outlined paths.
+        // A redundant runtime-drawn copy used to live here via a custom
+        // PanelLabel widget calling nvgText with APP->window->uiFont —
+        // that's a Rack desktop application resource, not something
+        // this plugin bundles, and it isn't available on the MetaModule
+        // firmware, which is what was actually causing the garbled
+        // "SKYLINE" text (not the panel SVG, which was already correct).
+        // Removed entirely rather than chasing a bundled-font fix, since
+        // it was always pure duplication: FM16Seq, confirmed working on
+        // hardware, has no runtime text drawing at all — every label on
+        // its panel lives purely in the panel art, the same as Skyline's
+        // panel SVG already does.
     }
 };
 
