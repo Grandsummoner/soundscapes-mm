@@ -643,16 +643,19 @@ struct Skyline : Module {
 // ============================================================
 struct SlimFader : app::SvgSlider {
     // TH/HW/HH here MUST exactly match SkylineFaderBg.svg's and
-    // SkylineFaderHandle.svg's own declared width/height. Every
-    // previous attempt at this changed these numbers in code only,
-    // leaving the SVG files at their original hardcoded size — feeding
-    // the native renderer mismatched size hints from two different
-    // sources, which is almost certainly why those attempts produced
-    // unpredictable results instead of just doing nothing or working.
+    // SkylineFaderHandle.svg's own declared width/height (see comment
+    // above on why that matters for the MetaModule renderer).
+    //
+    // No drawLayer/onButton/onDragMove/onDoubleClick here anymore —
+    // app::SvgSlider already draws its loaded background/handle SVGs
+    // and already handles click-and-drag natively, correctly, on its
+    // own. Custom overrides of all of that were leftover from when
+    // this class extended a bare ParamWidget (before the MetaModule
+    // fix), and kept painting a second, independently-computed track/
+    // handle on top of the base class's own rendering — invisible on
+    // hardware (where drawLayer never renders at all), but visible on
+    // desktop as a muddy, slightly-misaligned "double cap" look.
     static const int TW=6,TH=40,HW=14,HH=8,TM=6;
-    bool dragging=false; float dragStartY=0.f,dragStartVal=0.f;
-    int  chanIndex=-1;          // which channel this slider belongs to
-    Skyline* skyModule=nullptr; // for reading editChan / mode state
     SlimFader(){
         setBackgroundSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/SkylineFaderBg.svg")));
         setHandleSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/SkylineFaderHandle.svg")));
@@ -663,51 +666,6 @@ struct SlimFader : app::SvgSlider {
             Vec(TW/2.f, TM + HH/2.f)   // value 1 -> top, with a margin below the very top edge
         );
         box.size = Vec(HW, TH+HH);
-    }
-    void drawLayer(const DrawArgs& args,int layer) override {
-        if(layer!=1) return;
-        float val=getParamQuantity()?getParamQuantity()->getScaledValue():0.f;
-        float handleY=TM+(1.f-val)*(TH-TM), tx=(box.size.x-TW)*0.5f;
-
-        bool isTarget = skyModule && chanIndex >= 0 && chanIndex == skyModule->editChan &&
-            (skyModule->muteMode || skyModule->lengthMode ||
-             skyModule->scaleMode || skyModule->shiftMode);
-        if (isTarget) {
-            nvgBeginPath(args.vg);
-            nvgRoundedRect(args.vg, tx-3.f, HH*0.5f-3.f, TW+6.f, TH+6.f, 5.f);
-            nvgFillColor(args.vg, nvgRGBAf(0.1f,0.25f,0.6f,0.35f));
-            nvgFill(args.vg);
-        }
-
-        nvgBeginPath(args.vg); nvgRoundedRect(args.vg,tx,HH*0.5f,TW,TH,3.f);
-        nvgFillColor(args.vg,nvgRGB(0xb8,0xb5,0xae)); nvgFill(args.vg);
-        nvgBeginPath(args.vg); nvgRect(args.vg,tx,HH*0.5f+handleY,TW,TH-handleY);
-        nvgFillColor(args.vg,nvgRGB(0x99,0x20,0x20)); nvgFill(args.vg);
-        float hx=(box.size.x-HW)*0.5f;
-        nvgBeginPath(args.vg); nvgRoundedRect(args.vg,hx,handleY,HW,HH,2.f);
-        nvgFillColor(args.vg,nvgRGB(0x30,0x30,0x30)); nvgFill(args.vg);
-        nvgBeginPath(args.vg);
-        nvgMoveTo(args.vg,hx+2.f,handleY+HH*0.5f); nvgLineTo(args.vg,hx+HW-2.f,handleY+HH*0.5f);
-        nvgStrokeColor(args.vg,nvgRGB(0x80,0x80,0x80)); nvgStrokeWidth(args.vg,1.f); nvgStroke(args.vg);
-    }
-    void onButton(const ButtonEvent& e) override {
-        if(e.action==GLFW_PRESS&&e.button==GLFW_MOUSE_BUTTON_LEFT){
-            dragging=true; dragStartY=e.pos.y;
-            dragStartVal=getParamQuantity()?getParamQuantity()->getScaledValue():0.f;
-            e.consume(this);
-        }
-        if(e.action==GLFW_RELEASE) dragging=false;
-        ParamWidget::onButton(e);
-    }
-    void onDragMove(const DragMoveEvent& e) override {
-        if(!dragging||!getParamQuantity()) return;
-        float sensitivity = (APP->window->getMods() & RACK_MOD_CTRL) ? (float)TH*4 : (float)TH/2;
-        float delta = -e.mouseDelta.y / sensitivity;
-        dragStartVal = clamp(dragStartVal + delta, 0.f, 1.f);
-        getParamQuantity()->setScaledValue(dragStartVal);
-    }
-    void onDoubleClick(const DoubleClickEvent& e) override {
-        if(getParamQuantity()) getParamQuantity()->reset();
     }
 };
 
@@ -838,11 +796,8 @@ struct SkylineWidget : ModuleWidget {
         // REGISTER SLIDERS NATIVELY AS VCV SvgSliders (THE EXACT PATTERN USED BY BEFACO, VOSTOK & JW MODULES)
         // This is 100% crash-proof and guaranteed to map and render on the screen!
         for(int ch=0;ch<8;ch++){
-            auto* sf = createParam<SlimFader>(
-                mm2px(Vec(cX[ch]-2.37f,ySld)),module,Skyline::SLIDER_PARAMS+ch);
-            sf->chanIndex  = ch;
-            sf->skyModule  = module;
-            addParam(sf);
+            addParam(createParam<SlimFader>(
+                mm2px(Vec(cX[ch]-2.37f,ySld)),module,Skyline::SLIDER_PARAMS+ch));
         }
 
         // Buttons are now plain VCVButton with a SEPARATE, standalone
