@@ -646,16 +646,21 @@ struct SlimFader : app::SvgSlider {
     // SkylineFaderHandle.svg's own declared width/height (see comment
     // above on why that matters for the MetaModule renderer).
     //
-    // No drawLayer/onButton/onDragMove/onDoubleClick here anymore —
-    // app::SvgSlider already draws its loaded background/handle SVGs
-    // and already handles click-and-drag natively, correctly, on its
-    // own. Custom overrides of all of that were leftover from when
-    // this class extended a bare ParamWidget (before the MetaModule
-    // fix), and kept painting a second, independently-computed track/
-    // handle on top of the base class's own rendering — invisible on
-    // hardware (where drawLayer never renders at all), but visible on
-    // desktop as a muddy, slightly-misaligned "double cap" look.
+    // No drawLayer here — app::SvgSlider already draws its loaded
+    // background/handle SVGs correctly on its own; a custom drawLayer
+    // here previously painted a redundant, slightly-misaligned second
+    // copy on top (the "double cap" look).
+    //
+    // onButton/onDragMove ARE still needed, though — without them,
+    // SvgSlider's native dragging maps mouse position directly to
+    // raw pixel position within the box. With the box now small and
+    // part of it deliberately reserved as margin for hardware
+    // clearance, a large fraction of that height becomes a dead zone
+    // that clamps to min/max ("can't go below the midway point").
+    // Delta-based dragging here sidesteps that entirely — it doesn't
+    // care how small the box is, only how far the mouse has moved.
     static const int TW=6,TH=40,HW=14,HH=8,TM=6;
+    bool dragging=false; float dragStartVal=0.f;
     SlimFader(){
         setBackgroundSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/SkylineFaderBg.svg")));
         setHandleSvg(APP->window->loadSvg(asset::plugin(pluginInstance, "res/SkylineFaderHandle.svg")));
@@ -666,6 +671,25 @@ struct SlimFader : app::SvgSlider {
             Vec(TW/2.f, TM + HH/2.f)   // value 1 -> top, with a margin below the very top edge
         );
         box.size = Vec(HW, TH+HH);
+    }
+    void onButton(const ButtonEvent& e) override {
+        if(e.action==GLFW_PRESS&&e.button==GLFW_MOUSE_BUTTON_LEFT){
+            dragging=true;
+            dragStartVal=getParamQuantity()?getParamQuantity()->getScaledValue():0.f;
+            e.consume(this);
+        }
+        if(e.action==GLFW_RELEASE) dragging=false;
+        ParamWidget::onButton(e);
+    }
+    void onDragMove(const DragMoveEvent& e) override {
+        if(!dragging||!getParamQuantity()) return;
+        float sensitivity = (APP->window->getMods() & RACK_MOD_CTRL) ? 240.f : 60.f;
+        float delta = -e.mouseDelta.y / sensitivity;
+        dragStartVal = clamp(dragStartVal + delta, 0.f, 1.f);
+        getParamQuantity()->setScaledValue(dragStartVal);
+    }
+    void onDoubleClick(const DoubleClickEvent& e) override {
+        if(getParamQuantity()) getParamQuantity()->reset();
     }
 };
 
