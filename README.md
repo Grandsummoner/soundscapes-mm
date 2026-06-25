@@ -58,13 +58,5 @@ Activating a mode lets you edit parameters using the bottom 16 step buttons:
 * **SAVE / RECALL:** Saves or recalls the entire sequencer state into one of the 16 preset slots (assigned to step buttons 1–16).
 
 ---
-
-## Installation & Compilation
-
-### VCV Rack Desktop Build
-To compile for VCV Rack on Windows, macOS, or Linux, use the standard VCV Rack SDK.
-
-1. Ensure the VCV Rack SDK path is configured in your environment.
-2. Run the compiler toolchain:
-   ```bash
+h
    make dist
