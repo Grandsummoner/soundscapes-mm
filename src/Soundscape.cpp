@@ -114,10 +114,6 @@ struct Soundscape : Module {
             lastResetVal = rVal;
         }
 
-        // Clock Engine Calculations
-        float targetScaler = params[MASTER_CLOCK_PARAM].getValue(); // 0.0 to 1.0
-        float finalClockMultiplier = (targetScaler < 0.5f) ? (targetScaler * 2.f) : ((targetScaler - 0.5f) * 6.f + 1.f);
-
         if (globalMode == MODE_INT) {
             float baseBPM = params[MASTER_CLOCK_PARAM].getValue() * 240.f + 40.f;
             internalClockTimer += args.sampleTime;
@@ -129,7 +125,7 @@ struct Soundscape : Module {
         } else if (globalMode == MODE_EXT && inputs[CLOCK_INPUT].isConnected()) {
             float clkIn = inputs[CLOCK_INPUT].getVoltage();
             if (clkIn > 2.0f && lastClockVal <= 2.0f) {
-                clockTriggered = true; // Real implementation can scale delta transitions
+                clockTriggered = true;
             }
             lastClockVal = clkIn;
         }
@@ -167,10 +163,6 @@ struct Soundscape : Module {
                 int semi = std::round(rawVoltage * 12.f);
                 int oct = semi / 12;
                 int note = semi % 12;
-                bool match = false;
-                for (int n = 0; n < 12; n++) {
-                    if (SCALES[0][n] == note) { match = true; break; }
-                }
                 currentVoltages[i] = (float)oct + ((float)note / 12.f);
             } else if (chModes[i] == CH_GATE) {
                 currentVoltages[i] = (rawVoltage > 2.5f) ? 10.f : 0.f;
@@ -244,11 +236,11 @@ struct SoundscapeWidget : ModuleWidget {
         setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/Soundscape.svg")));
 
         // 1. Top Panel Connectivity Inputs
-        addInput(createInputCentered<SVGPort>(mm2px(Vec(12.5f, 15.f)), module, Soundscape::CLOCK_INPUT));
-        addInput(createInputCentered<SVGPort>(mm2px(Vec(12.5f, 32.f)), module, Soundscape::RESET_INPUT));
+        addInput(createInputCentered<SvgPort>(mm2px(Vec(12.5f, 15.f)), module, Soundscape::CLOCK_INPUT));
+        addInput(createInputCentered<SvgPort>(mm2px(Vec(12.5f, 32.f)), module, Soundscape::RESET_INPUT));
 
         // 2. Global Functional Mode Toggle Configuration
-        addParam(createParamCentered<SVGSwitch>(mm2px(Vec(42.5f, 23.5f)), module, Soundscape::MODE_TOGGLE_PARAM));
+        addParam(createParamCentered<SvgSwitch>(mm2px(Vec(42.5f, 23.5f)), module, Soundscape::MODE_TOGGLE_PARAM));
 
         // 3. Complete Integration of the 3 Command Knobs
         addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(95.f, 20.f)), module, Soundscape::MASTER_CLOCK_PARAM));
@@ -279,15 +271,13 @@ struct SoundscapeWidget : ModuleWidget {
             addParam(createParamCentered<VCVButton>(mm2px(Vec(currentX, 66.f)), module, Soundscape::DISPLAY_BTN_PARAMS + i));
 
             // Row 2: Diagnostic Indicator LED Layer
-            addChild(createLightCentered<MediumLight<AmberLight>>(mm2px(Vec(currentX, 82.f)), module, Soundscape::CHANNEL_LEDS + i));
+            addChild(createLightCentered<MediumLight<YellowLight>>(mm2px(Vec(currentX, 82.f)), module, Soundscape::CHANNEL_LEDS + i));
 
             // Row 3: Output Structural Connection Array
-            addOutput(createOutputCentered<SVGPort>(mm2px(Vec(currentX, 96.f)), module, Soundscape::CV_OUTPUTS + i));
+            addOutput(createOutputCentered<SvgPort>(mm2px(Vec(currentX, 96.f)), module, Soundscape::CV_OUTPUTS + i));
 
             // Row 4: Dedicated Linear Manual Attenuation Performance Faders
-            addParam(createParamCentered<SVGSlider>(mm2px(Vec(currentX, 150.f)), module, Soundscape::FADER_PARAMS + i));
-            // Apply slider background tracks
-            RACK_PLUGIN_MODEL_INIT(SoundscapeWidget);
+            addParam(createParamCentered<SvgSlider>(mm2px(Vec(currentX, 150.f)), module, Soundscape::FADER_PARAMS + i));
         }
 
         // 6. Complete Reconstruction of the 16 Bottom Performance Buttons Grid
