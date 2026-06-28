@@ -1,15 +1,5 @@
 #include "plugin.hpp"
 
-// Quantization Matrix
-static const float SCALES[16][12] = {
-    {0,1,2,3,4,5,6,7,8,9,10,11}, {0,1,5,7,10,0,1,5,7,10,0,1}, {0,2,4,7,9,0,2,4,7,9,0,2},
-    {0,3,5,7,10,0,3,5,7,10,0,3}, {0,3,5,6,7,10,0,3,5,6,7,10}, {0,1,3,4,6,8,10,0,1,3,4,6},
-    {0,2,4,5,6,8,10,0,2,4,5,6},  {0,1,3,5,7,8,10,0,1,3,5,7},  {0,2,3,5,7,8,10,0,2,3,5,7},
-    {0,2,3,5,7,9,10,0,2,3,5,7},   {0,2,4,5,7,9,10,0,2,4,5,7},  {0,2,4,5,7,8,10,0,2,4,5,7},
-    {0,2,4,6,8,10,0,2,4,6,8,10},  {0,1,4,5,7,8,11,0,1,4,5,7},  {0,1,3,5,6,9,10,0,1,3,5,6},
-    {0,1,4,5,8,9,0,1,4,5,8,9}
-};
-
 struct Soundscape : Module {
     enum ParamIds {
         MASTER_CLOCK_PARAM,
@@ -51,13 +41,21 @@ struct Soundscape : Module {
         configParam(MASTER_DENSITY_PARAM, 0.f, 1.f, 0.8f, "Rhythmic Density / Step Prob");
         configParam(MODE_TOGGLE_PARAM, 0.f, 2.f, 0.f, "Global Mode (INT, EXT, MOD)");
 
+        // FIXED: Explicitly define the 2 global inputs outside of the channel loop to prevent heap overflow
+        configInput(CLOCK_INPUT, "Clock Input");
+        configInput(RESET_INPUT, "Reset Input");
+
         for (int i = 0; i < 8; i++) {
             configParam(FADER_PARAMS + i, 0.f, 1.f, 0.f, "Channel Fader " + std::to_string(i + 1));
             configParam(DISPLAY_BTN_PARAMS + i, 0.f, 1.f, 0.f, "Channel Mode Button " + std::to_string(i + 1));
-            configInput(CLOCK_INPUT + i, "Clock Input");
             configOutput(CV_OUTPUTS + i, "CV Output " + std::to_string(i + 1));
         }
         
+        // FIXED: Added missing configuration for the 6 right-side macro buttons
+        for (int i = 0; i < 6; i++) {
+            configParam(MACRO_RIGHT_PARAMS + i, 0.f, 1.f, 0.f, "Macro Button " + std::to_string(i + 1));
+        }
+
         for (int i = 0; i < 16; i++) {
             configParam(PERF_GRID_PARAMS + i, 0.f, 1.f, 0.f, "Performance Grid Button " + std::to_string(i + 1));
         }
@@ -164,7 +162,10 @@ struct SoundscapeDisplay : LightWidget {
     Soundscape* module;
     int channelId;
     
-    SoundscapeDisplay() {}
+    SoundscapeDisplay() {
+        module = nullptr;
+        channelId = 0;
+    }
     
     void draw(const DrawArgs& args) override {
         nvgBeginPath(args.vg);
