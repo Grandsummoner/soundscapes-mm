@@ -62,15 +62,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y inkscape
           
-          # 2. Run the 4ms SvgToPng tool to generate assets/Skyline.png
-          python3 ${{ github.workspace }}/metamodule-plugin-sdk/scripts/SvgToPng.py --input ${{ github.workspace }}/res/Skyline.svg --output ${{ github.workspace }}/assets/ --white --height 240
+          # 2. Run the 4ms SvgToPng tool to generate assets/Soundscape.png
+          python3 ${{ github.workspace }}/metamodule-plugin-sdk/scripts/SvgToPng.py --input ${{ github.workspace }}/res/Soundscape.svg --output ${{ github.workspace }}/assets/ --white --height 240
 
-          # 2b. Convert the SlimFader background/handle SVGs the same way
-          python3 ${{ github.workspace }}/metamodule-plugin-sdk/scripts/SvgToPng.py --input ${{ github.workspace }}/res/SkylineFaderBg.svg --output ${{ github.workspace }}/assets/ --height 40
-          python3 ${{ github.workspace }}/metamodule-plugin-sdk/scripts/SvgToPng.py --input ${{ github.workspace }}/res/SkylineFaderHandle.svg --output ${{ github.workspace }}/assets/ --height 8
+          # 2b. Convert the updated fader background/handle SVGs
+          python3 ${{ github.workspace }}/metamodule-plugin-sdk/scripts/SvgToPng.py --input ${{ github.workspace }}/res/SoundscapeFaderBg.svg --output ${{ github.workspace }}/assets/ --height 40
+          python3 ${{ github.workspace }}/metamodule-plugin-sdk/scripts/SvgToPng.py --input ${{ github.workspace }}/res/SoundscapeFaderHandle.svg --output ${{ github.workspace }}/assets/ --height 8
 
-          # 2c. Convert the SkylinePort jack SVG the same way
-          python3 ${{ github.workspace }}/metamodule-plugin-sdk/scripts/SvgToPng.py --input ${{ github.workspace }}/res/SkylineJack.svg --output ${{ github.workspace }}/assets/ --height 18
+          # 2c. Convert the SoundscapePort jack SVG
+          python3 ${{ github.workspace }}/metamodule-plugin-sdk/scripts/SvgToPng.py --input ${{ github.workspace }}/res/SoundscapeJack.svg --output ${{ github.workspace }}/assets/ --height 18
           
           # 3. Print assets directory contents to console to verify the PNG was created
           echo "=== VERIFYING GENERATED ASSETS ==="
