@@ -1,7 +1,5 @@
 # Soundscape (WIP)
 
-![Module Graphic](./assets/Skyline.png)
-
 **Soundscape MM** is an 8-channel architectural control voltage (CV) sequencer, linear attenuator matrix, and multi-state modulation processor designed for high-performance deployment in both virtual environments (**VCV Rack**) and standalone embedded hardware hardware platform (**4ms MetaModule**).
 
 Derived from dense performance paradigms, Soundscape establishes a strict flat-hierarchy interface layout. It completely eliminates menu-diving by implementing a 1:1 spatial vertical alignment matching steps, state displays, indicator LEDs, and active signal outputs.
