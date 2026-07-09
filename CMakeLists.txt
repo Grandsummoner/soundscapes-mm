@@ -10,23 +10,22 @@ include(${METAMODULE_SDK_DIR}/plugin.cmake)
 
 project(soundscapes-mm VERSION 1.0.0 DESCRIPTION "Soundscapes Eurorack Synth Voice" LANGUAGES C CXX ASM)
 
-# Add your library as a STATIC target
-add_library(soundscapes-mm STATIC)
-
-# Define your source files explicitly
-target_sources(soundscapes-mm PRIVATE
-    src/plugin.cpp
-    src/soundscapes.cpp
-    src/soundscapes_ui.cpp
-    src/soundscapes_sequencer.cpp
-    src/soundscapes_synth.cpp
-    src/soundscapes_fx.cpp
+# Automatically find all C/C++ source files in the src/ directory.
+# This prevents case-sensitivity errors (e.g., Soundscape.cpp vs soundscapes.cpp)
+# and automatically scales if you split or rename files later.
+file(GLOB_RECURSE PLUGIN_SOURCES 
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
 )
+
+# Add your library as a STATIC target using the automatically discovered sources
+add_library(soundscapes-mm STATIC ${PLUGIN_SOURCES})
 
 # Set the include path to your local source directory
 target_include_directories(soundscapes-mm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-# Call the official SDK macro with all required parameter paths
+# Call the official SDK macro to link VCV Rack headers and package the bundle
 create_plugin(
     SOURCE_LIB soundscapes-mm
     PLUGIN_NAME soundscapes-mm
