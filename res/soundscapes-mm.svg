@@ -67,4 +67,247 @@
 
   <!-- DUCK Jack (Slightly oversized highlight ring) -->
   <circle cx="22.5" cy="315" r="14" fill="none" stroke="#ff3b30" stroke-width="1.25" />
-  <text x="22.5" y="336" font-family="sans-serif" font-weight="bold" font-size="7.5" fill="#36
+  <text x="22.5" y="336" font-family="sans-serif" font-weight="bold" font-size="7.5" fill="#362a21" text-anchor="middle">DUCK</text>
+
+  <!-- ========================================== -->
+  <!-- 4. TOP OUTPUT JACKS & DISPLAYS (1 - 8)     -->
+  <!-- ========================================== -->
+  <!-- Column Channels 1 - 4 (Left) -->
+  <g id="outputs-displays-left">
+    <!-- Channel 1 -->
+    <text x="70" y="80" font-family="sans-serif" font-weight="bold" font-size="8.5" fill="#362a21" text-anchor="middle">1</text>
+    <rect x="56" y="93" width="28" height="15" rx="2" fill="url(#displayGlass)" stroke="#362a21" stroke-width="1" />
+    <!-- Channel 2 -->
+    <text x="105" y="80" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" text-anchor="middle">2</text>
+    <rect x="91" y="93" width="28" height="15" rx="3" fill="url(#displayGlass)" stroke="#362a21" stroke-width="1" />
+    <!-- Channel 3 -->
+    <text x="140" y="80" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" text-anchor="middle">3</text>
+    <rect x="126" y="93" width="28" height="15" rx="3" fill="url(#displayGlass)" stroke="#362a21" stroke-width="1" />
+    <!-- Channel 4 -->
+    <text x="175" y="80" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" text-anchor="middle">4</text>
+    <rect x="161" y="93" width="28" height="15" rx="3" fill="url(#displayGlass)" stroke="#362a21" stroke-width="1.25" />
+  </g>
+
+  <!-- Column Channels 5 - 8 (Offset to clear center controllers) -->
+  <g id="columns-right">
+    <!-- Channel 5 -->
+    <text x="280" y="80" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" text-anchor="middle">5</text>
+    <rect x="266" y="93" width="28" height="15" rx="3" fill="url(#displayGlass)" stroke="#362a21" stroke-width="1.25" />
+    <!-- Channel 6 -->
+    <text x="315" y="80" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" text-anchor="middle">6</text>
+    <rect x="301" y="93" width="28" height="15" rx="3" fill="url(#displayGlass)" stroke="#362a21" stroke-width="1.25" />
+    <!-- Channel 7 -->
+    <text x="350" y="80" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" text-anchor="middle">7</text>
+    <rect x="336" y="93" width="28" height="15" rx="3" fill="url(#displayGlass)" stroke="#362a21" stroke-width="1.25" />
+    <!-- Channel 8 -->
+    <text x="385" y="80" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" text-anchor="middle">8</text>
+    <rect x="371" y="93" width="28" height="15" rx="3" fill="url(#displayGlass)" stroke="#362a21" stroke-width="1.25" />
+  </g>
+
+  <!-- ========================================== -->
+  <!-- 5. SYNTHESIS ENGINE ROW CONTROLS           -->
+  <!-- ========================================== -->
+  <!-- Section Border -->
+  <rect x="52" y="125" width="316" height="52" rx="3" fill="none" stroke="#362a21" stroke-width="0.75" />
+
+  <!-- Voice Mode Frame (V / W / D Switch bracket) -->
+  <rect x="58" y="131" width="24" height="40" rx="3" fill="#e5dba8" stroke="#362a21" stroke-width="1" />
+  <text x="70" y="141" font-family="sans-serif" font-size="7.5" font-weight="bold" fill="#362a21" text-anchor="middle">V</text>
+  <text x="70" y="153" font-family="sans-serif" font-size="7.5" font-weight="bold" fill="#362a21" text-anchor="middle" fill-opacity="0.3">W</text>
+  <text x="70" y="165" font-family="sans-serif" font-size="7.5" font-weight="bold" fill="#362a21" text-anchor="middle" fill-opacity="0.3">D</text>
+
+  <!-- Multi-FX Button Chassis -->
+  <rect x="90" y="131" width="86" height="40" rx="3" fill="#e5dba8" stroke="#362a21" stroke-width="1" />
+  <line x1="133" y1="131" x2="133" y2="171" stroke="#362a21" stroke-width="0.75" />
+  <line x1="90" y1="151" x2="176" y2="151" stroke="#362a21" stroke-width="0.75" />
+
+  <!-- FX Labels (FM, DELAY, REVERB, FILTER) -->
+  <text x="111" y="143" font-family="sans-serif" font-weight="bold" font-size="6.5" fill="#362a21" text-anchor="middle">FM</text>
+  <text x="154" y="143" font-family="sans-serif" font-weight="bold" font-size="6.5" fill="#362a21" text-anchor="middle">DELAY</text>
+  <text x="111" y="163" font-family="sans-serif" font-weight="bold" font-size="6.5" fill="#362a21" text-anchor="middle">REVERB</text>
+  <text x="154" y="163" font-family="sans-serif" font-weight="bold" font-size="6.5" fill="#362a21" text-anchor="middle">FILTER</text>
+
+  <!-- 6 Big Knobs Calibration Markings & Radial Ticks -->
+  <g id="synth-knob-markings">
+    <!-- Knob 1: RATE -->
+    <path d="M 183 148 A 12 12 0 1 1 207 148" fill="none" stroke="#362a21" stroke-dasharray="1.5,1.5" stroke-width="1" />
+    <text x="195" y="168" font-family="sans-serif" font-weight="bold" font-size="6.5" fill="#362a21" text-anchor="middle">RATE</text>
+
+    <!-- Knob 2: DENSITY -->
+    <path d="M 218 148 A 12 12 0 1 1 242 148" fill="none" stroke="#362a21" stroke-dasharray="1.5,1.5" stroke-width="1" />
+    <text x="230" y="168" font-family="sans-serif" font-weight="bold" font-size="6.5" fill="#362a21" text-anchor="middle">DENSITY</text>
+
+    <!-- Knob 3: TIMBRE -->
+    <path d="M 253 148 A 12 12 0 1 1 277 148" fill="none" stroke="#362a21" stroke-dasharray="1.5,1.5" stroke-width="1" />
+    <text x="265" y="168" font-family="sans-serif" font-weight="bold" font-size="6.5" fill="#362a21" text-anchor="middle">TIMBRE</text>
+
+    <!-- Knob 4: TEXTURE -->
+    <path d="M 288 148 A 12 12 0 1 1 312 148" fill="none" stroke="#362a21" stroke-dasharray="1.5,1.5" stroke-width="1" />
+    <text x="300" y="168" font-family="sans-serif" font-weight="bold" font-size="6.5" fill="#362a21" text-anchor="middle">TEXTURE</text>
+
+    <!-- Knob 5: SPREAD -->
+    <path d="M 323 148 A 12 12 0 1 1 347 148" fill="none" stroke="#362a21" stroke-dasharray="1.5,1.5" stroke-width="1" />
+    <text x="335" y="168" font-family="sans-serif" font-weight="bold" font-size="6.5" fill="#362a21" text-anchor="middle">SPREAD</text>
+
+    <!-- Knob 6: DYNAMICS -->
+    <path d="M 358 148 A 12 12 0 1 1 382 148" fill="none" stroke="#362a21" stroke-dasharray="1.5,1.5" stroke-width="1" />
+    <text x="370" y="168" font-family="sans-serif" font-weight="bold" font-size="6.5" fill="#362a21" text-anchor="middle">DYNAMICS</text>
+  </g>
+
+  <!-- ========================================== -->
+  <!-- 6. FADERS AND CONTROLLERS SECTION          -->
+  <!-- ========================================== -->
+  <!-- Section Border -->
+  <rect x="52" y="184" width="316" height="98" rx="3" fill="none" stroke="#362a21" stroke-width="0.75" />
+
+  <!-- Vertical Calibration Grids beside Fader Tracks (Left Side) -->
+  <g id="fader-scales-left" stroke="#362a21" stroke-width="0.5">
+    <!-- Channel 1 Scales -->
+    <line x1="65" y1="195" x2="68" y2="195" />
+    <line x1="63" y1="220" x2="68" y2="220" />
+    <line x1="65" y1="245" x2="68" y2="245" stroke-dasharray="1,1" />
+    <!-- Channel 2 Scales -->
+    <line x1="100" y1="195" x2="103" y2="195" />
+    <line x1="98" y1="220" x2="103" y2="220" />
+    <line x1="100" y1="245" x2="103" y2="245" stroke-dasharray="1,1" />
+    <!-- Channel 3 Scales -->
+    <line x1="135" y1="195" x2="138" y2="195" />
+    <line x1="133" y1="220" x2="138" y2="220" />
+    <line x1="135" y1="245" x2="138" y2="245" stroke-dasharray="1,1" />
+    <!-- Channel 4 Scales -->
+    <line x1="170" y1="195" x2="173" y2="195" />
+    <line x1="168" y1="220" x2="173" y2="220" />
+    <line x1="170" y1="245" x2="173" y2="245" stroke-dasharray="1,1" />
+  </g>
+
+  <!-- Standard Fader Slots (1 - 4) -->
+  <g id="fader-slots-left" stroke="#362a21" stroke-linecap="round" stroke-width="1.5">
+    <line x1="70" y1="195" x2="70" y2="245" />
+    <text x="70" y="255" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" stroke="none" text-anchor="middle">1</text>
+    
+    <line x1="105" y1="195" x2="105" y2="245" />
+    <text x="105" y="255" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" stroke="none" text-anchor="middle">2</text>
+    
+    <line x1="140" y1="195" x2="140" y2="245" />
+    <text x="140" y="255" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" stroke="none" text-anchor="middle">3</text>
+    
+    <line x1="175" y1="195" x2="175" y2="245" />
+    <text x="175" y="255" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" stroke="none" text-anchor="middle">4</text>
+  </g>
+
+  <!-- Center Master Quantization Knobs (ROOT & SCALE) -->
+  <g id="master-quantizers">
+    <!-- ROOT Knob Calibration Dots -->
+    <path d="M 197 218 A 13 13 0 1 1 223 218" fill="none" stroke="#362a21" stroke-dasharray="1,1.5" stroke-width="0.75" />
+    <text x="210" y="240" font-family="sans-serif" font-weight="bold" font-size="7.5" fill="#362a21" text-anchor="middle">ROOT</text>
+
+    <!-- SCALE Knob Calibration Dots -->
+    <path d="M 232 218 A 13 13 0 1 1 258 218" fill="none" stroke="#362a21" stroke-dasharray="1,1.5" stroke-width="0.75" />
+    <text x="245" y="240" font-family="sans-serif" font-weight="bold" font-size="7.5" fill="#362a21" text-anchor="middle">SCALE</text>
+  </g>
+
+  <!-- Vertical Calibration Grids beside Fader Tracks (Right Side) -->
+  <g id="fader-scales-right" stroke="#362a21" stroke-width="0.5">
+    <!-- Channel 5 Scales -->
+    <line x1="275" y1="195" x2="278" y2="195" />
+    <line x1="273" y1="220" x2="278" y2="220" />
+    <line x1="275" y1="245" x2="278" y2="245" stroke-dasharray="1,1" />
+    <!-- Channel 6 Scales -->
+    <line x1="310" y1="195" x2="313" y2="195" />
+    <line x1="308" y1="220" x2="313" y2="220" />
+    <line x1="310" y1="245" x2="313" y2="245" stroke-dasharray="1,1" />
+    <!-- Channel 7 Scales -->
+    <line x1="345" y1="195" x2="348" y2="195" />
+    <line x1="343" y1="220" x2="348" y2="220" />
+    <line x1="345" y1="245" x2="348" y2="245" stroke-dasharray="1,1" />
+    <!-- Channel 8 Scales -->
+    <line x1="380" y1="195" x2="383" y2="195" />
+    <line x1="378" y1="220" x2="383" y2="220" />
+    <line x1="380" y1="245" x2="383" y2="245" stroke-dasharray="1,1" />
+  </g>
+
+  <!-- Standard Fader Slots (5 - 8) -->
+  <g id="fader-slots-right" stroke="#362a21" stroke-linecap="round" stroke-width="1.5">
+    <line x1="280" y1="195" x2="280" y2="245" />
+    <text x="280" y="255" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" stroke="none" text-anchor="middle">5</text>
+    
+    <line x1="315" y1="195" x2="315" y2="245" />
+    <text x="315" y="255" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" stroke="none" text-anchor="middle">6</text>
+    
+    <line x1="350" y1="195" x2="350" y2="245" />
+    <text x="350" y="255" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" stroke="none" text-anchor="middle">7</text>
+    
+    <line x1="385" y1="195" x2="385" y2="245" />
+    <text x="385" y="255" font-family="sans-serif" font-weight="bold" font-size="8" fill="#362a21" stroke="none" text-anchor="middle">8</text>
+  </g>
+
+  <!-- ========================================== -->
+  <!-- 7. SEQUENCER STEPS DISPLAY & SLOTS         -->
+  <!-- ========================================== -->
+  <!-- Row 1: Melody Step Frames -->
+  <g id="melody-grid">
+    <text x="56" y="291" font-family="sans-serif" font-weight="900" font-size="6.5" fill="#2d6e35" letter-spacing="1">MELODY</text>
+    <!-- Group A Steps (1 - 4) -->
+    <rect x="56" y="294" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+    <rect x="91" y="294" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+    <rect x="126" y="294" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+    <rect x="161" y="294" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+    
+    <!-- Group B Steps (5 - 8) -->
+    <rect x="266" y="294" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+    <rect x="301" y="294" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+    <rect x="336" y="294" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+    <rect x="371" y="294" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+  </g>
+
+  <!-- Row 2: Chord Step Frames -->
+  <g id="chord-grid">
+    <text x="56" y="333" font-family="sans-serif" font-weight="900" font-size="6.5" fill="#7522a1" letter-spacing="1">CHORD</text>
+    <!-- Group A Steps (9 - 12) -->
+    <rect x="56" y="336" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+    <rect x="91" y="336" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+    <rect x="126" y="336" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+    <rect x="161" y="336" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+    
+    <!-- Group B Steps (13 - 16) -->
+    <rect x="266" y="336" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+    <rect x="301" y="336" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+    <rect x="336" y="336" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+    <rect x="371" y="336" width="28" height="24" rx="3" fill="#e4daba" stroke="#362a21" stroke-width="0.75" />
+  </g>
+
+  <!-- ========================================== -->
+  <!-- 8. RIGHT COLUMN PERFORMANCE INTERFACES     -->
+  <!-- ========================================== -->
+  <g id="performance-labels" font-family="sans-serif" font-weight="bold" font-size="7">
+    <!-- Col 1 labels -->
+    <text x="390" y="44" fill="#2d6e35" text-anchor="middle">PLAY</text>
+    <text x="390" y="112" fill="#0066b2" text-anchor="middle">ARP</text>
+    <text x="390" y="180" fill="#7522a1" text-anchor="middle">CHRD</text>
+    <text x="390" y="248" fill="#d95d12" text-anchor="middle">SAVE</text>
+
+    <!-- Col 2 labels -->
+    <text x="408" y="44" fill="#a88c00" text-anchor="middle">SHFT</text>
+    <text x="408" y="112" fill="#0066b2" text-anchor="middle">FRZ</text>
+    <text x="408" y="180" fill="#7522a1" text-anchor="middle">PROB</text>
+    <text x="408" y="248" fill="#d95d12" text-anchor="middle">RCL</text>
+  </g>
+
+  <!-- ========================================== -->
+  <!-- 9. THREE-DIMENSIONAL MOUNTING SCREWS       -->
+  <!-- ========================================== -->
+  <g id="panel-screws" filter="url(#shadowFilter)">
+    <!-- Top Left -->
+    <circle cx="7.5" cy="7.5" r="3" fill="#a39990" stroke="#362a21" stroke-width="0.5" />
+    <line x1="5.5" y1="7.5" x2="9.5" y2="7.5" stroke="#362a21" stroke-width="0.75" />
+    <!-- Top Right -->
+    <circle cx="412.5" cy="7.5" r="3" fill="#a39990" stroke="#362a21" stroke-width="0.5" />
+    <line x1="410.5" y1="7.5" x2="414.5" y2="7.5" stroke="#362a21" stroke-width="0.75" />
+    <!-- Bottom Left -->
+    <circle cx="7.5" cy="372.5" r="3" fill="#a39990" stroke="#362a21" stroke-width="0.5" />
+    <line x1="5.5" y1="372.5" x2="9.5" y2="372.5" stroke="#362a21" stroke-width="0.75" />
+    <!-- Bottom Right -->
+    <circle cx="412.5" cy="372.5" r="3" fill="#a39990" stroke="#362a21" stroke-width="0.5" />
+    <line x1="410.5" y1="372.5" x2="414.5" y2="372.5" stroke="#362a21" stroke-width="0.75" />
+  </g>
+</svg>
