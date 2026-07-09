@@ -3,8 +3,8 @@
 
 using namespace rack;
 
-// Declare the universal plugin instance reference
+// The global pointer to your plugin instance
 extern Plugin* pluginInstance;
 
-// Corrected alignment target matching Soundscape architecture
-extern Model* modelSoundscape;
+// Reference to the Soundscapes model declaration
+extern Model* modelSoundscapes;
