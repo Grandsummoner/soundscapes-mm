@@ -1,0 +1,53 @@
+name: Build MetaModule Plugin
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      SDK_branch:
+        description: 'MetaModule SDK branch to target'
+        required: true
+        type: choice
+        default: main
+        options:
+          - main
+
+jobs:
+  build-arm:
+    name: metamodule-arm-binary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Plugin Source Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Build Tools and ARM Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi python3 jq
+
+      - name: Checkout MetaModule SDK
+        uses: actions/checkout@v4
+        with:
+          repository: 4ms/metamodule-plugin-sdk
+          ref: ${{ github.event.inputs.SDK_branch || 'main' }}
+          path: metamodule-plugin-sdk
+          submodules: recursive
+
+      - name: Build ARM mmplugin
+        run: |
+          mkdir -p build
+          cmake -B build -G Ninja \
+            -DMETAMODULE_SDK_DIR=${{ github.workspace }}/metamodule-plugin-sdk \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      - name: Upload MetaModule Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: soundscapes-mm-hardware-plugin
+          path: build/*.mmplugin
