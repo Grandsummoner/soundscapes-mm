@@ -1,38 +1,34 @@
 cmake_minimum_required(VERSION 3.22)
 
-# 1. Locate the MetaModule SDK directory
-if(NOT "${METAMODULE_SDK_DIR}" STREQUAL "")
-    message("METAMODULE_SDK_DIR set by CMake variable ${METAMODULE_SDK_DIR}")
-elseif (DEFINED ENV{METAMODULE_SDK_DIR})
-    set(METAMODULE_SDK_DIR "$ENV{METAMODULE_SDK_DIR}")
-    message("METAMODULE_SDK_DIR set by environment variable ${METAMODULE_SDK_DIR}")
-else()
-    set(METAMODULE_SDK_DIR "${CMAKE_CURRENT_LIST_DIR}/metamodule-plugin-sdk")
-    message("METAMODULE_SDK_DIR set to default: ${METAMODULE_SDK_DIR}")
+# Set the path to the MetaModule SDK directory
+if(NOT DEFINED METAMODULE_SDK_DIR)
+    set(METAMODULE_SDK_DIR "../metamodule-plugin-sdk")
 endif()
 
-# 2. Include the MetaModule CMake build script
+# Include the core SDK configuration
 include(${METAMODULE_SDK_DIR}/plugin.cmake)
 
-# 3. Declare the project metadata
-project(maybe-Soundscape-MM
-    VERSION 2.0.1
-    DESCRIPTION "Soundscape for MetaModule"
-    LANGUAGES C CXX ASM
+project(soundscapes-mm VERSION 1.0.0 DESCRIPTION "Soundscapes Eurorack Synth Voice" LANGUAGES C CXX ASM)
+
+# Add your library as a STATIC target (the SDK translates this to an mmplugin)
+add_library(soundscapes-mm STATIC)
+
+# Define your source files explicitly
+target_sources(soundscapes-mm PRIVATE
+    src/plugin.cpp
+    src/soundscapes.cpp
+    src/soundscapes_ui.cpp
+    src/soundscapes_sequencer.cpp
+    src/soundscapes_synth.cpp
+    src/soundscapes_fx.cpp
 )
 
-# 4. Define the library target
-add_library(Soundscape STATIC)
+# Set the include path to your local source directory
+target_include_directories(soundscapes-mm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-# 5. Automatically locate and compile all .cpp files inside the src/ folder
-file(GLOB sources src/*.cpp)
-target_sources(Soundscape PRIVATE ${sources})
-target_include_directories(Soundscape PRIVATE src/)
-
-# 6. Configure compiler standards
-set_property(TARGET Soundscape PROPERTY CXX_STANDARD 17)
-
-# 7. Configure installation destination
-if("${MM_INSTALL_DIR}" STREQUAL "")
-    set(MM_INSTALL_DIR ${CMAKE_CURRENT_LIST_DIR}/metamodule-plugins)
-endif()
+# Call the official SDK macro to link VCV Rack headers and package the bundle
+create_plugin(
+    SOURCE_LIB soundscapes-mm
+    PLUGIN_NAME soundscapes-mm
+    PLUGIN_JSON ${CMAKE_CURRENT_SOURCE_DIR}/plugin.json
+)
