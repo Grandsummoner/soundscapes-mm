@@ -1,26 +1,42 @@
 {
-  "slug": "maybe-Soundscape-MM",
-  "name": "Soundscape MM",
-  "version": "2.0.1",
+  "slug": "soundscapes-mm",
+  "name": "soundscapes-mm",
+  "version": "1.0.0",
   "license": "GPL-3.0-or-later",
-  "brand": "maybe",
-  "author": "YourName",
-  "authorEmail": "your-email@example.com",
+  "brand": "Grandsummoner",
+  "author": "Grandsummoner",
+  "authorEmail": "",
   "authorUrl": "",
   "pluginUrl": "",
   "manualUrl": "",
-  "sourceUrl": "",
+  "sourceUrl": "https://github.com/Grandsummoner/soundscapes-mm",
   "donateUrl": "",
   "modules": [
     {
-      "slug": "SoundscapeMM",
-      "name": "Soundscape-MM",
-      "description": "Multi-Mode 8-Channel CV Sequencer and Quantizer",
+      "slug": "soundscapes-mm",
+      "name": "Soundscapes MM",
+      "description": "Ambient Generative Synth & Sequencer Workstation",
       "tags": [
+        "Synthesizer",
         "Sequencer",
-        "Quantizer",
-        "Dual / Stereo"
+        "Reverb",
+        "Delay",
+        "Granular"
       ]
     }
-  ]
+  ],
+  "metamodule": {
+    "hardware-mappings": {
+      "knobs": [
+        "RATE_PARAM",
+        "DENSITY_PARAM",
+        "TIMBRE_PARAM",
+        "TEXTURE_PARAM",
+        "SPREAD_PARAM",
+        "DYNAMICS_PARAM",
+        "ROOT_PARAM",
+        "SCALE_PARAM"
+      ]
+    }
+  }
 }
