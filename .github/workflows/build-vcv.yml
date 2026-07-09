@@ -41,12 +41,12 @@ jobs:
     needs: modify-plugin-version
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/qno/rack-plugin-toolchain-win-linux:v2
+      image: ghcr.io/bloodbat/rack-plugin-toolchain-win-linux
       options: --user root
     strategy:
       fail-fast: false
       matrix:
-        platform: [win-x64, lin-x64]
+        platform: [win, lin]
     steps:
       - name: Set up Git safe directory
         run: git config --global --add safe.directory '*'
