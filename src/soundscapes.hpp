@@ -7,6 +7,7 @@ using namespace rack;
 struct Soundscapes : Module {
     enum ParamId {
         ROOT_PARAM, SCALE_PARAM, RATE_PARAM, DENSITY_PARAM, TIMBRE_PARAM, TEXTURE_PARAM, SPREAD_PARAM, DYNAMICS_PARAM,
+        MODE_PARAM, // Added 3-way voice engine selector
         FM_PARAM, DELAY_PARAM, REVERB_PARAM, FILTER_PARAM,
         PLAY_PARAM, SHFT_PARAM, ARP_PARAM, FRZ_PARAM, CHRD_PARAM, PROB_PARAM, SAVE_PARAM, RCL_PARAM,
         FADER_1_PARAM, FADER_2_PARAM, FADER_3_PARAM, FADER_4_PARAM, FADER_5_PARAM, FADER_6_PARAM, FADER_7_PARAM, FADER_8_PARAM,
@@ -25,7 +26,7 @@ struct Soundscapes : Module {
         LIGHTS_LEN
     };
 
-    // State machine
+    // State machine tracking
     int focusedChannel = -1;
     int focusedFX = -1;
     bool shftMode = false;
@@ -38,7 +39,7 @@ struct Soundscapes : Module {
     bool frzMode = false;
     bool fxActive[4] = {false};
 
-    // Step Sequencer Memory Grid
+    // Sequencer Storage Matrix
     float stepVelocity[8][16];
     float stepProbability[8][16];
     float stepPitch[8][16];
@@ -46,37 +47,33 @@ struct Soundscapes : Module {
     bool stepGate[8][16];
     bool stepChordGate[8][16];
 
-    // Global Mixer & Playback variables
+    // Playback control registers
     float channelAmplitudes[8];
     float channelFxSends[4][8];
     int loopLength[8];
     float playheadPhases[8];
     int currentSteps[8];
 
-    // Automated trigger trackers
+    // Trigger Processors
     dsp::SchmittTrigger clockTrigger;
     dsp::SchmittTrigger resetTrigger;
     dsp::SchmittTrigger fxTriggers[4];
     dsp::SchmittTrigger btnTriggers[8];
     dsp::SchmittTrigger padTriggers[16];
 
-    // Synthesis Core States
+    // Dynamic Voice Registers
     struct Voice {
         float phase = 0.0f;
         float env = 0.0f;
         float filterState = 0.0f;
         float pitch = 0.0f;
         float noiseState = 0.0f;
-        
-        // Karplus-Strong physical modeling waveguide
         float delayBuffer[2048] = {0.0f};
         int writeIdx = 0;
-        
-        // Dust Transient spark generator
         float dustTimer = 0.0f;
     } voices[8];
 
-    // FX Delay & Reverb Buffers (Pre-allocated for ARM performance)
+    // Stereo FX buffers
     struct DelayProcessor {
         float buffer[48000] = {0.0f};
         int writeIdx = 0;
@@ -95,7 +92,6 @@ struct Soundscapes : Module {
     void process(const ProcessArgs& args) override;
     void toggleChannelFocus(int channelId);
     
-    // Core engine loops separated across files
     void processSequencer(const ProcessArgs& args);
     float processSynthVoice(int chan, const ProcessArgs& args);
     void processFXAndOutputs(float* drySignals, const ProcessArgs& args);
