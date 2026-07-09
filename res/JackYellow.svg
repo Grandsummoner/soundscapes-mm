@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22" width="22" height="22">
+  <!-- Outer Yellow Washer -->
+  <circle cx="11" cy="11" r="10.5" fill="#ffbf00" />
+  <!-- Metal Barrel Outline -->
+  <circle cx="11" cy="11" r="8" fill="#141414" stroke="#2d2d2d" stroke-width="1" />
+  <!-- Inner Metallic Sleeve -->
+  <circle cx="11" cy="11" r="6" fill="#4e4e4e" />
+  <!-- Dark Hole of the Jack -->
+  <circle cx="11" cy="11" r="4.5" fill="#141414" />
+  <!-- Subtle Metallic Highlight -->
+  <path d="M 8.5 7.5 A 4 4 0 0 1 13.5 7.5" fill="none" stroke="#7e7e7e" stroke-width="1" stroke-linecap="round" />
+</svg>
