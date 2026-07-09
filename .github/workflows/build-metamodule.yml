@@ -25,10 +25,18 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Build Tools and ARM Toolchain
+      - name: Install Build Tools and Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi python3 jq
+          sudo apt-get install -y cmake ninja-build python3 jq wget tar
+
+      - name: Install Supported ARM GNU Toolchain (v12.3)
+        run: |
+          mkdir -p $HOME/toolchain
+          wget -q https://developer.arm.com/-/media/Files/downloads/gnu/12.3.rel1/binrel/arm-gnu-toolchain-12.3.rel1-x86_64-arm-none-eabi.tar.xz -O $HOME/toolchain/arm-gnu-toolchain.tar.xz
+          tar -xf $HOME/toolchain/arm-gnu-toolchain.tar.xz -C $HOME/toolchain
+          # Add the precise toolchain bin folder to the GitHub action runner's path
+          echo "$HOME/toolchain/arm-gnu-toolchain-12.3.rel1-x86_64-arm-none-eabi/bin" >> $GITHUB_PATH
 
       - name: Checkout MetaModule SDK
         uses: actions/checkout@v4
