@@ -1,5 +1,50 @@
 {
-  "MetaModuleBrandName": "maybe",
-  "MetaModulePluginMaintainer": "YourName",
-  "MetaModulePluginMaintainerEmail": "your-email@example.com"
+  "slug": "soundscapes-mm",
+  "version": "1.0.0",
+  "modules": [
+    {
+      "slug": "soundscapes-mm",
+      "hardware-mappings": {
+        "knobs": [
+          "RATE_PARAM",
+          "DENSITY_PARAM",
+          "TIMBRE_PARAM",
+          "TEXTURE_PARAM",
+          "SPREAD_PARAM",
+          "DYNAMICS_PARAM",
+          "ROOT_PARAM",
+          "SCALE_PARAM"
+        ],
+        "buttons": [
+          "PLAY_PARAM",
+          "SHFT_PARAM",
+          "ARP_PARAM",
+          "FRZ_PARAM",
+          "CHRD_PARAM",
+          "PROB_PARAM",
+          "SAVE_PARAM",
+          "RCL_PARAM"
+        ],
+        "inputs": [
+          "CLK_INPUT",
+          "RST_INPUT",
+          "VOCT_INPUT",
+          "GATE_INPUT",
+          "VEL_INPUT",
+          "EXTIN_INPUT",
+          "DUCK_INPUT"
+        ],
+        "outputs": [
+          "PORT_1_OUTPUT",
+          "PORT_2_OUTPUT",
+          "PORT_3_OUTPUT",
+          "PORT_4_OUTPUT",
+          "PORT_5_OUTPUT",
+          "PORT_6_OUTPUT",
+          "PORT_7_OUTPUT",
+          "PORT_8_OUTPUT"
+        ]
+      }
+    }
+  ]
 }
