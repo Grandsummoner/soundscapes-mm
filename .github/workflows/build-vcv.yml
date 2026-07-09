@@ -16,7 +16,7 @@ defaults:
     shell: bash
 
 jobs:
-  # Job 1: Pre-process and inject the commit hash into the plugin version for development builds
+  # Job 1: Pre-process and inject the commit hash into the plugin version for dev builds
   modify-plugin-version:
     name: Modify plugin version
     runs-on: ubuntu-latest
@@ -68,32 +68,3 @@ jobs:
         with:
           name: soundscapes-mm-${{ matrix.platform }}
           path: ${{ env.rack-plugin-toolchain-dir }}/plugin-build/*.vcvplugin
-
-  # Job 3: Compile macOS Universal Binaries (x64 and ARM64 combined)
-  build-mac:
-    name: macos-universal
-    needs: modify-plugin-version
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: actions/cache@v4
-        id: plugin-version-cache
-        with:
-          path: plugin.json
-          key: ${{ github.sha }}-${{ github.run_id }}
-      - name: Download VCV Rack SDK for Mac
-        run: |
-          curl -o Rack-SDK.zip https://vcvrack.com/downloads/Rack-SDK-${{ env.rack-sdk-version }}-mac-x64+arm64.zip
-          unzip Rack-SDK.zip -d mac-sdk
-      - name: Compile macOS Plugin
-        run: |
-          export RACK_DIR=$GITHUB_WORKSPACE/mac-sdk/Rack-SDK
-          make clean
-          make dist
-      - name: Upload macOS Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: soundscapes-mm-mac
-          path: dist/*.vcvplugin
