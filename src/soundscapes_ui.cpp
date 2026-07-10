@@ -43,7 +43,7 @@ struct SoundscapesButton : app::ParamWidget {
 };
 
 /**
- * 1. Custom Smoked Bronze Channel Display Widget (with centered alignment and HUD value routing)
+ * 1. Custom Smoked Bronze Channel Display Widget (with 60Hz UI parameter HUD change-checking)
  */
 struct OpaqueDisplay : Widget {
     Soundscapes* module = nullptr;
@@ -95,22 +95,82 @@ struct OpaqueDisplay : Widget {
             nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xdf));
 
             char text[16];
-            // Displays real-time parameter levels if active display value HUD timer is running
+
+            // 1. Detect fader edits for this channel at the 60Hz UI rate
+            float currFader = module->params[Soundscapes::FADER1_PARAM + channelId].getValue();
+            static float lastFader[8] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+            if (lastFader[channelId] >= 0.0f && fabs(currFader - lastFader[channelId]) > 0.001f) {
+                module->displayValueTimer[channelId] = 1.5f;
+                module->displayValue[channelId] = currFader;
+                module->displayType[channelId] = 0;
+            }
+            lastFader[channelId] = currFader;
+
+            // 2. Detect global knob edits (RATE to DYNAMICS)
+            for (int k = 0; k < 6; k++) {
+                float currKnob = module->params[Soundscapes::RATE_PARAM + k].getValue();
+                static float lastKnob[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+                if (lastKnob[k] >= 0.0f && fabs(currKnob - lastKnob[k]) > 0.001f) {
+                    module->displayValueTimer[channelId] = 1.5f;
+                    module->displayValue[channelId] = currKnob;
+                    module->displayType[channelId] = 0;
+                }
+                lastKnob[k] = currKnob;
+            }
+
+            // 3. Detect root note edits
+            float currRoot = module->params[Soundscapes::ROOT_PARAM].getValue();
+            static float lastRoot = -1.0f;
+            if (lastRoot >= 0.0f && fabs(currRoot - lastRoot) > 0.001f) {
+                module->displayValueTimer[channelId] = 1.5f;
+                module->displayValue[channelId] = currRoot;
+                module->displayType[channelId] = 1;
+            }
+            lastRoot = currRoot;
+
+            // 4. Detect scale edits
+            float currScale = module->params[Soundscapes::SCALE_PARAM].getValue();
+            static float lastScale = -1.0f;
+            if (lastScale >= 0.0f && fabs(currScale - lastScale) > 0.001f) {
+                module->displayValueTimer[channelId] = 1.5f;
+                module->displayValue[channelId] = currScale;
+                module->displayType[channelId] = 2;
+            }
+            lastScale = currScale;
+
+            // 5. Detect 3-way Mode Switch edits
+            float currMode = module->params[Soundscapes::MODE_PARAM].getValue();
+            static float lastMode = -1.0f;
+            if (lastMode >= 0.0f && fabs(currMode - lastMode) > 0.01f) {
+                module->displayValueTimer[channelId] = 1.5f;
+                module->displayValue[channelId] = currMode;
+                module->displayType[channelId] = 3; 
+            }
+            lastMode = currMode;
+
+            // Decrease timer at UI rate (1/60th of a second per frame)
+            if (module->displayValueTimer[channelId] > 0.0f) {
+                module->displayValueTimer[channelId] -= 1.0f / 60.0f; 
+            }
+
+            // Route standard channel values vs temporary HUD values
             if (module->displayValueTimer[channelId] > 0.0f) {
                 if (module->displayType[channelId] == 1) {
-                    // Display Root Note Name
                     int r = (int)std::round(module->displayValue[channelId] * 11.0f);
                     r = clamp(r, 0, 11);
                     const char* notes[12] = {"C ", "C#", "D ", "D#", "E ", "F ", "F#", "G ", "G#", "A ", "A#", "B "};
                     snprintf(text, sizeof(text), "%s", notes[r]);
                 } else if (module->displayType[channelId] == 2) {
-                    // Display Scale Type Abbreviation
                     int s = (int)std::round(module->displayValue[channelId] * 4.0f);
                     s = clamp(s, 0, 4);
                     const char* scalesText[5] = {"MA", "MI", "PE", "DO", "PH"};
                     snprintf(text, sizeof(text), "%s", scalesText[s]);
+                } else if (module->displayType[channelId] == 3) {
+                    int m = (int)std::round(module->displayValue[channelId]);
+                    m = clamp(m, 0, 2);
+                    const char* modesText[3] = {"VO", "WA", "DR"};
+                    snprintf(text, sizeof(text), "%s", modesText[m]);
                 } else {
-                    // Display general fader/knob level (00 to 99)
                     int pct = (int)std::round(module->displayValue[channelId] * 99.0f);
                     pct = clamp(pct, 0, 99);
                     snprintf(text, sizeof(text), "%02d", pct);
@@ -176,12 +236,12 @@ struct StepPadWidget : app::SvgSwitch {
 };
 
 /**
- * 3. Procedural Slide Fader Handle (Speed increased for fast drag responses)
+ * 3. Procedural Slide Fader Handle
  */
 struct SoundscapesFader : app::SvgSlider {
     SoundscapesFader() {
         box.size = Vec(14.0f, 56.0f); // Spans full slot range track height
-        speed = 2.5f;                 // Accelerated vertical slider mouse-dragging speed
+        speed = 2.5f;                 // Responsive mouse dragging speed
     }
 
     void draw(const DrawArgs& args) override {
@@ -191,7 +251,7 @@ struct SoundscapesFader : app::SvgSlider {
         nvgFillColor(args.vg, nvgRGBA(13, 12, 11, 255)); // #0d0c0b
         nvgFill(args.vg);
 
-        // Position of cap handle relative to dynamic value travel
+        // Position of cap handle relative to travel range
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.8f;
         float handleHeight = 16.0f;
         float handleY = (1.0f - value) * (box.size.y - handleHeight);
@@ -217,7 +277,7 @@ struct SoundscapesFader : app::SvgSlider {
 };
 
 /**
- * 4. Procedural Utility/Performance Buttons
+ * 4. Procedural Utility/Performance Buttons (Enhanced high-contrast vivid colors)
  */
 struct PerformanceButtonWidget : SoundscapesButton {
     int buttonId = 0; // 0 to 7
@@ -229,7 +289,6 @@ struct PerformanceButtonWidget : SoundscapesButton {
     }
 
     void onButton(const event::Button& e) override {
-        // Evaluates momentary status inside button trigger handler
         momentary = (buttonId != 0 && buttonId != 1);
         SoundscapesButton::onButton(e);
     }
@@ -254,21 +313,32 @@ struct PerformanceButtonWidget : SoundscapesButton {
         nvgRoundedRect(args.vg, 0.0f, 0.0f, box.size.x, box.size.y, 2.5f);
 
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.0f;
-        if (litState) {
+        if (litState || value > 0.5f) {
+            // Assign a unique vivid glowing color based on buttonId!
             if (buttonId == 0) {
-                nvgFillColor(args.vg, nvgRGBA(0x2e, 0xcc, 0x71, 0xff)); // PLAY lit green
+                nvgFillColor(args.vg, nvgRGBA(46, 204, 113, 255)); // PLAY: Vivid Emerald Green
+            } else if (buttonId == 1) {
+                nvgFillColor(args.vg, nvgRGBA(230, 126, 34, 255)); // SHFT: Vivid Flame Orange
+            } else if (buttonId == 2) {
+                nvgFillColor(args.vg, nvgRGBA(52, 152, 219, 255)); // ARP: Vivid Electric Blue
+            } else if (buttonId == 3) {
+                nvgFillColor(args.vg, nvgRGBA(26, 188, 156, 255)); // FRZ: Vivid Icy Cyan
+            } else if (buttonId == 4) {
+                nvgFillColor(args.vg, nvgRGBA(155, 89, 182, 255)); // CHRD: Vivid Royal Purple
+            } else if (buttonId == 5) {
+                nvgFillColor(args.vg, nvgRGBA(233, 30, 99, 255));  // PROB: Vivid Hot Magenta
+            } else if (buttonId == 6) {
+                nvgFillColor(args.vg, nvgRGBA(241, 196, 15, 255)); // SAVE: Vivid Amber Gold
             } else {
-                nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // SHFT lit amber
+                nvgFillColor(args.vg, nvgRGBA(231, 76, 60, 255));  // RCL: Vivid Coral Red
             }
-        } else if (value > 0.5f) {
-            nvgFillColor(args.vg, nvgRGBA(0xee, 0xee, 0xee, 0xff));     // Pressed grey
         } else {
-            nvgFillColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff));     // White unlit
+            nvgFillColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff)); // White unlit
         }
         nvgFill(args.vg);
 
         // Bold white stroke to highlight active state
-        if (litState) {
+        if (litState || value > 0.5f) {
             nvgStrokeColor(args.vg, nvgRGBA(255, 255, 255, 255));
             nvgStrokeWidth(args.vg, 1.5f);
         } else {
@@ -282,7 +352,7 @@ struct PerformanceButtonWidget : SoundscapesButton {
             nvgFontFaceId(args.vg, font->handle);
             nvgFontSize(args.vg, 5.0f);
             nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-            nvgFillColor(args.vg, litState ? nvgRGBA(0xff, 0xff, 0xff, 0xff) : nvgRGBA(0x5c, 0x53, 0x46, 0xff));
+            nvgFillColor(args.vg, (litState || value > 0.5f) ? nvgRGBA(0xff, 0xff, 0xff, 0xff) : nvgRGBA(0x5c, 0x53, 0x46, 0xff));
             
             const char* labels[8] = {"PLAY", "SHFT", "ARP", "FRZ", "CHRD", "PROB", "SAVE", "RCL"};
             nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, labels[buttonId], NULL);
@@ -392,7 +462,7 @@ struct ModeThreeWaySwitch : app::ParamWidget {
 
     void onButton(const event::Button& e) override {
         ParamWidget::onButton(e);
-        // Corrected: Switches across three clean positions (0, 1, 2) without clipping
+        // Switches across three clean positions (0, 1, 2) without clipping
         if (getParamQuantity()) {
             if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
                 float val = getParamQuantity()->getValue();
@@ -452,6 +522,16 @@ struct FXButtonWidget : SoundscapesButton {
         font = loadRobustFont();
     }
 
+    void onButton(const event::Button& e) override {
+        // Corrected: If shift is active, disable button clicks completely (fixes hidden latching)
+        Soundscapes* module = dynamic_cast<Soundscapes*>(this->module);
+        if (module && module->shiftActive) {
+            e.consume(this);
+            return;
+        }
+        SoundscapesButton::onButton(e);
+    }
+
     void draw(const DrawArgs& args) override {
         Soundscapes* module = dynamic_cast<Soundscapes*>(this->module);
         bool isActive = false;
@@ -475,8 +555,7 @@ struct FXButtonWidget : SoundscapesButton {
 
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.0f;
         if (isActive) {
-            // Highly obvious glowing neon-amber selection fill to match display digits
-            nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); 
+            nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // Active amber glow
         } else if (value > 0.5f) {
             nvgFillColor(args.vg, nvgRGBA(0xee, 0xee, 0xee, 0xff)); // Pressed grey
         } else {
