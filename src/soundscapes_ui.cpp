@@ -1,134 +1,253 @@
 #include "soundscapes.hpp"
+#include "plugin.hpp"
 
-// Deriving from OpaqueWidget ensures mouse events consume correctly on hardware
-struct DisplayButton : OpaqueWidget {
+/**
+ * 1. Custom Smoked Bronze Channel Display Widget
+ */
+struct OpaqueDisplay : TransparentWidget {
     Soundscapes* module;
-    int channelId;
-    std::shared_ptr<Font> displayFont;
+    int channelId; // Range 0 - 7
+    std::shared_ptr<Font> font;
 
-    DisplayButton() {
-        displayFont = APP->window->loadFont(asset::plugin(pluginInstance, "res/RobotoMono-Regular.ttf"));
-    }
-
-    // Overridden with VCV Rack v2 event::Button namespace
-    void onButton(const event::Button& e) override {
-        if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
-            if (module) module->toggleChannelFocus(channelId);
-            e.consume(this);
-        }
+    OpaqueDisplay() {
+        font = APP->window->loadFont(asset::plugin(pluginInstance, "res/RobotoMono-Regular.ttf"));
     }
 
     void draw(const DrawArgs& args) override {
-        // Draw smoked glass backgrounds
-        nvgBeginPath(args.vg);
-        nvgRect(args.vg, 0, 0, box.size.x, box.size.y);
-        nvgFillColor(args.vg, nvgRGBA(20, 12, 7, 255));
-        nvgFill(args.vg);
-        nvgStrokeColor(args.vg, nvgRGBA(54, 42, 33, 255));
-        nvgStrokeWidth(args.vg, 1.0f);
-        nvgStroke(args.vg);
-
         if (!module) return;
 
         bool isFocused = (module->focusedChannel == channelId);
-        bool isProbMode = module->probMode;
-        
-        NVGcolor activeColor;
-        if (isProbMode) {
-            activeColor = nvgRGBA(180, 50, 250, 255); // Purple
-        } else if (isFocused) {
-            activeColor = nvgRGBA(50, 250, 100, 255);  // Green
-        } else {
-            activeColor = nvgRGBA(217, 93, 18, 255);   // Orange
-        }
+        bool shouldFlash = isFocused && module->displayFlashState;
 
-        nvgFillColor(args.vg, activeColor);
-        if (displayFont) {
-            nvgFontFaceId(args.vg, displayFont->handle);
-            nvgFontSize(args.vg, 11.0f);
-            
-            float pVal = module->stepPitch[channelId][module->currentSteps[channelId]];
-            std::string noteName = "C";
-            if (pVal == 1.f) noteName = "d";
-            if (pVal == 2.f) noteName = "E";
-            if (pVal == 4.f) noteName = "G";
-            if (pVal == 5.f) noteName = "A";
-            
-            nvgText(args.vg, 6.0f, 11.0f, noteName.c_str(), NULL);
-        }
+        // Skip drawing text during flash-off states to create a pulsing visual effect
+        if (shouldFlash) return;
+
+        nvgFontFaceId(args.vg, font->handle);
+        nvgFontSize(args.vg, 21.0f);
+        nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+
+        // Warm amber-orange glow: #ff9d00
+        nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xdf));
+
+        // Display current state (e.g. channel number, or parameter level)
+        std::string text = std::to_string(channelId + 1);
+        nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, text.c_str(), NULL);
     }
 };
 
+/**
+ * 2. Procedural Step Sequencer Pad Widget
+ */
+struct StepPadWidget : SvgSwitch {
+    int padId; // Range 0 - 15
+
+    StepPadWidget() {
+        momentary = false;
+        box.size = Vec(24.0f, 20.0f);
+    }
+
+    void draw(const DrawArgs& args) override {
+        Soundscapes* module = dynamic_cast<Soundscapes*>(this->module);
+        bool stepActive = false;
+        bool isPlayhead = false;
+
+        if (module) {
+            if (padId < 8) {
+                stepActive = module->melodyTrack.steps[padId].active;
+                isPlayhead = (module->melodyTrack.playhead == padId) && module->isPlaying;
+            } else {
+                int chordStep = padId - 8;
+                stepActive = module->chordTrack.steps[chordStep].active;
+                isPlayhead = (module->chordTrack.playhead == chordStep) && module->isPlaying;
+            }
+        }
+
+        // Draw soft button shadow
+        nvgBeginPath(args.vg);
+        nvgRoundedRect(args.vg, 0.0f, 1.0f, box.size.x, box.size.y, 3.5f);
+        nvgFillColor(args.vg, nvgRGBA(0x00, 0x00, 0x00, 0x0c));
+        nvgFill(args.vg);
+
+        // Draw button body
+        nvgBeginPath(args.vg);
+        nvgRoundedRect(args.vg, 0.0f, 0.0f, box.size.x, box.size.y, 3.5f);
+
+        if (isPlayhead) {
+            nvgFillColor(args.vg, nvgRGBA(0x2e, 0xcc, 0x71, 0xff)); // Active green playhead
+        } else if (stepActive) {
+            nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // Programmed step amber glow
+        } else {
+            nvgFillColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff)); // Clean white unlit pad
+        }
+        nvgFill(args.vg);
+
+        // Bezel outline
+        nvgStrokeColor(args.vg, nvgRGBA(0xd5, 0xcf, 0xc5, 0xff));
+        nvgStrokeWidth(args.vg, 1.0f);
+        nvgStroke(args.vg);
+    }
+};
+
+/**
+ * 3. Procedural Slide Fader Handle
+ */
+struct SoundscapesFader : SvgSlider {
+    SoundscapesFader() {
+        box.size = Vec(14.0f, 20.0f);
+    }
+
+    void draw(const DrawArgs& args) override {
+        // Draw fader track cap procedural body
+        nvgBeginPath(args.vg);
+        nvgRoundedRect(args.vg, 0.0f, 0.0f, box.size.x, box.size.y, 2.0f);
+        nvgFillColor(args.vg, nvgRGBA(0xfa, 0xf9, 0xf6, 0xff)); // Silver-cream
+        nvgFill(args.vg);
+
+        nvgStrokeColor(args.vg, nvgRGBA(0xcc, 0xc4, 0xb5, 0xff));
+        nvgStrokeWidth(args.vg, 1.0f);
+        nvgStroke(args.vg);
+
+        // Center black indicator line
+        nvgBeginPath(args.vg);
+        nvgMoveTo(args.vg, 2.0f, box.size.y / 2.0f);
+        nvgLineTo(args.vg, box.size.x - 2.0f, box.size.y / 2.0f);
+        nvgStrokeColor(args.vg, nvgRGBA(0x1a, 0x1a, 0x1a, 0xff));
+        nvgStrokeWidth(args.vg, 1.5f);
+        nvgStroke(args.vg);
+    }
+};
+
+/**
+ * 4. Procedural Utility/Performance Buttons
+ */
+struct PerformanceButtonWidget : SvgSwitch {
+    int buttonId; // 0 to 7
+
+    PerformanceButtonWidget() {
+        momentary = true;
+        box.size = Vec(18.0f, 14.0f);
+    }
+
+    void draw(const DrawArgs& args) override {
+        Soundscapes* module = dynamic_cast<Soundscapes*>(this->module);
+        bool litState = false;
+
+        if (module) {
+            if (buttonId == 0) litState = module->isPlaying;       // PLAY Button
+            if (buttonId == 1) litState = module->shiftActive;     // SHFT Button
+        }
+
+        nvgBeginPath(args.vg);
+        nvgRoundedRect(args.vg, 0.0f, 0.0f, box.size.x, box.size.y, 2.5f);
+
+        if (litState) {
+            if (buttonId == 0) {
+                nvgFillColor(args.vg, nvgRGBA(0x2e, 0xcc, 0x71, 0xff)); // PLAY lit green
+            } else {
+                nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // SHFT lit amber
+            }
+        } else {
+            nvgFillColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff));     // White unlit
+        }
+        nvgFill(args.vg);
+
+        nvgStrokeColor(args.vg, nvgRGBA(0xcc, 0xc4, 0xb6, 0xff));
+        nvgStrokeWidth(args.vg, 1.0f);
+        nvgStroke(args.vg);
+    }
+};
+
+/**
+ * 5. Master ModuleWidget Panel Setup
+ */
 struct SoundscapesWidget : ModuleWidget {
     SoundscapesWidget(Soundscapes* module) {
         setModule(module);
-        box.size = Vec(142.2f * 1.5f, 380.0f); // 28HP
+        
+        // Load the finalized symmetrical vector faceplate panel
         setPanel(createPanel(asset::plugin(pluginInstance, "res/soundscapes-mm.svg")));
 
-        // Coordinate panel layout (Refer to original coordinates)
-        float outStartX = 70.0f;
-        float outSpacingX = 35.0f;
-
-        // Visual Jacks Overlay
-        for (int i = 0; i < 4; i++) {
-            addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(outStartX + (i * outSpacingX), 55.0f)), module, Soundscapes::PORT_1_OUTPUT + i));
-            addChild(createLightCentered<MediumLight<GreenLight>>(mm2px(Vec(outStartX + (i * outSpacingX), 65.0f)), module, Soundscapes::PORT_1_LIGHT + i));
-        }
-        for (int i = 4; i < 8; i++) {
-            addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(outStartX + 70.0f + ((i-4) * outSpacingX), 55.0f)), module, Soundscapes::PORT_1_OUTPUT + i));
-            addChild(createLightCentered<MediumLight<GreenLight>>(mm2px(Vec(outStartX + 70.0f + ((i-4) * outSpacingX), 65.0f)), module, Soundscapes::PORT_1_LIGHT + i));
+        // --- I. Left Sidebar Inputs & LEDs ---
+        for (int i = 0; i < Soundscapes::NUM_INPUTS; i++) {
+            float y = SoundscapesCoords::SIDEBAR_Y_START + (i * SoundscapesCoords::SIDEBAR_Y_SPACING);
+            addInput(createInputCentered<PJ301MPort>(Vec(SoundscapesCoords::SIDEBAR_JACK_X, y), module, i));
+            addChild(createLightCentered<MediumLight<GreenLight>>(Vec(SoundscapesCoords::SIDEBAR_LED_X, y), module, i));
         }
 
-        // Custom Clickable 7-Segment Displays
-        for (int i = 0; i < 4; i++) {
-            DisplayButton* dBtn = new DisplayButton();
-            dBtn->module = module;
-            dBtn->channelId = i;
-            dBtn->box.pos = mm2px(Vec(outStartX + (i * outSpacingX) - 14.0f, 93.0f));
-            dBtn->box.size = mm2px(Vec(28.0f, 15.0f));
-            addChild(dBtn);
-        }
-        for (int i = 4; i < 8; i++) {
-            DisplayButton* dBtn = new DisplayButton();
-            dBtn->module = module;
-            dBtn->channelId = i;
-            dBtn->box.pos = mm2px(Vec(outStartX + 70.0f + ((i-4) * outSpacingX) - 14.0f, 93.0f));
-            dBtn->box.size = mm2px(Vec(28.0f, 15.0f));
-            addChild(dBtn);
+        // --- II. Row 1: Outputs, LED Indicators, & Opaque Displays ---
+        for (int i = 0; i < 8; i++) {
+            float x = SoundscapesCoords::CH_COLS[i];
+            addOutput(createOutputCentered<PJ301MPort>(Vec(x, SoundscapesCoords::ROW1_JACK_Y), module, i));
+            addChild(createLightCentered<MediumLight<GreenLight>>(Vec(x, SoundscapesCoords::ROW1_LED_Y), module, i));
+
+            // Custom Display overlays
+            OpaqueDisplay* display = new OpaqueDisplay();
+            display->box.pos = Vec(x - 14.0f, SoundscapesCoords::ROW1_DISPLAY_Y - 20.0f);
+            display->box.size = Vec(28.0f, 40.0f);
+            display->module = module;
+            display->channelId = i;
+            addChild(display);
         }
 
-        // 8 Channels Sliders
-        for (int i = 0; i < 4; i++) {
-            addParam(createParamCentered<VCVSlider>(mm2px(Vec(outStartX + (i * outSpacingX), 235.0f)), module, Soundscapes::FADER_1_PARAM + i));
+        // --- III. Row 2: Centralized Synth Deck ---
+        // Mode Button mapping over the bronze display box
+        addParam(createParamCentered<VCVMomentaryButton>(Vec(SoundscapesCoords::MODE_X, SoundscapesCoords::MODE_Y), module, Soundscapes::MODE_PARAM));
+
+        // 2x2 FX Button Group
+        addParam(createParamCentered<VCVMomentaryButton>(Vec(SoundscapesCoords::FX_COLS[0], SoundscapesCoords::FX_ROWS[0]), module, Soundscapes::FM_PARAM));
+        addParam(createParamCentered<VCVMomentaryButton>(Vec(SoundscapesCoords::FX_COLS[1], SoundscapesCoords::FX_ROWS[0]), module, Soundscapes::DELAY_PARAM));
+        addParam(createParamCentered<VCVMomentaryButton>(Vec(SoundscapesCoords::FX_COLS[0], SoundscapesCoords::FX_ROWS[1]), module, Soundscapes::REVERB_PARAM));
+        addParam(createParamCentered<VCVMomentaryButton>(Vec(SoundscapesCoords::FX_COLS[1], SoundscapesCoords::FX_ROWS[1]), module, Soundscapes::FILTER_PARAM));
+
+        // 6 Large Parameter Knobs
+        for (int i = 0; i < 6; i++) {
+            addParam(createParamCentered<RoundLargeWhiteKnob>(Vec(SoundscapesCoords::KNOB_COLS[i], SoundscapesCoords::ROW2_KNOB_Y), module, Soundscapes::RATE_PARAM + i));
         }
-        for (int i = 4; i < 8; i++) {
-            addParam(createParamCentered<VCVSlider>(mm2px(Vec(outStartX + 70.0f + ((i-4) * outSpacingX), 235.0f)), module, Soundscapes::FADER_1_PARAM + i));
+
+        // --- IV. Row 3: Mixer Faders & Diagonal Quantizer Knobs ---
+        // 8 Volume/Send Faders grouped together (Columns 1–8)
+        for (int i = 0; i < 8; i++) {
+            float x = SoundscapesCoords::GRID_COLS[i];
+            addParam(createParam<SoundscapesFader>(Vec(x - 7.0f, SoundscapesCoords::ROW3_FADER_Y - 23.0f), module, Soundscapes::FADER1_PARAM + i));
         }
 
-        // Sidebars
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.5f, 55.0f)), module, Soundscapes::CLK_INPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.5f, 95.0f)), module, Soundscapes::RST_INPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.5f, 135.0f)), module, Soundscapes::VOCT_INPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.5f, 175.0f)), module, Soundscapes::GATE_INPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.5f, 215.0f)), module, Soundscapes::VEL_INPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.5f, 265.0f)), module, Soundscapes::EXTIN_INPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.5f, 315.0f)), module, Soundscapes::DUCK_INPUT));
+        // Diagonal Large Quantizers on Columns 9 and 10
+        addParam(createParamCentered<RoundLargeWhiteKnob>(Vec(SoundscapesCoords::GRID_COLS[8], SoundscapesCoords::ROOT_Y), module, Soundscapes::ROOT_PARAM));
+        addParam(createParamCentered<RoundLargeWhiteKnob>(Vec(SoundscapesCoords::GRID_COLS[9], SoundscapesCoords::SCALE_Y), module, Soundscapes::SCALE_PARAM));
 
-        addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(210.0f, 232.0f)), module, Soundscapes::ROOT_PARAM));
-        addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(245.0f, 232.0f)), module, Soundscapes::SCALE_PARAM));
+        // --- V. Row 4: Step Sequencer Pads & Performance Block ---
+        // 16 Step Pad triggers (Columns 1–8)
+        for (int i = 0; i < 8; i++) {
+            float x = SoundscapesCoords::GRID_COLS[i];
+            
+            // Melody step button (Row 1)
+            StepPadWidget* melPad = createParam<StepPadWidget>(Vec(x - 12.0f, SoundscapesCoords::ROW4_MELODY_PAD_Y - 10.0f), module, Soundscapes::STEP_PARAM_START + i);
+            melPad->padId = i;
+            addParam(melPad);
 
-        float btnX = 390.0f;
-        addParam(createParamCentered<VCVButton>(mm2px(Vec(btnX, 55.0f)), module, Soundscapes::PLAY_PARAM));
-        addParam(createParamCentered<VCVButton>(mm2px(Vec(btnX, 125.0f)), module, Soundscapes::ARP_PARAM));
-        addParam(createParamCentered<VCVButton>(mm2px(Vec(btnX, 195.0f)), module, Soundscapes::CHRD_PARAM));
-        addParam(createParamCentered<VCVButton>(mm2px(Vec(btnX, 265.0f)), module, Soundscapes::SAVE_PARAM));
+            // Chord step button (Row 2)
+            StepPadWidget* chdPad = createParam<StepPadWidget>(Vec(x - 12.0f, SoundscapesCoords::ROW4_CHORD_PAD_Y - 10.0f), module, Soundscapes::STEP_PARAM_START + 8 + i);
+            chdPad->padId = 8 + i;
+            addParam(chdPad);
+        }
 
-        addParam(createParamCentered<VCVButton>(mm2px(Vec(btnX + 18.0f, 55.0f)), module, Soundscapes::SHFT_PARAM));
-        addParam(createParamCentered<VCVButton>(mm2px(Vec(btnX + 18.0f, 125.0f)), module, Soundscapes::FRZ_PARAM));
-        addParam(createParamCentered<VCVButton>(mm2px(Vec(btnX + 18.0f, 195.0f)), module, Soundscapes::PROB_PARAM));
-        addParam(createParamCentered<VCVButton>(mm2px(Vec(btnX + 18.0f, 265.0f)), module, Soundscapes::RCL_PARAM));
+        // 2x4 Utility Button Grid on Columns 9 & 10
+        for (int row = 0; i < 4; row++) {
+            float y = SoundscapesCoords::ROW4_BUTTON_ROWS[row];
+            int btnIndex = row * 2;
+
+            // Column 1 Button
+            PerformanceButtonWidget* btn1 = createParam<PerformanceButtonWidget>(Vec(SoundscapesCoords::GRID_COLS[8] - 9.0f, y - 7.0f), module, Soundscapes::PLAY_PARAM + btnIndex);
+            btn1->buttonId = btnIndex;
+            addParam(btn1);
+
+            // Column 2 Button
+            PerformanceButtonWidget* btn2 = createParam<PerformanceButtonWidget>(Vec(SoundscapesCoords::GRID_COLS[9] - 9.0f, y - 7.0f), module, Soundscapes::PLAY_PARAM + btnIndex + 1);
+            btn2->buttonId = btnIndex + 1;
+            addParam(btn2);
+        }
     }
 };
 
-// Declaring Model at the bottom of UI file guarantees successful linking
+// Model definition binding class implementations to unique slug
 Model* modelSoundscapes = createModel<Soundscapes, SoundscapesWidget>("soundscapes-mm");
