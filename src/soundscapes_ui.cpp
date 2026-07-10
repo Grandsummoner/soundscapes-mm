@@ -2,6 +2,27 @@
 #include "plugin.hpp"
 
 /**
+ * Robust Font Loading Helper
+ * Searches typical project subdirectories to prevent crash regardless of placement,
+ * falling back gracefully if the asset is missing.
+ */
+static std::shared_ptr<Font> loadRobustFont() {
+    std::shared_ptr<Font> f = nullptr;
+    
+    // Path 1: Standard VCV community folder structure (res/fonts/)
+    f = APP->window->loadFont(asset::plugin(pluginInstance, "res/fonts/RobotoMono-Regular.ttf"));
+    if (f) return f;
+    
+    // Path 2: Singular folder variant (res/font/)
+    f = APP->window->loadFont(asset::plugin(pluginInstance, "res/font/RobotoMono-Regular.ttf"));
+    if (f) return f;
+    
+    // Path 3: Direct asset root fallback (res/)
+    f = APP->window->loadFont(asset::plugin(pluginInstance, "res/RobotoMono-Regular.ttf"));
+    return f;
+}
+
+/**
  * 1. Custom Smoked Bronze Channel Display Widget
  */
 struct OpaqueDisplay : Widget {
@@ -10,12 +31,12 @@ struct OpaqueDisplay : Widget {
     std::shared_ptr<Font> font;
 
     OpaqueDisplay() {
-        font = APP->window->loadFont(asset::plugin(pluginInstance, "res/RobotoMono-Regular.ttf"));
+        font = loadRobustFont();
     }
 
-    void onButton(const ButtonEvent& e) override {
+    void onButton(const event::Button& e) override {
         Widget::onButton(e);
-        if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
+        if (e.action == event::Button::PRESS && e.button == event::Button::LEFT) {
             if (module) {
                 module->handleFocusToggle(channelId);
             }
@@ -32,16 +53,19 @@ struct OpaqueDisplay : Widget {
         // Skip drawing text during flash-off states to create a pulsing visual effect
         if (shouldFlash) return;
 
-        nvgFontFaceId(args.vg, font->handle);
-        nvgFontSize(args.vg, 21.0f);
-        nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+        // Verify the font pointer is loaded before attempting dereferencing (Prevents Segfault)
+        if (font) {
+            nvgFontFaceId(args.vg, font->handle);
+            nvgFontSize(args.vg, 21.0f);
+            nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
 
-        // Warm amber-orange glow: #ff9d00
-        nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xdf));
+            // Warm amber-orange glow: #ff9d00
+            nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xdf));
 
-        // Display current state (e.g. channel number, or parameter level)
-        std::string text = std::to_string(channelId + 1);
-        nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, text.c_str(), NULL);
+            // Display current state (e.g. channel number, or parameter level)
+            std::string text = std::to_string(channelId + 1);
+            nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, text.c_str(), NULL);
+        }
     }
 };
 
@@ -132,10 +156,12 @@ struct SoundscapesFader : app::SvgSlider {
  */
 struct PerformanceButtonWidget : app::SvgSwitch {
     int buttonId = 0; // 0 to 7
+    std::shared_ptr<Font> font;
 
     PerformanceButtonWidget() {
         momentary = true;
         box.size = Vec(18.0f, 14.0f);
+        font = loadRobustFont(); // Loaded once during widget setup (Optimized)
     }
 
     void draw(const DrawArgs& args) override {
@@ -175,8 +201,7 @@ struct PerformanceButtonWidget : app::SvgSwitch {
         nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
 
-        // Render Dynamic Text Label inside the button (C++11 compatible)
-        std::shared_ptr<Font> font = APP->window->loadFont(asset::plugin(pluginInstance, "res/RobotoMono-Regular.ttf"));
+        // Render Dynamic Text Label inside the button
         if (font) {
             nvgFontFaceId(args.vg, font->handle);
             nvgFontSize(args.vg, 5.0f);
@@ -303,9 +328,11 @@ struct ModeButtonWidget : app::ParamWidget {
  */
 struct FXButtonWidget : app::ParamWidget {
     std::string label;
+    std::shared_ptr<Font> font;
 
     FXButtonWidget() {
         box.size = Vec(24.0f, 20.0f);
+        font = loadRobustFont(); // Loaded once during widget setup (Optimized)
     }
 
     void draw(const DrawArgs& args) override {
@@ -345,7 +372,6 @@ struct FXButtonWidget : app::ParamWidget {
         nvgStroke(args.vg);
 
         // Centered Button Label text drawn using verified monospaced font
-        std::shared_ptr<Font> font = APP->window->loadFont(asset::plugin(pluginInstance, "res/RobotoMono-Regular.ttf"));
         if (font) {
             nvgFontFaceId(args.vg, font->handle);
             nvgFontSize(args.vg, 5.0f);
@@ -441,7 +467,7 @@ struct SoundscapesWidget : ModuleWidget {
             addParam(chdPad);
         }
 
-        // 2x4 Utility Button Grid on Columns 9 & 10 (Typo 'i' corrected to 'row')
+        // 2x4 Utility Button Grid on Columns 9 & 10
         for (int row = 0; row < 4; row++) {
             float y = SoundscapesCoords::ROW4_BUTTON_ROWS[row];
             int btnIndex = row * 2;
