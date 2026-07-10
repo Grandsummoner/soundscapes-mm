@@ -10,12 +10,10 @@ struct StereoSVF {
     float ic1eq_R = 0.0f, ic2eq_R = 0.0f;
 
     void process(float inputL, float inputR, float cutoffHz, float resonance, float sampleRate, float& outL, float& outR) {
-        // Clamp parameters for stability using VCV math::clamp (C++11 compatible)
         cutoffHz = math::clamp(cutoffHz, 20.0f, 18000.0f);
         resonance = math::clamp(resonance, 0.01f, 0.99f);
         float q = 1.0f / (2.0f * (1.0f - resonance)); // Q-factor mapping
 
-        // Prewarp cutoff frequency
         float g = std::tan(M_PI * cutoffHz / sampleRate);
         float k = 1.0f / q;
         float a1 = 1.0f / (1.0f + g * (g + k));
@@ -39,7 +37,6 @@ struct StereoSVF {
     }
 };
 
-// Instantiate local filter module
 static StereoSVF mainFilter;
 
 /**
@@ -52,17 +49,14 @@ struct ShimmerPitchShifter {
     float readPtr2 = 2048.0f;
 
     float process(float sample) {
-        // Write to circular buffer
         buffer[writePtr] = sample;
 
-        // Advance fractional read pointers for pitch transposition (Octave up = rate 2.0)
         readPtr1 += 2.0f;
         readPtr2 += 2.0f;
 
         if (readPtr1 >= 4096.0f) readPtr1 -= 4096.0f;
         if (readPtr2 >= 4096.0f) readPtr2 -= 4096.0f;
 
-        // Linear interpolation for readout taps
         int idx1 = (int)readPtr1;
         float frac1 = readPtr1 - idx1;
         float out1 = (1.0f - frac1) * buffer[idx1] + frac1 * buffer[(idx1 + 1) % 4096];
@@ -71,36 +65,87 @@ struct ShimmerPitchShifter {
         float frac2 = readPtr2 - idx2;
         float out2 = (1.0f - frac2) * buffer[idx2] + frac2 * buffer[(idx2 + 1) % 4096];
 
-        // Dual-tap crossfading to eliminate circular buffer head clicks
         float fade = std::abs(2048.0f - (float)writePtr) / 2048.0f;
         float shiftedOutput = out1 * fade + out2 * (1.0f - fade);
 
-        // Advance write pointer
         writePtr = (writePtr + 1) % 4096;
 
         return shiftedOutput;
     }
 };
 
-// Instantiate local pitch shifters for stereo shimmer channels
 static ShimmerPitchShifter shimmerShiftL;
 static ShimmerPitchShifter shimmerShiftR;
 
 /**
- * 3. Cascade FX Processing Loop
+ * 3. Master Consolidated Process Loop
  */
 void Soundscapes::process(const ProcessArgs& args) {
     // A. Tick Sequencer Step clocks & handle focused fader locks
     processSequencer(args.sampleTime);
     handleFaderMapping();
 
-    // B. Call Synthesizer Engine to process raw Voice DSP output signals
+    // B. Temporary HUD Displays update timers
+    for (int i = 0; i < 8; i++) {
+        if (displayValueTimer[i] > 0.0f) {
+            displayValueTimer[i] -= args.sampleTime;
+        }
+    }
+
+    // C. Monitor fader movements to display active percentages (00 - 99)
+    for (int i = 0; i < 8; i++) {
+        static float prevFaderVal[8] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+        float currVal = params[FADER1_PARAM + i].getValue();
+        if (prevFaderVal[i] >= 0.0f && fabs(currVal - prevFaderVal[i]) > 0.001f) {
+            displayValueTimer[i] = 1.5f;
+            displayValue[i] = currVal;
+            displayType[i] = 0;
+        }
+        prevFaderVal[i] = currVal;
+    }
+
+    // D. Monitor macro knobs to display edited levels across all screens
+    for (int k = 0; k < 6; k++) {
+        static float prevKnobVal[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+        float currVal = params[RATE_PARAM + k].getValue();
+        if (prevKnobVal[k] >= 0.0f && fabs(currVal - prevKnobVal[k]) > 0.001f) {
+            for (int i = 0; i < 8; i++) {
+                displayValueTimer[i] = 1.5f;
+                displayValue[i] = currVal;
+                displayType[i] = 0;
+            }
+        }
+        prevKnobVal[k] = currVal;
+    }
+
+    // E. Monitor ROOT & SCALE edits to display note names and scale abbreviations
+    static float prevRoot = -1.0f;
+    float currRoot = params[ROOT_PARAM].getValue();
+    if (prevRoot >= 0.0f && fabs(currRoot - prevRoot) > 0.01f) {
+        for (int i = 0; i < 8; i++) {
+            displayValueTimer[i] = 1.5f;
+            displayValue[i] = currRoot;
+            displayType[i] = 1;
+        }
+    }
+    prevRoot = currRoot;
+
+    static float prevScale = -1.0f;
+    float currScale = params[SCALE_PARAM].getValue();
+    if (prevScale >= 0.0f && fabs(currScale - prevScale) > 0.01f) {
+        for (int i = 0; i < 8; i++) {
+            displayValueTimer[i] = 1.5f;
+            displayValue[i] = currScale;
+            displayType[i] = 2;
+        }
+    }
+    prevScale = currScale;
+
+    // F. Call Synthesizer Engine to process raw Voice DSP output signals
     processDSP(args);
 
-    // C. Cascade FX Tank Bus Processing
+    // G. Cascade FX Tank Bus Processing
     float sampleRate = args.sampleRate;
-    // float sampleTime = args.sampleTime; // Commented out to clear unused variable warning
-
     float inputBusL = 0.0f;
     float inputBusR = 0.0f;
 
