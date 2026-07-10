@@ -48,7 +48,7 @@ struct OpaqueDisplay : Widget {
 /**
  * 2. Procedural Step Sequencer Pad Widget
  */
-struct StepPadWidget : SvgSwitch {
+struct StepPadWidget : Switch {
     int padId = 0; // Range 0 - 15
 
     StepPadWidget() {
@@ -101,7 +101,7 @@ struct StepPadWidget : SvgSwitch {
 /**
  * 3. Procedural Slide Fader Handle
  */
-struct SoundscapesFader : SvgSlider {
+struct SoundscapesFader : Slider {
     SoundscapesFader() {
         box.size = Vec(14.0f, 20.0f);
     }
@@ -130,7 +130,7 @@ struct SoundscapesFader : SvgSlider {
 /**
  * 4. Procedural Utility/Performance Buttons
  */
-struct PerformanceButtonWidget : SvgSwitch {
+struct PerformanceButtonWidget : Switch {
     int buttonId = 0; // 0 to 7
 
     PerformanceButtonWidget() {
