@@ -69,7 +69,7 @@ struct OpaqueDisplay : Widget {
 
         bool isFocused = (module->focusedChannel == channelId);
         
-        // Draw physical glowing aura/outline if focused (perfectly aligned with backplate now)
+        // Draw physical glowing aura/outline if focused
         if (isFocused) {
             nvgBeginPath(args.vg);
             nvgRoundedRect(args.vg, -2.0f, -2.0f, box.size.x + 4.0f, box.size.y + 4.0f, 5.0f);
@@ -95,7 +95,6 @@ struct OpaqueDisplay : Widget {
             nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xdf));
 
             std::string text = std::to_string(channelId + 1);
-            // Adjusted: Y-coordinate mathematically aligned to the dead-center
             nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f + 1.5f, text.c_str(), NULL);
         }
     }
@@ -168,7 +167,7 @@ struct SoundscapesFader : app::SvgSlider {
         nvgFillColor(args.vg, nvgRGBA(13, 12, 11, 255)); // #0d0c0b
         nvgFill(args.vg);
 
-        // Position of cap handle relative to travel range
+        // Position of cap handle relative to dynamic value travel
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.8f;
         float handleHeight = 16.0f;
         float handleY = (1.0f - value) * (box.size.y - handleHeight);
@@ -194,16 +193,21 @@ struct SoundscapesFader : app::SvgSlider {
 };
 
 /**
- * 4. Procedural Utility/Performance Buttons (Enhanced selection contrast)
+ * 4. Procedural Utility/Performance Buttons
  */
 struct PerformanceButtonWidget : SoundscapesButton {
     int buttonId = 0; // 0 to 7
     std::shared_ptr<Font> font;
 
     PerformanceButtonWidget() {
-        momentary = (buttonId != 0 && buttonId != 1);
         box.size = Vec(18.0f, 14.0f);
         font = loadRobustFont();
+    }
+
+    void onButton(const event::Button& e) override {
+        // Corrected: Evaluates momentary status inside button trigger handler (fixes uninitialized constructor variable)
+        momentary = (buttonId != 0 && buttonId != 1);
+        SoundscapesButton::onButton(e);
     }
 
     void draw(const DrawArgs& args) override {
@@ -228,11 +232,9 @@ struct PerformanceButtonWidget : SoundscapesButton {
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.0f;
         if (litState) {
             if (buttonId == 0) {
-                // Highly colorful bright green active selection fill
-                nvgFillColor(args.vg, nvgRGBA(0x2e, 0xcc, 0x71, 0xff)); 
+                nvgFillColor(args.vg, nvgRGBA(0x2e, 0xcc, 0x71, 0xff)); // PLAY lit green
             } else {
-                // Highly colorful deep amber-orange shift active selection fill
-                nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); 
+                nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // SHFT lit amber
             }
         } else if (value > 0.5f) {
             nvgFillColor(args.vg, nvgRGBA(0xee, 0xee, 0xee, 0xff));     // Pressed grey
@@ -354,6 +356,7 @@ struct SoundscapesSmallKnob : SoundscapesKnob {
 
 /**
  * 7. Procedural MODE Selection Window (Beautiful 3-Way Selector Switch)
+ * Now overrides click logic to guarantee precise toggle cycling.
  */
 struct ModeThreeWaySwitch : app::ParamWidget {
     std::shared_ptr<Font> font;
@@ -361,6 +364,20 @@ struct ModeThreeWaySwitch : app::ParamWidget {
     ModeThreeWaySwitch() {
         box.size = Vec(14.0f, 36.0f);
         font = loadRobustFont();
+    }
+
+    void onButton(const event::Button& e) override {
+        ParamWidget::onButton(e);
+        // Corrected: Handled mouse click toggles directly inside the Mode selector
+        if (getParamQuantity()) {
+            if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
+                float val = getParamQuantity()->getValue();
+                float newVal = val + 1.0f;
+                if (newVal > 2.0f) newVal = 0.0f;
+                getParamQuantity()->setValue(newVal);
+                e.consume(this);
+            }
+        }
     }
 
     void draw(const DrawArgs& args) override {
@@ -434,8 +451,7 @@ struct FXButtonWidget : SoundscapesButton {
 
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.0f;
         if (isActive) {
-            // Highly obvious glowing neon-amber selection fill to match display digits
-            nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); 
+            nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // Active amber glow
         } else if (value > 0.5f) {
             nvgFillColor(args.vg, nvgRGBA(0xee, 0xee, 0xee, 0xff)); // Pressed grey
         } else {
@@ -465,7 +481,92 @@ struct FXButtonWidget : SoundscapesButton {
 };
 
 /**
- * 9. Master ModuleWidget Panel Setup
+ * 9. Custom Layer Widget to Programmatically Render Label Layers
+ * This layer is drawn on top of the SVG panel but behind active parameter controls,
+ * completely solving missing faceplate labeling with zero SVG path dependancies.
+ */
+struct FaceplateLabels : Widget {
+    std::shared_ptr<Font> font;
+
+    FaceplateLabels() {
+        font = loadRobustFont();
+        box.size = Vec(420.0f, 380.0f); // Cover entire module width and height
+    }
+
+    void draw(const DrawArgs& args) override {
+        if (font) {
+            nvgFontFaceId(args.vg, font->handle);
+            nvgFillColor(args.vg, nvgRGBA(0x5c, 0x53, 0x46, 0xff)); // Clean charcoal
+            nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+            
+            // A. Draw Module Main Header
+            nvgFontSize(args.vg, 14.5f);
+            nvgFontFaceId(args.vg, font->handle);
+            nvgFillColor(args.vg, nvgRGBA(0x11, 0x11, 0x11, 0xff)); // Dark bold
+            nvgText(args.vg, 232.5f, 25.0f, "SOUNDSCAPES", NULL);
+
+            // B. Draw Module Slogan
+            nvgFontSize(args.vg, 6.5f);
+            nvgFillColor(args.vg, nvgRGBA(0x6d, 0x65, 0x58, 0xff)); // Cream-charcoal
+            nvgText(args.vg, 232.5f, 36.0f, "8-Channel Poly-Engine", NULL);
+
+            // C. Sidebar Labels (CLK, RST, etc.)
+            const char* sidebarLabels[7] = {"CLK", "RST", "V/OCT", "GATE", "VEL", "EXT IN", "DUCK"};
+            for (int i = 0; i < 7; i++) {
+                float y = SoundscapesCoords::SIDEBAR_Y_START + (i * SoundscapesCoords::SIDEBAR_Y_SPACING);
+                nvgFontSize(args.vg, 5.5f);
+                if (i == 5) nvgFillColor(args.vg, nvgRGBA(0xd4, 0x7d, 0x00, 0xff)); // Orange for EXT IN
+                else if (i == 6) nvgFillColor(args.vg, nvgRGBA(0xd0, 0x02, 0x1b, 0xff)); // Red for DUCK
+                else nvgFillColor(args.vg, nvgRGBA(0x7d, 0x71, 0x60, 0xff));
+                nvgText(args.vg, SoundscapesCoords::SIDEBAR_JACK_X, y + 14.0f, sidebarLabels[i], NULL);
+            }
+            nvgFillColor(args.vg, nvgRGBA(0x5c, 0x53, 0x46, 0xff)); // Reset to standard charcoal
+
+            // D. Output Jack Column Numbers (1 to 8)
+            for (int i = 0; i < 8; i++) {
+                float x = SoundscapesCoords::CH_COLS[i];
+                nvgFontSize(args.vg, 6.0f);
+                nvgText(args.vg, x, SoundscapesCoords::ROW1_JACK_Y + 16.0f, std::to_string(i + 1).c_str(), NULL);
+                nvgText(args.vg, x, SoundscapesCoords::ROW1_DISPLAY_Y + 28.0f, std::to_string(i + 1).c_str(), NULL);
+            }
+
+            // E. Fader Numbers (1 to 8)
+            for (int i = 0; i < 8; i++) {
+                float x = SoundscapesCoords::GRID_COLS[i];
+                nvgFontSize(args.vg, 6.0f);
+                nvgText(args.vg, x, SoundscapesCoords::ROW3_FADER_Y + 34.0f, std::to_string(i + 1).c_str(), NULL);
+            }
+
+            // F. Macro Knob Labels
+            const char* knobLabels[6] = {"RATE", "DENSITY", "TIMBRE", "TEXTURE", "SPREAD", "DYNAMICS"};
+            for (int i = 0; i < 6; i++) {
+                nvgFontSize(args.vg, 5.0f);
+                nvgText(args.vg, SoundscapesCoords::KNOB_COLS[i], SoundscapesCoords::ROW2_KNOB_Y + 21.0f, knobLabels[i], NULL);
+            }
+
+            // G. Root & Scale Labels
+            nvgFontSize(args.vg, 5.0f);
+            nvgText(args.vg, SoundscapesCoords::GRID_COLS[8], SoundscapesCoords::ROOT_Y + 21.0f, "ROOT", NULL);
+            nvgText(args.vg, SoundscapesCoords::GRID_COLS[9], SoundscapesCoords::SCALE_Y + 21.0f, "SCALE", NULL);
+
+            // H. Melody & Chord Labels
+            nvgFontSize(args.vg, 5.5f);
+            for (int i = 0; i < 8; i++) {
+                float x = SoundscapesCoords::GRID_COLS[i];
+                nvgText(args.vg, x, SoundscapesCoords::ROW4_MELODY_PAD_Y + 18.0f, std::to_string(i + 1).c_str(), NULL);
+                nvgText(args.vg, x, SoundscapesCoords::ROW4_CHORD_PAD_Y + 18.0f, std::to_string(i + 9).c_str(), NULL);
+            }
+
+            // Section Labels
+            nvgFontSize(args.vg, 6.0f);
+            nvgText(args.vg, 198.0f, 315.0f, "MELODY", NULL);
+            nvgText(args.vg, 198.0f, 363.0f, "CHORD", NULL);
+        }
+    }
+};
+
+/**
+ * 10. Master ModuleWidget Panel Setup
  */
 struct SoundscapesWidget : ModuleWidget {
     SoundscapesWidget(Soundscapes* module) {
@@ -473,6 +574,10 @@ struct SoundscapesWidget : ModuleWidget {
         
         // Load the finalized symmetrical vector faceplate panel
         setPanel(createPanel(asset::plugin(pluginInstance, "res/soundscapes-mm.svg")));
+
+        // Corrected: Add the programmatic label overlay directly on top of the SVG panel (fixes missing labels)
+        FaceplateLabels* labelOverlay = new FaceplateLabels();
+        addChild(labelOverlay);
 
         // --- I. Left Sidebar Inputs & LEDs ---
         for (int i = 0; i < Soundscapes::NUM_INPUTS; i++) {
@@ -562,70 +667,6 @@ struct SoundscapesWidget : ModuleWidget {
             PerformanceButtonWidget* btn2 = createParamCentered<PerformanceButtonWidget>(Vec(SoundscapesCoords::GRID_COLS[9], y), module, Soundscapes::PLAY_PARAM + btnIndex + 1);
             btn2->buttonId = btnIndex + 1;
             addParam(btn2);
-        }
-    }
-
-    /**
-     * Programmatic Label Renderer
-     * Completely eliminates missing SVG text issues by using direct NanoVG vectors
-     */
-    void draw(const DrawArgs& args) override {
-        // Render the base panel SVG first
-        ModuleWidget::draw(args);
-        
-        std::shared_ptr<Font> font = loadRobustFont();
-        if (font) {
-            nvgFontFaceId(args.vg, font->handle);
-            nvgFillColor(args.vg, nvgRGBA(0x5c, 0x53, 0x46, 0xff)); // Clean charcoal
-            nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-            
-            // 1. Sidebar Labels (CLK, RST, etc.)
-            const char* sidebarLabels[7] = {"CLK", "RST", "V/OCT", "GATE", "VEL", "EXT IN", "DUCK"};
-            for (int i = 0; i < 7; i++) {
-                float y = SoundscapesCoords::SIDEBAR_Y_START + (i * SoundscapesCoords::SIDEBAR_Y_SPACING);
-                nvgFontSize(args.vg, 5.5f);
-                nvgText(args.vg, SoundscapesCoords::SIDEBAR_JACK_X, y + 14.0f, sidebarLabels[i], NULL);
-            }
-
-            // 2. Output Jack Column Numbers (1 to 8)
-            for (int i = 0; i < 8; i++) {
-                float x = SoundscapesCoords::CH_COLS[i];
-                nvgFontSize(args.vg, 6.0f);
-                nvgText(args.vg, x, SoundscapesCoords::ROW1_JACK_Y + 16.0f, std::to_string(i + 1).c_str(), NULL);
-                nvgText(args.vg, x, SoundscapesCoords::ROW1_DISPLAY_Y + 28.0f, std::to_string(i + 1).c_str(), NULL);
-            }
-
-            // 3. Fader Numbers (1 to 8)
-            for (int i = 0; i < 8; i++) {
-                float x = SoundscapesCoords::GRID_COLS[i];
-                nvgFontSize(args.vg, 6.0f);
-                nvgText(args.vg, x, SoundscapesCoords::ROW3_FADER_Y + 34.0f, std::to_string(i + 1).c_str(), NULL);
-            }
-
-            // 4. Macro Knob Labels
-            const char* knobLabels[6] = {"RATE", "DENSITY", "TIMBRE", "TEXTURE", "SPREAD", "DYNAMICS"};
-            for (int i = 0; i < 6; i++) {
-                nvgFontSize(args.vg, 5.0f);
-                nvgText(args.vg, SoundscapesCoords::KNOB_COLS[i], SoundscapesCoords::ROW2_KNOB_Y + 21.0f, knobLabels[i], NULL);
-            }
-
-            // 5. Root & Scale Labels
-            nvgFontSize(args.vg, 5.0f);
-            nvgText(args.vg, SoundscapesCoords::GRID_COLS[8], SoundscapesCoords::ROOT_Y + 21.0f, "ROOT", NULL);
-            nvgText(args.vg, SoundscapesCoords::GRID_COLS[9], SoundscapesCoords::SCALE_Y + 21.0f, "SCALE", NULL);
-
-            // 6. Melody & Chord Labels
-            nvgFontSize(args.vg, 5.5f);
-            for (int i = 0; i < 8; i++) {
-                float x = SoundscapesCoords::GRID_COLS[i];
-                nvgText(args.vg, x, SoundscapesCoords::ROW4_MELODY_PAD_Y + 18.0f, std::to_string(i + 1).c_str(), NULL);
-                nvgText(args.vg, x, SoundscapesCoords::ROW4_CHORD_PAD_Y + 18.0f, std::to_string(i + 9).c_str(), NULL);
-            }
-
-            // Section Labels
-            nvgFontSize(args.vg, 6.0f);
-            nvgText(args.vg, 198.0f, 315.0f, "MELODY", NULL);
-            nvgText(args.vg, 198.0f, 363.0f, "CHORD", NULL);
         }
     }
 };
