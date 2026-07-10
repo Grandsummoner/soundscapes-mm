@@ -1,17 +1,17 @@
-# Path to the VCV Rack SDK directory (defaults to sibling path if not specified)
+# If RACK_DIR is not defined when calling make, default to the SDK directory
 RACK_DIR ?= ../..
 
-# Custom compiler flags
+# FLAGS will be passed to both C and C++ compilers
 FLAGS +=
 CFLAGS +=
 CXXFLAGS +=
 
-# Automatically compile all C++ source files found in our src/ directory
+# List of source files to compile
 SOURCES += $(wildcard src/*.cpp)
 
-# Import the core VCV Rack plugin compilation rules
-include $(RACK_DIR)/plugin.mk
+# List of helper files to include in distribution (SVG panel, fonts, and metadata)
+# Note: DISTRIBUTABLES is the standard VCV SDK variable used to pack the assets!
+DISTRIBUTABLES += plugin.json res/
 
-# CRITICAL VCV SDK RULE: Custom assets must be appended AFTER including plugin.mk
-# otherwise they will be overwritten and excluded from the compiled .vcvplugin!
-DISTFILES += res
+# Include the standard Rack plugin Makefile framework
+include $(RACK_DIR)/plugin.mk
