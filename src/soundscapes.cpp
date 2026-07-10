@@ -18,7 +18,7 @@ Soundscapes::Soundscapes() {
 
     // 3. Configure Row 1 Channel Output Sockets
     for (int i = 0; i < 8; i++) {
-        configOutput(CH1_OUTPUT + i, "Channel " + std::to_string(i + 1) + " Audio Output");
+        configOutput(CH1_OUTPUT + i, string::f("Channel %d Audio Output", i + 1));
     }
 
     // 4. Configure Row 2 Core Synth Parameters
@@ -37,14 +37,14 @@ Soundscapes::Soundscapes() {
 
     // 5. Configure Row 3 Mixer Faders & Center Quantizers
     for (int i = 0; i < 8; i++) {
-        configParam(FADER1_PARAM + i, 0.0f, 1.0f, 0.8f, "Channel " + std::to_string(i + 1) + " Amplitude/Send Fader");
+        configParam(FADER1_PARAM + i, 0.0f, 1.0f, 0.8f, string::f("Channel %d Amplitude/Send Fader", i + 1));
     }
     configParam(ROOT_PARAM, 0.0f, 1.0f, 0.0f, "Diatonic Quantizer: Root Scale Transposition Note");
     configParam(SCALE_PARAM, 0.0f, 1.0f, 0.0f, "Diatonic Quantizer: Selected Harmonised Scale Degrees");
 
     // 6. Configure Row 4 Step Buttons & Performance Block
     for (int i = 0; i < 16; i++) {
-        configParam(STEP_PARAM_START + i, 0.0f, 1.0f, 0.0f, "Step Pad " + std::to_string(i + 1) + " Toggle trigger");
+        configParam(STEP_PARAM_START + i, 0.0f, 1.0f, 0.0f, string::f("Step Pad %d Toggle Trigger", i + 1));
     }
 
     configParam(PLAY_PARAM, 0.0f, 1.0f, 0.0f, "Transport: Sequencer Play / Stop Toggle");
