@@ -147,15 +147,25 @@ struct PerformanceButtonWidget : app::SvgSwitch {
             if (buttonId == 1) litState = module->shiftActive;     // SHFT Button
         }
 
+        // Soft shadow
+        nvgBeginPath(args.vg);
+        nvgRoundedRect(args.vg, 0.0f, 1.0f, box.size.x, box.size.y, 2.5f);
+        nvgFillColor(args.vg, nvgRGBA(0x00, 0x00, 0x00, 0x0c));
+        nvgFill(args.vg);
+
+        // Button Body
         nvgBeginPath(args.vg);
         nvgRoundedRect(args.vg, 0.0f, 0.0f, box.size.x, box.size.y, 2.5f);
 
+        float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.0f;
         if (litState) {
             if (buttonId == 0) {
                 nvgFillColor(args.vg, nvgRGBA(0x2e, 0xcc, 0x71, 0xff)); // PLAY lit green
             } else {
                 nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // SHFT lit amber
             }
+        } else if (value > 0.5f) {
+            nvgFillColor(args.vg, nvgRGBA(0xee, 0xee, 0xee, 0xff));     // Pressed grey
         } else {
             nvgFillColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff));     // White unlit
         }
@@ -164,6 +174,19 @@ struct PerformanceButtonWidget : app::SvgSwitch {
         nvgStrokeColor(args.vg, nvgRGBA(0xcc, 0xc4, 0xb6, 0xff));
         nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
+
+        // Render Dynamic Text Label inside the button (C++11 compatible)
+        std::shared_ptr<Font> font = APP->window->loadFont(asset::plugin(pluginInstance, "res/RobotoMono-Regular.ttf"));
+        if (font) {
+            nvgFontFaceId(args.vg, font->handle);
+            nvgFontSize(args.vg, 5.0f);
+            nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+            nvgFillColor(args.vg, litState ? nvgRGBA(0xff, 0xff, 0xff, 0xff) : nvgRGBA(0x5c, 0x53, 0x46, 0xff));
+            
+            // Map buttonId to label string
+            const char* labels[8] = {"PLAY", "SHFT", "ARP", "FRZ", "CHRD", "PROB", "SAVE", "RCL"};
+            nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, labels[buttonId], NULL);
+        }
     }
 };
 
