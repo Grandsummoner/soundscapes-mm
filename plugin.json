@@ -1,42 +1,26 @@
 {
   "slug": "soundscapes-mm",
-  "name": "soundscapes-mm",
+  "name": "Soundscapes",
   "version": "1.0.0",
   "license": "GPL-3.0-or-later",
-  "brand": "Grandsummoner",
-  "author": "Grandsummoner",
-  "authorEmail": "",
-  "authorUrl": "",
-  "pluginUrl": "",
-  "manualUrl": "",
-  "sourceUrl": "https://github.com/Grandsummoner/soundscapes-mm",
+  "brand": "Soundscapes",
+  "author": "Soundscapes-MM",
+  "authorEmail": "contact@example.com",
+  "authorUrl": "https://github.com/example/soundscapes-mm",
+  "pluginUrl": "https://github.com/example/soundscapes-mm",
+  "manualUrl": "https://github.com/example/soundscapes-mm/blob/main/README.md",
+  "sourceUrl": "https://github.com/example/soundscapes-mm",
   "donateUrl": "",
   "modules": [
     {
       "slug": "soundscapes-mm",
-      "name": "Soundscapes MM",
-      "description": "Ambient Generative Synth & Sequencer Workstation",
+      "name": "Soundscapes",
+      "description": "8-Channel Polyphonic Synth Voice & Dual-Track Sequencer Engine",
       "tags": [
-        "Synthesizer",
+        "Synth Voice",
         "Sequencer",
-        "Reverb",
-        "Delay",
-        "Granular"
+        "Polyphonic"
       ]
     }
-  ],
-  "metamodule": {
-    "hardware-mappings": {
-      "knobs": [
-        "RATE_PARAM",
-        "DENSITY_PARAM",
-        "TIMBRE_PARAM",
-        "TEXTURE_PARAM",
-        "SPREAD_PARAM",
-        "DYNAMICS_PARAM",
-        "ROOT_PARAM",
-        "SCALE_PARAM"
-      ]
-    }
-  }
+  ]
 }
