@@ -64,206 +64,108 @@
     <g id="sidebar-inputs">
         <use href="#jack-placeholder" x="22.5" y="55"/>
         <use href="#status-led" x="34.5" y="55"/>
-        <text x="22.5" y="69" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">CLK</text>
 
         <use href="#jack-placeholder" x="22.5" y="102"/>
         <use href="#status-led" x="34.5" y="102"/>
-        <text x="22.5" y="116" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">RST</text>
 
         <use href="#jack-placeholder" x="22.5" y="149"/>
         <use href="#status-led" x="34.5" y="149"/>
-        <text x="22.5" y="163" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">V/OCT</text>
 
         <use href="#jack-placeholder" x="22.5" y="196"/>
         <use href="#status-led" x="34.5" y="196"/>
-        <text x="22.5" y="210" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">GATE</text>
 
         <use href="#jack-placeholder" x="22.5" y="243"/>
         <use href="#status-led" x="34.5" y="243"/>
-        <text x="22.5" y="257" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">VEL</text>
 
         <use href="#jack-amber" x="22.5" y="290"/>
         <use href="#status-led" x="34.5" y="290"/>
-        <text x="22.5" y="304" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#d47d00" text-anchor="middle">EXT IN</text>
 
         <use href="#jack-red" x="22.5" y="337"/>
         <use href="#status-led" x="34.5" y="337"/>
-        <text x="22.5" y="351" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#d0021b" text-anchor="middle">DUCK</text>
     </g>
 
     <!-- ================================================================= -->
-    <!-- II. MAIN MODULE HEADER                                            -->
+    <!-- II. ROW 1 (EXPANDED OUTPUTS AND SMOKED BRONZE DISPLAYS)          -->
     <!-- ================================================================= -->
-    <g id="header-text">
-        <text x="232.5" y="25" font-family="'Roboto Mono', monospace" font-size="14.5" font-weight="bold" fill="#111111" letter-spacing="4" text-anchor="middle">SOUNDSCAPES</text>
-        <text x="232.5" y="36" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#6d6558" letter-spacing="0.8" text-anchor="middle">8-Channel Poly-Engine</text>
-    </g>
-
-    <!-- ================================================================= -->
-    <!-- III. ROW 1 (EXPANDED OUTPUTS AND SMOKED BRONZE DISPLAYS)          -->
-    <!-- ================================================================= -->
+    <!-- Green background LED circles have been removed to avoid duplicates -->
     <g id="row1-expanded-grid">
         <!-- CH1 -->
         <use href="#jack-placeholder" x="79" y="55"/>
-        <circle cx="79" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
-        <text x="79" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">1</text>
         <rect x="65" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
-        <text x="79" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">1</text>
 
         <!-- CH2 -->
         <use href="#jack-placeholder" x="123" y="55"/>
-        <circle cx="123" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
-        <text x="123" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">2</text>
         <rect x="109" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
-        <text x="123" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">2</text>
 
         <!-- CH3 -->
         <use href="#jack-placeholder" x="167" y="55"/>
-        <circle cx="167" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
-        <text x="167" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">3</text>
         <rect x="153" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
-        <text x="167" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">3</text>
 
         <!-- CH4 -->
         <use href="#jack-placeholder" x="211" y="55"/>
-        <circle cx="211" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
-        <text x="211" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">4</text>
         <rect x="197" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
-        <text x="211" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">4</text>
 
         <!-- CH5 -->
         <use href="#jack-placeholder" x="254" y="55"/>
-        <circle cx="254" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
-        <text x="254" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">5</text>
         <rect x="240" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
-        <text x="254" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">5</text>
 
         <!-- CH6 -->
         <use href="#jack-placeholder" x="298" y="55"/>
-        <circle cx="298" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
-        <text x="298" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">6</text>
         <rect x="284" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
-        <text x="298" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">6</text>
 
         <!-- CH7 -->
         <use href="#jack-placeholder" x="342" y="55"/>
-        <circle cx="342" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
-        <text x="342" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">7</text>
         <rect x="328" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
-        <text x="342" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">7</text>
 
         <!-- CH8 -->
         <use href="#jack-placeholder" x="386" y="55"/>
-        <circle cx="386" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
-        <text x="386" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">8</text>
         <rect x="372" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
-        <text x="386" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">8</text>
     </g>
 
     <!-- ================================================================= -->
-    <!-- IV. ROW 2 (THE SYNTH DECK)                                        -->
+    <!-- III. ROW 2 (THE SYNTH DECK)                                       -->
     <!-- ================================================================= -->
-    <!-- Static components are retained. Static overlay rectangles for buttons
-         have been removed, letting C++ draw active elements crisply. -->
     <g id="synth-deck">
         <!-- MODE Window Backplate (X = 67 to 91 - Centered at 79) -->
         <rect x="67" y="150" width="24" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <rect x="68.5" y="151.5" width="21" height="37" fill="none" stroke="#000000" stroke-width="0.8" opacity="0.3"/>
-        <text x="79" y="201" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#5c5346" text-anchor="middle">MODE</text>
 
         <!-- 6 Large Parameter Knobs (41px spacing starting at CH4 = 181) -->
         <!-- Knob 1: RATE (X = 181) -->
         <use href="#knob-large" x="181" y="170"/>
-        <text x="181" y="191" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#6c6457" text-anchor="middle">RATE</text>
 
         <!-- Knob 2: DENSITY (X = 222) -->
         <use href="#knob-large" x="222" y="170"/>
-        <text x="222" y="191" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#6c6457" text-anchor="middle">DENSITY</text>
 
         <!-- Knob 3: TIMBRE (X = 263) -->
         <use href="#knob-large" x="263" y="170"/>
-        <text x="263" y="191" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#6c6457" text-anchor="middle">TIMBRE</text>
 
         <!-- Knob 4: TEXTURE (X = 304) -->
         <use href="#knob-large" x="304" y="170"/>
-        <text x="304" y="191" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#6c6457" text-anchor="middle">TEXTURE</text>
 
         <!-- Knob 5: SPREAD (X = 345) -->
         <use href="#knob-large" x="345" y="170"/>
-        <text x="345" y="191" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#6c6457" text-anchor="middle">SPREAD</text>
 
         <!-- Knob 6: DYNAMICS (X = 386) -->
         <use href="#knob-large" x="386" y="170"/>
-        <text x="386" y="191" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#6c6457" text-anchor="middle">DYNAMICS</text>
     </g>
 
     <!-- ================================================================= -->
-    <!-- V. ROW 3 (DARK FADERS 1-8 AND DIAGONAL ROOT / SCALE KNOBS)         -->
+    <!-- IV. ROW 3 (DARK FADERS 1-8 AND DIAGONAL ROOT / SCALE KNOBS)       -->
     <!-- ================================================================= -->
     <g id="fader-row">
         <!-- Faders (CH 1–8) -->
         <rect x="77" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#221e1a" stroke-width="0.8"/>
-        <text x="79" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">1</text>
-        
         <rect x="111" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#221e1a" stroke-width="0.8"/>
-        <text x="113" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">2</text>
-        
         <rect x="145" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#221e1a" stroke-width="0.8"/>
-        <text x="147" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">3</text>
-        
         <rect x="179" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#221e1a" stroke-width="0.8"/>
-        <text x="181" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">4</text>
-        
         <rect x="213" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#221e1a" stroke-width="0.8"/>
-        <text x="215" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">5</text>
-        
         <rect x="247" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#221e1a" stroke-width="0.8"/>
-        <text x="249" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">6</text>
-        
         <rect x="281" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#221e1a" stroke-width="0.8"/>
-        <text x="283" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">7</text>
-        
         <rect x="315" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#221e1a" stroke-width="0.8"/>
-        <text x="317" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">8</text>
 
         <!-- Diagonal ROOT and SCALE Knobs -->
         <use href="#knob-large" x="351" y="220"/>
-        <text x="351" y="241" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#7c7365" text-anchor="middle">ROOT</text>
-        
         <use href="#knob-large" x="386" y="246"/>
-        <text x="386" y="267" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#7c7365" text-anchor="middle">SCALE</text>
-    </g>
-
-    <!-- ================================================================= -->
-    <!-- VI. ROW 4 (THE SEQUENCER LABELING AND DECORATIVE DETAILS)         -->
-    <!-- ================================================================= -->
-    <!-- Removes all static pad outlines. Visual guides and text structures 
-         are fully preserved for clean dynamic overlaying. -->
-    <g id="step-pads">
-        <!-- Labels for Melody Sequence (Columns 1–8) -->
-        <text x="79" y="306" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">1</text>
-        <text x="113" y="306" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">2</text>
-        <text x="147" y="306" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">3</text>
-        <text x="181" y="306" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">4</text>
-        <text x="215" y="306" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">5</text>
-        <text x="249" y="306" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">6</text>
-        <text x="283" y="306" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">7</text>
-        <text x="317" y="306" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">8</text>
-
-        <!-- Centered MELODY Label -->
-        <text x="198" y="315" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#8d8170" letter-spacing="1" text-anchor="middle">MELODY</text>
-
-        <!-- Labels for Chord Sequence (Columns 1–8) -->
-        <text x="79" y="354" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">9</text>
-        <text x="113" y="354" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">10</text>
-        <text x="147" y="354" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">11</text>
-        <text x="181" y="354" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">12</text>
-        <text x="215" y="354" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">13</text>
-        <text x="249" y="354" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">14</text>
-        <text x="283" y="354" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">15</text>
-        <text x="317" y="354" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">16</text>
-
-        <!-- Centered CHORD Label -->
-        <text x="198" y="363" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#8d8170" letter-spacing="1" text-anchor="middle">CHORD</text>
     </g>
 </svg>
