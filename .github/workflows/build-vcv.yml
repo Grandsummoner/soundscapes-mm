@@ -1,70 +1,28 @@
 name: Build VCV Rack Plugin
 
-on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:
+on: [push, pull_request]
 
 env:
-  rack-sdk-version: latest
   rack-plugin-toolchain-dir: /home/build/rack-plugin-toolchain
-
+  
 defaults:
   run:
     shell: bash
 
 jobs:
-  # Job 1: Pre-process and inject the commit hash into the plugin version for dev builds
-  modify-plugin-version:
-    name: Modify plugin version
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        id: plugin-version-cache
-        with:
-          path: plugin.json
-          key: ${{ github.sha }}-${{ github.run_id }}
-      - name: Inject Commit Hash to version
-        run: |
-          gitrev=`git rev-parse --short HEAD`
-          pluginversion=`jq -r '.version' plugin.json`
-          echo "Setting version from $pluginversion to $pluginversion-dev-$gitrev"
-          cat <<< `jq --arg VERSION "$pluginversion-dev-$gitrev" '.version=$VERSION' plugin.json` > plugin.json
-        if: "! startsWith(github.ref, 'refs/tags/v')"
-
-  # Job 2: Compile Windows and Linux binaries inside the official VCV Toolchain container
-  build-win-linux:
-    name: ${{ matrix.platform }}
-    needs: modify-plugin-version
+  build:
+    name: Windows x64 Build
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/bloodbat/rack-plugin-toolchain-win-linux
+      image: ghcr.io/qno/rack-plugin-toolchain:v2
       options: --user root
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [win, lin]
+      
     steps:
-      - name: Set up Git safe directory
-        run: git config --global --add safe.directory '*'
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
-      - uses: actions/cache@v4
-        id: plugin-version-cache
-        with:
-          path: plugin.json
-          key: ${{ github.sha }}-${{ github.run_id }}
-      - name: Compile Plugin
+
+      - name: Build plugin
         run: |
           export PLUGIN_DIR=$GITHUB_WORKSPACE
-          pushd ${{ env.rack-plugin-toolchain-dir }}
-          make plugin-build-${{ matrix.platform }}
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: soundscapes-mm-${{ matrix.platform }}
-          path: ${{ env.rack-plugin-toolchain-dir }}/plugin-build/*.vcvplugin
+          /home/build/rack-plugin-toolchain/compile-plugin.sh win-x64
