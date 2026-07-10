@@ -14,15 +14,15 @@ extern Plugin* pluginInstance;
 namespace SoundscapesCoords {
     // Left Sidebar Inputs
     const float SIDEBAR_JACK_X = 22.5f;
-    const float SIDEBAR_LED_X = 38.5f; // Shifted right for breathing space
+    const float SIDEBAR_LED_X = 38.5f; // Spacious gap between jack and LED
     const float SIDEBAR_Y_START = 55.0f;
     const float SIDEBAR_Y_SPACING = 47.0f;
 
     // Row 1: Expanded 8-Channel Outputs & Displays (44px spacing)
     const float CH_COLS[8] = {79.0f, 123.0f, 167.0f, 211.0f, 254.0f, 298.0f, 342.0f, 386.0f};
     const float ROW1_JACK_Y = 55.0f;
-    const float ROW1_LED_Y = 76.0f;       // Shifted down to separate from jacks
-    const float ROW1_DISPLAY_Y = 120.0f;  // Shifted display down to match LED shift
+    const float ROW1_LED_Y = 74.0f;       // Spacious gap between jack and LED
+    const float ROW1_DISPLAY_Y = 115.0f;  // Aligned perfectly with SVG backplate Y=115
 
     // Row 2: Centralized Synth Deck
     const float MODE_X = 79.0f;
