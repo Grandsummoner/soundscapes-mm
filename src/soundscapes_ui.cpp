@@ -43,7 +43,7 @@ struct SoundscapesButton : app::ParamWidget {
 };
 
 /**
- * 1. Custom Smoked Bronze Channel Display Widget (with centered alignment and glows)
+ * 1. Custom Smoked Bronze Channel Display Widget (with centered alignment and HUD value routing)
  */
 struct OpaqueDisplay : Widget {
     Soundscapes* module = nullptr;
@@ -94,8 +94,31 @@ struct OpaqueDisplay : Widget {
             nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
             nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xdf));
 
-            std::string text = std::to_string(channelId + 1);
-            nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f + 1.5f, text.c_str(), NULL);
+            char text[16];
+            // Displays real-time parameter levels if active display value HUD timer is running
+            if (module->displayValueTimer[channelId] > 0.0f) {
+                if (module->displayType[channelId] == 1) {
+                    // Display Root Note Name
+                    int r = (int)std::round(module->displayValue[channelId] * 11.0f);
+                    r = clamp(r, 0, 11);
+                    const char* notes[12] = {"C ", "C#", "D ", "D#", "E ", "F ", "F#", "G ", "G#", "A ", "A#", "B "};
+                    snprintf(text, sizeof(text), "%s", notes[r]);
+                } else if (module->displayType[channelId] == 2) {
+                    // Display Scale Type Abbreviation
+                    int s = (int)std::round(module->displayValue[channelId] * 4.0f);
+                    s = clamp(s, 0, 4);
+                    const char* scalesText[5] = {"MA", "MI", "PE", "DO", "PH"};
+                    snprintf(text, sizeof(text), "%s", scalesText[s]);
+                } else {
+                    // Display general fader/knob level (00 to 99)
+                    int pct = (int)std::round(module->displayValue[channelId] * 99.0f);
+                    pct = clamp(pct, 0, 99);
+                    snprintf(text, sizeof(text), "%02d", pct);
+                }
+            } else {
+                snprintf(text, sizeof(text), "%d", channelId + 1);
+            }
+            nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f + 1.5f, text, NULL);
         }
     }
 };
@@ -153,11 +176,12 @@ struct StepPadWidget : app::SvgSwitch {
 };
 
 /**
- * 3. Procedural Slide Fader Handle
+ * 3. Procedural Slide Fader Handle (Speed increased for fast drag responses)
  */
 struct SoundscapesFader : app::SvgSlider {
     SoundscapesFader() {
         box.size = Vec(14.0f, 56.0f); // Spans full slot range track height
+        speed = 2.5f;                 // Accelerated vertical slider mouse-dragging speed
     }
 
     void draw(const DrawArgs& args) override {
@@ -205,7 +229,7 @@ struct PerformanceButtonWidget : SoundscapesButton {
     }
 
     void onButton(const event::Button& e) override {
-        // Corrected: Evaluates momentary status inside button trigger handler (fixes uninitialized constructor variable)
+        // Evaluates momentary status inside button trigger handler
         momentary = (buttonId != 0 && buttonId != 1);
         SoundscapesButton::onButton(e);
     }
@@ -356,7 +380,7 @@ struct SoundscapesSmallKnob : SoundscapesKnob {
 
 /**
  * 7. Procedural MODE Selection Window (Beautiful 3-Way Selector Switch)
- * Now overrides click logic to guarantee precise toggle cycling.
+ * Overrides click logic to cycle smoothly across 3 states (0, 1, 2)
  */
 struct ModeThreeWaySwitch : app::ParamWidget {
     std::shared_ptr<Font> font;
@@ -368,7 +392,7 @@ struct ModeThreeWaySwitch : app::ParamWidget {
 
     void onButton(const event::Button& e) override {
         ParamWidget::onButton(e);
-        // Corrected: Handled mouse click toggles directly inside the Mode selector
+        // Corrected: Switches across three clean positions (0, 1, 2) without clipping
         if (getParamQuantity()) {
             if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
                 float val = getParamQuantity()->getValue();
@@ -416,7 +440,7 @@ struct ModeThreeWaySwitch : app::ParamWidget {
 };
 
 /**
- * 8. Procedural FX Selection Buttons (Now colorful when selected)
+ * 8. Procedural FX Selection Buttons
  */
 struct FXButtonWidget : SoundscapesButton {
     std::string label;
@@ -451,7 +475,8 @@ struct FXButtonWidget : SoundscapesButton {
 
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.0f;
         if (isActive) {
-            nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // Active amber glow
+            // Highly obvious glowing neon-amber selection fill to match display digits
+            nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); 
         } else if (value > 0.5f) {
             nvgFillColor(args.vg, nvgRGBA(0xee, 0xee, 0xee, 0xff)); // Pressed grey
         } else {
@@ -482,15 +507,13 @@ struct FXButtonWidget : SoundscapesButton {
 
 /**
  * 9. Custom Layer Widget to Programmatically Render Label Layers
- * This layer is drawn on top of the SVG panel but behind active parameter controls,
- * completely solving missing faceplate labeling with zero SVG path dependancies.
  */
 struct FaceplateLabels : Widget {
     std::shared_ptr<Font> font;
 
     FaceplateLabels() {
         font = loadRobustFont();
-        box.size = Vec(420.0f, 380.0f); // Cover entire module width and height
+        box.size = Vec(420.0f, 380.0f);
     }
 
     void draw(const DrawArgs& args) override {
@@ -575,7 +598,7 @@ struct SoundscapesWidget : ModuleWidget {
         // Load the finalized symmetrical vector faceplate panel
         setPanel(createPanel(asset::plugin(pluginInstance, "res/soundscapes-mm.svg")));
 
-        // Corrected: Add the programmatic label overlay directly on top of the SVG panel (fixes missing labels)
+        // Add the programmatic label overlay directly on top of the SVG panel
         FaceplateLabels* labelOverlay = new FaceplateLabels();
         addChild(labelOverlay);
 
