@@ -1,35 +1,42 @@
 cmake_minimum_required(VERSION 3.22)
 
-# Set the path to the MetaModule SDK directory
+# Default path to the metamodule-plugin-sdk if not passed as a cmake command argument
 if(NOT DEFINED METAMODULE_SDK_DIR)
     set(METAMODULE_SDK_DIR "../metamodule-plugin-sdk")
 endif()
 
-# Include the core SDK configuration
+# Include the core compilation directives provided by 4ms
 include(${METAMODULE_SDK_DIR}/plugin.cmake)
 
-project(soundscapes-mm VERSION 1.0.0 DESCRIPTION "Soundscapes Eurorack Synth Voice" LANGUAGES C CXX ASM)
-
-# Automatically find all C/C++ source files in the src/ directory.
-# This prevents case-sensitivity errors (e.g., Soundscape.cpp vs soundscapes.cpp)
-# and automatically scales if you split or rename files later.
-file(GLOB_RECURSE PLUGIN_SOURCES 
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
+project(soundscapes-mm
+    VERSION 1.0.0
+    DESCRIPTION "8-Channel Poly-engine for VCV Rack and 4ms MetaModule"
+    LANGUAGES C CXX ASM
 )
 
-# Add your library as a STATIC target using the automatically discovered sources
-add_library(soundscapes-mm STATIC ${PLUGIN_SOURCES})
+# Define static compilation library
+add_library(soundscapes-mm STATIC)
 
-# Set the include path to your local source directory
-target_include_directories(soundscapes-mm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+# Establish header search locations
+target_include_directories(soundscapes-mm PRIVATE
+    .
+    src
+)
 
-# Call the official SDK macro to link VCV Rack headers and package the bundle
+# Collect all core C++ source implementation files
+target_sources(soundscapes-mm PRIVATE
+    src/plugin.cpp
+    src/soundscapes.cpp
+    src/soundscapes_ui.cpp
+    src/soundscapes_sequencer.cpp
+    src/soundscapes_synth.cpp
+    src/soundscapes_fx.cpp
+)
+
+# Invoke the SDK packaging macro to link, pack, and create the final binary plugins (.mmplugin)
 create_plugin(
     SOURCE_LIB soundscapes-mm
     PLUGIN_NAME soundscapes-mm
-    PLUGIN_JSON ${CMAKE_CURRENT_SOURCE_DIR}/plugin.json
-    SOURCE_ASSETS ${CMAKE_CURRENT_SOURCE_DIR}/res
-    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/build
+    PLUGIN_JSON ${CMAKE_CURRENT_LIST_DIR}/plugin-mm.json
+    SOURCE_ASSETS ${CMAKE_CURRENT_LIST_DIR}/res
 )
