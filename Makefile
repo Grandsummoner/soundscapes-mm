@@ -1,7 +1,7 @@
 # Path to the VCV Rack SDK directory (defaults to sibling path if not specified)
 RACK_DIR ?= ../..
 
-# Custom compiler flags (add optimization levels or processor flags here if desired)
+# Custom compiler flags
 FLAGS +=
 CFLAGS +=
 CXXFLAGS +=
