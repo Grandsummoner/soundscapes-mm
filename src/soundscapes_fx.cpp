@@ -85,66 +85,10 @@ void Soundscapes::process(const ProcessArgs& args) {
     processSequencer(args.sampleTime);
     handleFaderMapping();
 
-    // B. Temporary HUD Displays update timers
-    for (int i = 0; i < 8; i++) {
-        if (displayValueTimer[i] > 0.0f) {
-            displayValueTimer[i] -= args.sampleTime;
-        }
-    }
-
-    // C. Monitor fader movements to display active percentages (00 - 99)
-    for (int i = 0; i < 8; i++) {
-        static float prevFaderVal[8] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
-        float currVal = params[FADER1_PARAM + i].getValue();
-        if (prevFaderVal[i] >= 0.0f && fabs(currVal - prevFaderVal[i]) > 0.001f) {
-            displayValueTimer[i] = 1.5f;
-            displayValue[i] = currVal;
-            displayType[i] = 0;
-        }
-        prevFaderVal[i] = currVal;
-    }
-
-    // D. Monitor macro knobs to display edited levels across all screens
-    for (int k = 0; k < 6; k++) {
-        static float prevKnobVal[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
-        float currVal = params[RATE_PARAM + k].getValue();
-        if (prevKnobVal[k] >= 0.0f && fabs(currVal - prevKnobVal[k]) > 0.001f) {
-            for (int i = 0; i < 8; i++) {
-                displayValueTimer[i] = 1.5f;
-                displayValue[i] = currVal;
-                displayType[i] = 0;
-            }
-        }
-        prevKnobVal[k] = currVal;
-    }
-
-    // E. Monitor ROOT & SCALE edits to display note names and scale abbreviations
-    static float prevRoot = -1.0f;
-    float currRoot = params[ROOT_PARAM].getValue();
-    if (prevRoot >= 0.0f && fabs(currRoot - prevRoot) > 0.01f) {
-        for (int i = 0; i < 8; i++) {
-            displayValueTimer[i] = 1.5f;
-            displayValue[i] = currRoot;
-            displayType[i] = 1;
-        }
-    }
-    prevRoot = currRoot;
-
-    static float prevScale = -1.0f;
-    float currScale = params[SCALE_PARAM].getValue();
-    if (prevScale >= 0.0f && fabs(currScale - prevScale) > 0.01f) {
-        for (int i = 0; i < 8; i++) {
-            displayValueTimer[i] = 1.5f;
-            displayValue[i] = currScale;
-            displayType[i] = 2;
-        }
-    }
-    prevScale = currScale;
-
-    // F. Call Synthesizer Engine to process raw Voice DSP output signals
+    // B. Call Synthesizer Engine to process raw Voice DSP output signals
     processDSP(args);
 
-    // G. Cascade FX Tank Bus Processing
+    // C. Cascade FX Tank Bus Processing
     float sampleRate = args.sampleRate;
     float inputBusL = 0.0f;
     float inputBusR = 0.0f;
