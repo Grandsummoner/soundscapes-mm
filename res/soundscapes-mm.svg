@@ -1,669 +1,384 @@
-<svg viewBox="0 0 420 380" width="840" height="760" style="max-width: 100%; max-height: 100%; display: block;">
-  <defs>
-    <linearGradient id="bgG" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#f8eed8"></stop>
-      <stop offset="100%" stop-color="#f0e4c4"></stop>
-    </linearGradient>
-    <linearGradient id="stripG" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#c8be98"></stop>
-      <stop offset="100%" stop-color="#dad0aa"></stop>
-    </linearGradient>
-    <radialGradient id="knobG" cx="33%" cy="28%" r="70%">
-      <stop offset="0%" stop-color="#4e3e2c"></stop>
-      <stop offset="100%" stop-color="#19120a"></stop>
-    </radialGradient>
-    <pattern id="gridPat" x="0" y="0" width="3" height="3" patternUnits="userSpaceOnUse">
-      <path d="M3 0L0 0M0 3L0 0" stroke="#ff7c12" stroke-width="0.3" opacity="0.15"></path>
-    </pattern>
-    <linearGradient id="sockShad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="rgba(0,0,0,0.55)"></stop>
-      <stop offset="40%" stop-color="rgba(0,0,0,0.1)"></stop>
-      <stop offset="100%" stop-color="rgba(255,200,100,0.04)"></stop>
-    </linearGradient>
-    <radialGradient id="vignG" cx="50%" cy="50%" r="72%">
-      <stop offset="50%" stop-color="transparent"></stop>
-      <stop offset="100%" stop-color="rgba(18,10,3,0.24)"></stop>
-    </radialGradient>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 380" width="420" height="380">
+    <defs>
+        <!-- Soft skeuomorphic vertical faceplate gradient -->
+        <linearGradient id="bg-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#fcfcfc"/>
+            <stop offset="35%" stop-color="#f5f3f0"/>
+            <stop offset="100%" stop-color="#e6e3de"/>
+        </linearGradient>
 
-  <!-- ========================================================== -->
-  <!-- 1. CHASSIS BACKGROUND                                      -->
-  <!-- ========================================================== -->
-  <rect width="420" height="380" fill="url(#bgG)"></rect>
-  <rect x="0" y="0" width="45" height="380" fill="url(#stripG)"></rect>
+        <!-- Dynamic metal texture gradient for jacks -->
+        <linearGradient id="metal-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="30%" stop-color="#dfdfdf"/>
+            <stop offset="70%" stop-color="#9e9e9e"/>
+            <stop offset="100%" stop-color="#6a6a6a"/>
+        </linearGradient>
 
-  <!-- Clean Structural Gridlines (No Mounting Holes) -->
-  <line x1="45" y1="0" x2="45" y2="380" stroke="#362a21" stroke-width="0.35" opacity="0.25"></line>
-  <line x1="45" y1="0.7" x2="45" y2="380.7" stroke="white" stroke-width="0.25" opacity="0.125"></line>
-  <line x1="0" y1="146" x2="420" y2="146" stroke="#362a21" stroke-width="0.35" opacity="0.2"></line>
-  <line x1="0" y1="146.7" x2="420" y2="146.7" stroke="white" stroke-width="0.25" opacity="0.1"></line>
-  <line x1="0" y1="192" x2="420" y2="192" stroke="#362a21" stroke-width="0.35" opacity="0.2"></line>
-  <line x1="0" y1="192.7" x2="420" y2="192.7" stroke="white" stroke-width="0.25" opacity="0.1"></line>
-  <line x1="0" y1="268" x2="420" y2="268" stroke="#362a21" stroke-width="0.35" opacity="0.2"></line>
-  <line x1="0" y1="268.7" x2="420" y2="268.7" stroke="white" stroke-width="0.25" opacity="0.1"></line>
-  <line x1="0" y1="308" x2="420" y2="308" stroke="#362a21" stroke-width="0.35" opacity="0.2"></line>
-  <line x1="0" y1="308.7" x2="420" y2="308.7" stroke="white" stroke-width="0.25" opacity="0.1"></line>
+        <!-- Recessed display/button inset gradient -->
+        <linearGradient id="display-inset" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#e0e0e0"/>
+            <stop offset="20%" stop-color="#f8f8f8"/>
+            <stop offset="100%" stop-color="#ffffff"/>
+        </linearGradient>
 
-  <!-- ========================================== -->
-  <!-- 2. BRANDING AND HEADER                     -->
-  <!-- ========================================== -->
-  <g transform="translate(0, -3)">
-    <text x="232.5" y="30" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="14" font-weight="800" fill="#362a21" letter-spacing="0.1em">SOUNDSCAPES</text>
-    <text x="232.5" y="44" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="5.2" font-weight="600" fill="#8a7455" letter-spacing="0.05em">8-CHANNEL POLY-ENGINE</text>
-  </g>
+        <!-- Fader track inner shadow -->
+        <linearGradient id="track-shadow" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#999184"/>
+            <stop offset="30%" stop-color="#d6cfc5"/>
+            <stop offset="100%" stop-color="#ffffff"/>
+        </linearGradient>
 
-  <!-- ========================================== -->
-  <!-- 3. INPUT COLUMN MARKINGS (LEFT SIDEBAR)    -->
-  <!-- ========================================== -->
-  <!-- CLK -->
-  <g>
-    <g>
-      <circle cx="22.5" cy="62" r="9" fill="#0c0905"></circle>
-      <circle cx="22.5" cy="62" r="7" fill="#1e1a15"></circle>
-      <circle cx="22.5" cy="62" r="5.2" fill="#262016"></circle>
-      <circle cx="22.5" cy="62" r="3.2" fill="#070502"></circle>
-      <circle cx="22.5" cy="62" r="7" fill="none" stroke="#a89060" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="22.5" cy="62" r="1" fill="#a89060" opacity="0.55"></circle>
+        <!-- Standard Jack Template -->
+        <g id="jack-standard">
+            <circle cx="0" cy="0" r="8.5" fill="#e2dad0" stroke="#c4b9a8" stroke-width="0.5"/>
+            <circle cx="0" cy="0" r="7.2" fill="url(#metal-grad)"/>
+            <circle cx="0" cy="0" r="4.2" fill="#181818"/>
+            <circle cx="0" cy="0" r="3.2" fill="none" stroke="#4a4a4a" stroke-width="0.6"/>
+            <circle cx="-1.8" cy="-1.8" r="5" fill="none" stroke="#ffffff" stroke-width="0.4" opacity="0.6"/>
+        </g>
+
+        <!-- Amber Accent Jack Template (EXT IN) -->
+        <g id="jack-amber">
+            <circle cx="0" cy="0" r="8.5" fill="#f5a623" stroke="#cb820e" stroke-width="0.5"/>
+            <circle cx="0" cy="0" r="7.2" fill="url(#metal-grad)"/>
+            <circle cx="0" cy="0" r="4.2" fill="#181818"/>
+            <circle cx="0" cy="0" r="3.2" fill="none" stroke="#4a4a4a" stroke-width="0.6"/>
+            <circle cx="-1.8" cy="-1.8" r="5" fill="none" stroke="#ffffff" stroke-width="0.4" opacity="0.6"/>
+        </g>
+
+        <!-- Crimson Accent Jack Template (DUCK) -->
+        <g id="jack-red">
+            <circle cx="0" cy="0" r="8.5" fill="#d0021b" stroke="#9b0110" stroke-width="0.5"/>
+            <circle cx="0" cy="0" r="7.2" fill="url(#metal-grad)"/>
+            <circle cx="0" cy="0" r="4.2" fill="#181818"/>
+            <circle cx="0" cy="0" r="3.2" fill="none" stroke="#4a4a4a" stroke-width="0.6"/>
+            <circle cx="-1.8" cy="-1.8" r="5" fill="none" stroke="#ffffff" stroke-width="0.4" opacity="0.6"/>
+        </g>
+
+        <!-- Static 7-Segment Mockup background elements for displays -->
+        <g id="seven-segment-mock">
+            <path d="M -4 -14 L 4 -14 L 3 -12 L -3 -12 Z" fill="#e4e4e4"/> <!-- A -->
+            <path d="M 4 -13 L 5 -5 L 3 -6 L 3 -12 Z" fill="#e4e4e4"/> <!-- B -->
+            <path d="M 3 -4 L 3 2 L 5 3 L 4 -5 Z" fill="#e4e4e4"/> <!-- C -->
+            <path d="M -3 2 L 3 2 L 4 4 L -4 4 Z" fill="#e4e4e4"/> <!-- D -->
+            <path d="M -5 3 L -3 2 L -3 -4 L -4 -5 Z" fill="#e4e4e4"/> <!-- E -->
+            <path d="M -4 -13 L -3 -12 L -3 -6 L -5 -5 Z" fill="#e4e4e4"/> <!-- F -->
+            <path d="M -3 -5 L 3 -5 L 4 -4 L 3 -3 L -3 -3 L -4 -4 Z" fill="#e4e4e4"/> <!-- G -->
+        </g>
+    </defs>
+
+    <!-- Faceplate Base -->
+    <rect width="420" height="380" fill="url(#bg-grad)" rx="5" ry="5"/>
+    <rect x="0.5" y="0.5" width="419" height="379" fill="none" stroke="#dcd3c3" stroke-width="1" rx="4.5" ry="4.5"/>
+    <rect x="1.5" y="1.5" width="417" height="377" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.8" rx="3.5" ry="3.5"/>
+
+    <!-- Left Input Sidebar Divider -->
+    <line x1="45" y1="0" x2="45" y2="380" stroke="#d2c9b9" stroke-width="1"/>
+    <line x1="46" y1="0" x2="46" y2="380" stroke="#ffffff" stroke-width="1" opacity="0.9"/>
+
+    <!-- ================================================================= -->
+    <!-- I. LEFT INPUT SIDEBAR (X = 22.5)                                  -->
+    <!-- ================================================================= -->
+    <g id="sidebar-inputs">
+        <use href="#jack-standard" x="22.5" y="55"/>
+        <text x="22.5" y="69" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">CLK</text>
+
+        <use href="#jack-standard" x="22.5" y="102"/>
+        <text x="22.5" y="116" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">RST</text>
+
+        <use href="#jack-standard" x="22.5" y="149"/>
+        <text x="22.5" y="163" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">V/OCT</text>
+
+        <use href="#jack-standard" x="22.5" y="196"/>
+        <text x="22.5" y="210" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">GATE</text>
+
+        <use href="#jack-standard" x="22.5" y="243"/>
+        <text x="22.5" y="257" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">VEL</text>
+
+        <use href="#jack-amber" x="22.5" y="290"/>
+        <text x="22.5" y="304" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#d47d00" text-anchor="middle">EXT IN</text>
+
+        <use href="#jack-red" x="22.5" y="337"/>
+        <text x="22.5" y="351" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#d0021b" text-anchor="middle">DUCK</text>
     </g>
-    <text x="22.5" y="74" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.2" font-weight="600" fill="#8a7455" letter-spacing="0.05em">CLK</text>
-  </g>
 
-  <!-- RST -->
-  <g>
-    <g>
-      <circle cx="22.5" cy="110" r="9" fill="#0c0905"></circle>
-      <circle cx="22.5" cy="110" r="7" fill="#1e1a15"></circle>
-      <circle cx="22.5" cy="110" r="5.2" fill="#262016"></circle>
-      <circle cx="22.5" cy="110" r="3.2" fill="#070502"></circle>
-      <circle cx="22.5" cy="110" r="7" fill="none" stroke="#a89060" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="22.5" cy="110" r="1" fill="#a89060" opacity="0.55"></circle>
+    <!-- ================================================================= -->
+    <!-- II. MAIN MODULE HEADER (Symmetrically aligned to X = 210.0)       -->
+    <!-- ================================================================= -->
+    <g id="header-text">
+        <text x="210" y="25" font-family="'Roboto Mono', monospace" font-size="14.5" font-weight="bold" fill="#111111" letter-spacing="4" text-anchor="middle">SOUNDSCAPES</text>
+        <text x="210" y="36" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#6d6558" letter-spacing="0.8" text-anchor="middle">8-Channel Poly-Engine</text>
     </g>
-    <text x="22.5" y="122" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.2" font-weight="600" fill="#8a7455" letter-spacing="0.05em">RST</text>
-  </g>
 
-  <!-- V/O -->
-  <g>
-    <g>
-      <circle cx="22.5" cy="158" r="9" fill="#0c0905"></circle>
-      <circle cx="22.5" cy="158" r="7" fill="#1e1a15"></circle>
-      <circle cx="22.5" cy="158" r="5.2" fill="#262016"></circle>
-      <circle cx="22.5" cy="158" r="3.2" fill="#070502"></circle>
-      <circle cx="22.5" cy="158" r="7" fill="none" stroke="#a89060" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="22.5" cy="158" r="1" fill="#a89060" opacity="0.55"></circle>
+    <!-- ================================================================= -->
+    <!-- III. ROW 1 (OUTPUTS & DISPLAYS - SPLIT WINGS)                     -->
+    <!-- ================================================================= -->
+    <g id="row1-split-wings">
+        <!-- === LEFT WING (CH 1-4) === -->
+        <!-- CH1 (X = 57) -->
+        <use href="#jack-standard" x="57" y="55"/>
+        <circle cx="57" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
+        <text x="57" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">1</text>
+        <rect x="43" y="95" width="28" height="40" rx="2.5" ry="2.5" fill="url(#display-inset)" stroke="#dcd3c3" stroke-width="1"/>
+        <use href="#seven-segment-mock" x="57" y="115"/>
+        <text x="57" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">1</text>
+
+        <!-- CH2 (X = 92) -->
+        <use href="#jack-standard" x="92" y="55"/>
+        <circle cx="92" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
+        <text x="92" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">2</text>
+        <rect x="78" y="95" width="28" height="40" rx="2.5" ry="2.5" fill="url(#display-inset)" stroke="#dcd3c3" stroke-width="1"/>
+        <use href="#seven-segment-mock" x="92" y="115"/>
+        <text x="92" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">2</text>
+
+        <!-- CH3 (X = 127) -->
+        <use href="#jack-standard" x="127" y="55"/>
+        <circle cx="127" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
+        <text x="127" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">3</text>
+        <rect x="113" y="95" width="28" height="40" rx="2.5" ry="2.5" fill="url(#display-inset)" stroke="#dcd3c3" stroke-width="1"/>
+        <use href="#seven-segment-mock" x="127" y="115"/>
+        <text x="127" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">3</text>
+
+        <!-- CH4 (X = 162) -->
+        <use href="#jack-standard" x="162" y="55"/>
+        <circle cx="162" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
+        <text x="162" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">4</text>
+        <rect x="148" y="95" width="28" height="40" rx="2.5" ry="2.5" fill="url(#display-inset)" stroke="#dcd3c3" stroke-width="1"/>
+        <use href="#seven-segment-mock" x="162" y="115"/>
+        <text x="162" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">4</text>
+
+
+        <!-- === RIGHT WING (CH 5-8) === -->
+        <!-- CH5 (X = 258) -->
+        <use href="#jack-standard" x="258" y="55"/>
+        <circle cx="258" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
+        <text x="258" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">5</text>
+        <rect x="244" y="95" width="28" height="40" rx="2.5" ry="2.5" fill="url(#display-inset)" stroke="#dcd3c3" stroke-width="1"/>
+        <use href="#seven-segment-mock" x="258" y="115"/>
+        <text x="258" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">5</text>
+
+        <!-- CH6 (X = 293) -->
+        <use href="#jack-standard" x="293" y="55"/>
+        <circle cx="293" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
+        <text x="293" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">6</text>
+        <rect x="279" y="95" width="28" height="40" rx="2.5" ry="2.5" fill="url(#display-inset)" stroke="#dcd3c3" stroke-width="1"/>
+        <use href="#seven-segment-mock" x="293" y="115"/>
+        <text x="293" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">6</text>
+
+        <!-- CH7 (X = 328) -->
+        <use href="#jack-standard" x="328" y="55"/>
+        <circle cx="328" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
+        <text x="328" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">7</text>
+        <rect x="314" y="95" width="28" height="40" rx="2.5" ry="2.5" fill="url(#display-inset)" stroke="#dcd3c3" stroke-width="1"/>
+        <use href="#seven-segment-mock" x="328" y="115"/>
+        <text x="328" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">7</text>
+
+        <!-- CH8 (X = 363) -->
+        <use href="#jack-standard" x="363" y="55"/>
+        <circle cx="363" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
+        <text x="363" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">8</text>
+        <rect x="349" y="95" width="28" height="40" rx="2.5" ry="2.5" fill="url(#display-inset)" stroke="#dcd3c3" stroke-width="1"/>
+        <use href="#seven-segment-mock" x="363" y="115"/>
+        <text x="363" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">8</text>
     </g>
-    <text x="22.5" y="170" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.2" font-weight="600" fill="#8a7455" letter-spacing="0.05em">V/O</text>
-  </g>
 
-  <!-- GATE -->
-  <g>
-    <g>
-      <circle cx="22.5" cy="206" r="9" fill="#0c0905"></circle>
-      <circle cx="22.5" cy="206" r="7" fill="#1e1a15"></circle>
-      <circle cx="22.5" cy="206" r="5.2" fill="#262016"></circle>
-      <circle cx="22.5" cy="206" r="3.2" fill="#070502"></circle>
-      <circle cx="22.5" cy="206" r="7" fill="none" stroke="#a89060" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="22.5" cy="206" r="1" fill="#a89060" opacity="0.55"></circle>
+    <!-- ================================================================= -->
+    <!-- IV. ROW 2 (THE SYNTH DECK - SHIFTED SPACING)                      -->
+    <!-- ================================================================= -->
+    <g id="synth-deck">
+        <!-- MODE Window (X = 57) -->
+        <rect x="45" y="150" width="24" height="40" rx="3" ry="3" fill="#1e1e1f" stroke="#323234" stroke-width="1"/>
+        <rect x="46.5" y="151.5" width="21" height="37" fill="none" stroke="#000000" stroke-width="0.8" opacity="0.6"/>
+        <text x="57" y="201" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#5c5346" text-anchor="middle">MODE</text>
+
+        <!-- 2x2 FX Buttons -->
+        <!-- FM (X = 92) -->
+        <rect x="78" y="153" width="28" height="14" rx="2" ry="2" fill="#ffffff" stroke="#ccc4b6" stroke-width="0.8"/>
+        <text x="92" y="162" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#5c5346" text-anchor="middle">FM</text>
+        <!-- DELAY (X = 127) -->
+        <rect x="113" y="153" width="28" height="14" rx="2" ry="2" fill="#ffffff" stroke="#ccc4b6" stroke-width="0.8"/>
+        <text x="127" y="162" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#5c5346" text-anchor="middle">DELAY</text>
+        <!-- REVERB (X = 92) -->
+        <rect x="78" y="173" width="28" height="14" rx="2" ry="2" fill="#ffffff" stroke="#ccc4b6" stroke-width="0.8"/>
+        <text x="92" y="182" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#5c5346" text-anchor="middle">REVERB</text>
+        <!-- FILTER (X = 127) -->
+        <rect x="113" y="173" width="28" height="14" rx="2" ry="2" fill="#ffffff" stroke="#ccc4b6" stroke-width="0.8"/>
+        <text x="127" y="182" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#5c5346" text-anchor="middle">FILTER</text>
+
+        <!-- 6 Knobs (Symmetrically offset around X = 210) -->
+        <!-- Knob 1: RATE (Col 4 = 162) -->
+        <circle cx="162" cy="170" r="14" fill="#000000" opacity="0.08"/>
+        <circle cx="162" cy="170" r="13" fill="#fbfaf8" stroke="#ccc4b6" stroke-width="1"/>
+        <line x1="162" y1="165" x2="162" y2="159" stroke="#605548" stroke-width="1.6" stroke-linecap="round"/>
+        <text x="162" y="191" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#6c6457" text-anchor="middle">RATE</text>
+
+        <!-- Knob 2: DENSITY (X = 191) -->
+        <circle cx="191" cy="170" r="14" fill="#000000" opacity="0.08"/>
+        <circle cx="191" cy="170" r="13" fill="#fbfaf8" stroke="#ccc4b6" stroke-width="1"/>
+        <line x1="191" y1="165" x2="191" y2="159" stroke="#605548" stroke-width="1.6" stroke-linecap="round"/>
+        <text x="191" y="191" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#6c6457" text-anchor="middle">DENSITY</text>
+
+        <!-- Knob 3: TIMBRE (X = 229) -->
+        <circle cx="229" cy="170" r="14" fill="#000000" opacity="0.08"/>
+        <circle cx="229" cy="170" r="13" fill="#fbfaf8" stroke="#ccc4b6" stroke-width="1"/>
+        <line x1="229" y1="165" x2="229" y2="159" stroke="#605548" stroke-width="1.6" stroke-linecap="round"/>
+        <text x="229" y="191" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#6c6457" text-anchor="middle">TIMBRE</text>
+
+        <!-- Knob 4: TEXTURE (Col 5 = 258) -->
+        <circle cx="258" cy="170" r="14" fill="#000000" opacity="0.08"/>
+        <circle cx="258" cy="170" r="13" fill="#fbfaf8" stroke="#ccc4b6" stroke-width="1"/>
+        <line x1="258" y1="165" x2="258" y2="159" stroke="#605548" stroke-width="1.6" stroke-linecap="round"/>
+        <text x="258" y="191" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#6c6457" text-anchor="middle">TEXTURE</text>
+
+        <!-- Knob 5: SPREAD (Col 6 = 293) -->
+        <circle cx="293" cy="170" r="14" fill="#000000" opacity="0.08"/>
+        <circle cx="293" cy="170" r="13" fill="#fbfaf8" stroke="#ccc4b6" stroke-width="1"/>
+        <line x1="293" y1="165" x2="293" y2="159" stroke="#605548" stroke-width="1.6" stroke-linecap="round"/>
+        <text x="293" y="191" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#6c6457" text-anchor="middle">SPREAD</text>
+
+        <!-- Knob 6: DYNAMICS (Col 7 = 328) -->
+        <circle cx="328" cy="170" r="14" fill="#000000" opacity="0.08"/>
+        <circle cx="328" cy="170" r="13" fill="#fbfaf8" stroke="#ccc4b6" stroke-width="1"/>
+        <line x1="328" y1="165" x2="328" y2="159" stroke="#605548" stroke-width="1.6" stroke-linecap="round"/>
+        <text x="328" y="191" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#6c6457" text-anchor="middle">DYNAMICS</text>
     </g>
-    <text x="22.5" y="218" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.2" font-weight="600" fill="#8a7455" letter-spacing="0.05em">GATE</text>
-  </g>
 
-  <!-- VEL -->
-  <g>
-    <g>
-      <circle cx="22.5" cy="254" r="9" fill="#0c0905"></circle>
-      <circle cx="22.5" cy="254" r="7" fill="#1e1a15"></circle>
-      <circle cx="22.5" cy="254" r="5.2" fill="#262016"></circle>
-      <circle cx="22.5" cy="254" r="3.2" fill="#070502"></circle>
-      <circle cx="22.5" cy="254" r="7" fill="none" stroke="#a89060" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="22.5" cy="254" r="1" fill="#a89060" opacity="0.55"></circle>
+    <!-- ================================================================= -->
+    <!-- V. ROW 3 (SPLIT MIXING FADERS & CENTER QUANTIZERS)                 -->
+    <!-- ================================================================= -->
+    <g id="fader-row">
+        <!-- === LEFT MIXER WING (CH 1–4) === -->
+        <!-- Fader 1 (X = 57) -->
+        <rect x="55" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#dbd3c5" stroke-width="0.5"/>
+        <text x="57" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">1</text>
+        <!-- Fader 2 (X = 92) -->
+        <rect x="90" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#dbd3c5" stroke-width="0.5"/>
+        <text x="92" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">2</text>
+        <!-- Fader 3 (X = 127) -->
+        <rect x="125" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#dbd3c5" stroke-width="0.5"/>
+        <text x="127" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">3</text>
+        <!-- Fader 4 (X = 162) -->
+        <rect x="160" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#dbd3c5" stroke-width="0.5"/>
+        <text x="162" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">4</text>
+
+        <!-- === THE CENTRAL QUANTIZERS === -->
+        <!-- ROOT Knob (X = 191) -->
+        <circle cx="191" cy="233" r="10" fill="#000000" opacity="0.06"/>
+        <circle cx="191" cy="233" r="9.5" fill="#fcfbf9" stroke="#ccc4b6" stroke-width="0.8"/>
+        <line x1="191" y1="229.5" x2="191" y2="225" stroke="#605548" stroke-width="1.3" stroke-linecap="round"/>
+        <text x="191" y="251" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#7c7365" text-anchor="middle">ROOT</text>
+        
+        <!-- SCALE Knob (X = 229) -->
+        <circle cx="229" cy="233" r="10" fill="#000000" opacity="0.06"/>
+        <circle cx="229" cy="233" r="9.5" fill="#fcfbf9" stroke="#ccc4b6" stroke-width="0.8"/>
+        <line x1="229" y1="229.5" x2="229" y2="225" stroke="#605548" stroke-width="1.3" stroke-linecap="round"/>
+        <text x="229" y="251" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#7c7365" text-anchor="middle">SCALE</text>
+
+        <!-- === RIGHT MIXER WING (CH 5–8) === -->
+        <!-- Fader 5 (X = 258) -->
+        <rect x="256" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#dbd3c5" stroke-width="0.5"/>
+        <text x="258" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">5</text>
+        <!-- Fader 6 (X = 293) -->
+        <rect x="291" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#dbd3c5" stroke-width="0.5"/>
+        <text x="293" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">6</text>
+        <!-- Fader 7 (X = 328) -->
+        <rect x="326" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#dbd3c5" stroke-width="0.5"/>
+        <text x="328" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">7</text>
+        <!-- Fader 8 (X = 363) -->
+        <rect x="361" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#dbd3c5" stroke-width="0.5"/>
+        <text x="363" y="267" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#7a7061" text-anchor="middle">8</text>
     </g>
-    <text x="22.5" y="266" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.2" font-weight="600" fill="#8a7455" letter-spacing="0.05em">VEL</text>
-  </g>
 
-  <!-- EXT -->
-  <g>
-    <g>
-      <circle cx="22.5" cy="302" r="9" fill="#0c0905"></circle>
-      <circle cx="22.5" cy="302" r="7" fill="#1e1a15"></circle>
-      <circle cx="22.5" cy="302" r="5.2" fill="#262016"></circle>
-      <circle cx="22.5" cy="302" r="3.2" fill="#070502"></circle>
-      <circle cx="22.5" cy="302" r="7" fill="none" stroke="#d4a800" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="22.5" cy="302" r="1" fill="#d4a800" opacity="0.55"></circle>
+    <!-- ================================================================= -->
+    <!-- VI. ROW 4 (THE SEQUENCER - SPLIT BLOCK DESIGN)                   -->
+    <!-- ================================================================= -->
+    <g id="step-pads">
+        <!-- Row Labels -->
+        <text x="50" y="271" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#8d8170" letter-spacing="0.5" text-anchor="start">MELODY</text>
+        <text x="50" y="319" font-family="'Roboto Mono', monospace" font-size="5" font-weight="bold" fill="#8d8170" letter-spacing="0.5" text-anchor="start">CHORD</text>
+
+        <!-- === MELODY ROW (Y = 282 - SPLIT 1-4 and 5-8) === -->
+        <!-- Pad 1 (X = 57) -->
+        <rect x="42" y="282" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="57" y="314" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">1</text>
+        <!-- Pad 2 (X = 92) -->
+        <rect x="77" y="282" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="92" y="314" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">2</text>
+        <!-- Pad 3 (X = 127) -->
+        <rect x="112" y="282" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="127" y="314" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">3</text>
+        <!-- Pad 4 (X = 162) -->
+        <rect x="147" y="282" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="162" y="314" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">4</text>
+
+        <!-- (Perfect 96px central structural channel gap) -->
+
+        <!-- Pad 5 (X = 258) -->
+        <rect x="243" y="282" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="258" y="314" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">5</text>
+        <!-- Pad 6 (X = 293) -->
+        <rect x="278" y="282" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="293" y="314" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">6</text>
+        <!-- Pad 7 (X = 328) -->
+        <rect x="313" y="282" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="328" y="314" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">7</text>
+        <!-- Pad 8 (X = 363) -->
+        <rect x="348" y="282" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="363" y="314" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">8</text>
+
+
+        <!-- === CHORD ROW (Y = 330 - SPLIT 9-12 and 13-16) === -->
+        <!-- Pad 9 (X = 57) -->
+        <rect x="42" y="330" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="57" y="362" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">9</text>
+        <!-- Pad 10 (X = 92) -->
+        <rect x="77" y="330" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="92" y="362" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">10</text>
+        <!-- Pad 11 (X = 127) -->
+        <rect x="112" y="330" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="127" y="362" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">11</text>
+        <!-- Pad 12 (X = 162) -->
+        <rect x="147" y="330" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="162" y="362" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">12</text>
+
+        <!-- (Perfect 96px central structural channel gap) -->
+
+        <!-- Pad 13 (X = 258) -->
+        <rect x="243" y="330" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="258" y="362" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">13</text>
+        <!-- Pad 14 (X = 293) -->
+        <rect x="278" y="330" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="293" y="362" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">14</text>
+        <!-- Pad 15 (X = 328) -->
+        <rect x="313" y="330" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="328" y="362" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">15</text>
+        <!-- Pad 16 (X = 363) -->
+        <rect x="348" y="330" width="30" height="24" rx="4" ry="4" fill="#ffffff" stroke="#d5cfc5" stroke-width="1"/>
+        <text x="363" y="362" font-family="'Roboto Mono', monospace" font-size="5.5" fill="#a29889" text-anchor="middle">16</text>
     </g>
-    <text x="22.5" y="314" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.2" font-weight="600" fill="#8a7455" letter-spacing="0.05em">EXT</text>
-  </g>
 
-  <!-- DUCK -->
-  <g>
-    <g>
-      <circle cx="22.5" cy="350" r="9" fill="#0c0905"></circle>
-      <circle cx="22.5" cy="350" r="7" fill="#1e1a15"></circle>
-      <circle cx="22.5" cy="350" r="5.2" fill="#262016"></circle>
-      <circle cx="22.5" cy="350" r="3.2" fill="#070502"></circle>
-      <circle cx="22.5" cy="350" r="7" fill="none" stroke="#c0201a" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="22.5" cy="350" r="1" fill="#c0201a" opacity="0.55"></circle>
+    <!-- ================================================================= -->
+    <!-- VII. THE 2x4 PERFORMANCE BUTTON GRID (FAR RIGHT)                 -->
+    <!-- ================================================================= -->
+    <!-- Placed on the far right of the step pads to sit beneath
+         Faders 7 (Col 7 = 328) and 8 (Col 8 = 363) with absolute margins.
+         Buttons are 18x14px with rx = 2.5px. -->
+    <g id="performance-block">
+        <!-- Row 1 (Y = 282) -->
+        <rect x="385" y="282" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
+        <rect x="405" y="282" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
+
+        <!-- Row 2 (Y = 301) -->
+        <rect x="385" y="301" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
+        <rect x="405" y="301" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
+
+        <!-- Row 3 (Y = 320) -->
+        <rect x="385" y="320" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
+        <rect x="405" y="320" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
+
+        <!-- Row 4 (Y = 339) -->
+        <rect x="385" y="339" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
+        <rect x="405" y="339" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
     </g>
-    <text x="22.5" y="362" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.2" font-weight="600" fill="#8a7455" letter-spacing="0.05em">DUCK</text>
-  </g>
-
-  <!-- ========================================== -->
-  <!-- 4. CH1 TO CH8 COLUMN MARKERS AND DISPLAYS  -->
-  <!-- ========================================== -->
-  <!-- CH1 -->
-  <g>
-    <text x="63.75" y="68" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">CH1</text>
-    <g>
-      <circle cx="63.75" cy="82" r="8.5" fill="#0c0905"></circle>
-      <circle cx="63.75" cy="82" r="6.5" fill="#1e1a15"></circle>
-      <circle cx="63.75" cy="82" r="4.7" fill="#262016"></circle>
-      <circle cx="63.75" cy="82" r="2.7" fill="#070502"></circle>
-      <circle cx="63.75" cy="82" r="6.5" fill="none" stroke="#a89060" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="63.75" cy="82" r="1" fill="#a89060" opacity="0.55"></circle>
-    </g>
-    <!-- Channel Active LED Socket (Positioned beautifully between jack and display) -->
-    <circle cx="63.75" cy="91" r="1.5" fill="#140c05" stroke="#3a2510" stroke-width="0.6"></circle>
-    <!-- Giant 7-Segment Window (2.2x Taller Display Frame) -->
-    <g>
-      <rect x="47.25" y="95.5" width="33" height="43" rx="3" fill="#3a2510"></rect>
-      <rect x="48.75" y="97" width="30" height="40" rx="2" fill="#1b110a"></rect>
-      <rect x="48.75" y="97" width="30" height="40" rx="2" fill="url(#gridPat)" opacity="0.1"></rect>
-      <text x="63.75" y="109" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="6" fill="#3a1a04" letter-spacing="0.04em">88</text>
-      <text x="63.75" y="121" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="9" fill="#ff7c12" letter-spacing="0.04em">C4</text>
-    </g>
-  </g>
-
-  <!-- CH2 -->
-  <g>
-    <text x="101.25" y="68" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">CH2</text>
-    <g>
-      <circle cx="101.25" cy="82" r="8.5" fill="#0c0905"></circle>
-      <circle cx="101.25" cy="82" r="6.5" fill="#1e1a15"></circle>
-      <circle cx="101.25" cy="82" r="4.7" fill="#262016"></circle>
-      <circle cx="101.25" cy="82" r="2.7" fill="#070502"></circle>
-      <circle cx="101.25" cy="82" r="6.5" fill="none" stroke="#a89060" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="101.25" cy="82" r="1" fill="#a89060" opacity="0.55"></circle>
-    </g>
-    <circle cx="101.25" cy="91" r="1.5" fill="#140c05" stroke="#3a2510" stroke-width="0.6"></circle>
-    <g>
-      <rect x="84.75" y="95.5" width="33" height="43" rx="3" fill="#3a2510"></rect>
-      <rect x="86.25" y="97" width="30" height="40" rx="2" fill="#1b110a"></rect>
-      <rect x="86.25" y="97" width="30" height="40" rx="2" fill="url(#gridPat)" opacity="0.1"></rect>
-      <text x="101.25" y="109" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="6" fill="#3a1a04" letter-spacing="0.04em">88</text>
-      <text x="101.25" y="121" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="9" fill="#ff7c12" letter-spacing="0.04em">G3</text>
-    </g>
-  </g>
-
-  <!-- CH3 -->
-  <g>
-    <text x="138.75" y="68" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">CH3</text>
-    <g>
-      <circle cx="138.75" cy="82" r="8.5" fill="#0c0905"></circle>
-      <circle cx="138.75" cy="82" r="6.5" fill="#1e1a15"></circle>
-      <circle cx="138.75" cy="82" r="4.7" fill="#262016"></circle>
-      <circle cx="138.75" cy="82" r="2.7" fill="#070502"></circle>
-      <circle cx="138.75" cy="82" r="6.5" fill="none" stroke="#a89060" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="138.75" cy="82" r="1" fill="#a89060" opacity="0.55"></circle>
-    </g>
-    <circle cx="138.75" cy="91" r="1.5" fill="#140c05" stroke="#3a2510" stroke-width="0.6"></circle>
-    <g>
-      <rect x="122.25" y="95.5" width="33" height="43" rx="3" fill="#3a2510"></rect>
-      <rect x="123.75" y="97" width="30" height="40" rx="2" fill="#1b110a"></rect>
-      <rect x="123.75" y="97" width="30" height="40" rx="2" fill="url(#gridPat)" opacity="0.1"></rect>
-      <text x="138.75" y="109" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="6" fill="#3a1a04" letter-spacing="0.04em">88</text>
-      <text x="138.75" y="121" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="9" fill="#ff7c12" letter-spacing="0.04em">E4</text>
-    </g>
-  </g>
-
-  <!-- CH4 -->
-  <g>
-    <text x="176.25" y="68" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">CH4</text>
-    <g>
-      <circle cx="176.25" cy="82" r="8.5" fill="#0c0905"></circle>
-      <circle cx="176.25" cy="82" r="6.5" fill="#1e1a15"></circle>
-      <circle cx="176.25" cy="82" r="4.7" fill="#262016"></circle>
-      <circle cx="176.25" cy="82" r="2.7" fill="#070502"></circle>
-      <circle cx="176.25" cy="82" r="6.5" fill="none" stroke="#a89060" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="176.25" cy="82" r="1" fill="#a89060" opacity="0.55"></circle>
-    </g>
-    <circle cx="176.25" cy="91" r="1.5" fill="#140c05" stroke="#3a2510" stroke-width="0.6"></circle>
-    <g>
-      <rect x="159.75" y="95.5" width="33" height="43" rx="3" fill="#3a2510"></rect>
-      <rect x="161.25" y="97" width="30" height="40" rx="2" fill="#1b110a"></rect>
-      <rect x="161.25" y="97" width="30" height="40" rx="2" fill="url(#gridPat)" opacity="0.1"></rect>
-      <text x="176.25" y="109" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="6" fill="#3a1a04" letter-spacing="0.04em">88</text>
-      <text x="176.25" y="121" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="9" fill="#ff7c12" letter-spacing="0.04em">A3</text>
-    </g>
-  </g>
-
-  <!-- CH5 -->
-  <g>
-    <text x="213.75" y="68" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">CH5</text>
-    <g>
-      <circle cx="213.75" cy="82" r="8.5" fill="#0c0905"></circle>
-      <circle cx="213.75" cy="82" r="6.5" fill="#1e1a15"></circle>
-      <circle cx="213.75" cy="82" r="4.7" fill="#262016"></circle>
-      <circle cx="213.75" cy="82" r="2.7" fill="#070502"></circle>
-      <circle cx="213.75" cy="82" r="6.5" fill="none" stroke="#a89060" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="213.75" cy="82" r="1" fill="#a89060" opacity="0.55"></circle>
-    </g>
-    <circle cx="213.75" cy="91" r="1.5" fill="#140c05" stroke="#3a2510" stroke-width="0.6"></circle>
-    <g>
-      <rect x="197.25" y="95.5" width="33" height="43" rx="3" fill="#3a2510"></rect>
-      <rect x="198.75" y="97" width="30" height="40" rx="2" fill="#1b110a"></rect>
-      <rect x="198.75" y="97" width="30" height="40" rx="2" fill="url(#gridPat)" opacity="0.1"></rect>
-      <text x="213.75" y="109" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="6" fill="#3a1a04" letter-spacing="0.04em">88</text>
-      <text x="213.75" y="121" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="9" fill="#ff7c12" letter-spacing="0.04em">D4</text>
-    </g>
-  </g>
-
-  <!-- CH6 -->
-  <g>
-    <text x="251.25" y="68" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">CH6</text>
-    <g>
-      <circle cx="251.25" cy="82" r="8.5" fill="#0c0905"></circle>
-      <circle cx="251.25" cy="82" r="6.5" fill="#1e1a15"></circle>
-      <circle cx="251.25" cy="82" r="4.7" fill="#262016"></circle>
-      <circle cx="251.25" cy="82" r="2.7" fill="#070502"></circle>
-      <circle cx="251.25" cy="82" r="6.5" fill="none" stroke="#a89060" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="251.25" cy="82" r="1" fill="#a89060" opacity="0.55"></circle>
-    </g>
-    <circle cx="251.25" cy="91" r="1.5" fill="#140c05" stroke="#3a2510" stroke-width="0.6"></circle>
-    <g>
-      <rect x="234.75" y="95.5" width="33" height="43" rx="3" fill="#3a2510"></rect>
-      <rect x="236.25" y="97" width="30" height="40" rx="2" fill="#1b110a"></rect>
-      <rect x="236.25" y="97" width="30" height="40" rx="2" fill="url(#gridPat)" opacity="0.1"></rect>
-      <text x="251.25" y="109" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="6" fill="#3a1a04" letter-spacing="0.04em">88</text>
-      <text x="251.25" y="121" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="9" fill="#ff7c12" letter-spacing="0.04em">F3</text>
-    </g>
-  </g>
-
-  <!-- CH7 -->
-  <g>
-    <text x="288.75" y="68" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">CH7</text>
-    <g>
-      <circle cx="288.75" cy="82" r="8.5" fill="#0c0905"></circle>
-      <circle cx="288.75" cy="82" r="6.5" fill="#1e1a15"></circle>
-      <circle cx="288.75" cy="82" r="4.7" fill="#262016"></circle>
-      <circle cx="288.75" cy="82" r="2.7" fill="#070502"></circle>
-      <circle cx="288.75" cy="82" r="6.5" fill="none" stroke="#a89060" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="288.75" cy="82" r="1" fill="#a89060" opacity="0.55"></circle>
-    </g>
-    <circle cx="288.75" cy="91" r="1.5" fill="#140c05" stroke="#3a2510" stroke-width="0.6"></circle>
-    <g>
-      <rect x="272.25" y="95.5" width="33" height="43" rx="3" fill="#3a2510"></rect>
-      <rect x="273.75" y="97" width="30" height="40" rx="2" fill="#1b110a"></rect>
-      <rect x="273.75" y="97" width="30" height="40" rx="2" fill="url(#gridPat)" opacity="0.1"></rect>
-      <text x="288.75" y="109" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="6" fill="#3a1a04" letter-spacing="0.04em">88</text>
-      <text x="288.75" y="121" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="9" fill="#ff7c12" letter-spacing="0.04em">B4</text>
-    </g>
-  </g>
-
-  <!-- CH8 -->
-  <g>
-    <text x="326.25" y="68" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">CH8</text>
-    <g>
-      <circle cx="326.25" cy="82" r="8.5" fill="#0c0905"></circle>
-      <circle cx="326.25" cy="82" r="6.5" fill="#1e1a15"></circle>
-      <circle cx="326.25" cy="82" r="4.7" fill="#262016"></circle>
-      <circle cx="326.25" cy="82" r="2.7" fill="#070502"></circle>
-      <circle cx="326.25" cy="82" r="6.5" fill="none" stroke="#a89060" stroke-width="1.3" opacity="0.65"></circle>
-      <circle cx="326.25" cy="82" r="1" fill="#a89060" opacity="0.55"></circle>
-    </g>
-    <circle cx="326.25" cy="91" r="1.5" fill="#140c05" stroke="#3a2510" stroke-width="0.6"></circle>
-    <g>
-      <rect x="309.75" y="95.5" width="33" height="43" rx="3" fill="#3a2510"></rect>
-      <rect x="311.25" y="97" width="30" height="40" rx="2" fill="#1b110a"></rect>
-      <rect x="311.25" y="97" width="30" height="40" rx="2" fill="url(#gridPat)" opacity="0.1"></rect>
-      <text x="326.25" y="109" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="6" fill="#3a1a04" letter-spacing="0.04em">88</text>
-      <text x="326.25" y="121" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="9" fill="#ff7c12" letter-spacing="0.04em">G4</text>
-    </g>
-  </g>
-
-  <!-- ========================================== -->
-  <!-- 5. MODE SELECTOR AND COMPONENT ALIGNMENT   -->
-  <!-- ========================================== -->
-  <!-- MODE (Left edge aligned to CH1 Display's left edge of 47.25 px) -->
-  <g>
-    <rect x="47.25" y="149" width="40.5" height="26" rx="3" fill="#1c1608" stroke="#362a21" stroke-width="0.45"></rect>
-    <g style="cursor: pointer;">
-      <rect x="49.25" y="151" width="10.5" height="22" rx="2" fill="#5a4020" stroke="#ff7c12" stroke-width="0.8"></rect>
-      <text x="54.5" y="162" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="8" font-weight="700" fill="#ff7c12" letter-spacing="0.05em">V</text>
-    </g>
-    <g style="cursor: pointer;">
-      <rect x="62.25" y="151" width="10.5" height="22" rx="2" fill="#141008" stroke="#2a1e08" stroke-width="0.3"></rect>
-      <text x="67.5" y="162" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="8" font-weight="700" fill="#3e3018" letter-spacing="0.05em">W</text>
-    </g>
-    <g style="cursor: pointer;">
-      <rect x="75.25" y="151" width="10.5" height="22" rx="2" fill="#141008" stroke="#2a1e08" stroke-width="0.3"></rect>
-      <text x="80.5" y="162" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="8" font-weight="700" fill="#3e3018" letter-spacing="0.05em">D</text>
-    </g>
-    <text x="67.5" y="181" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.8" font-weight="600" fill="#8a7455" letter-spacing="0.05em">MODE</text>
-  </g>
-
-  <!-- FX Buttons (FM, DLY, REV, FLT scaled up to match Play Button size of 28x16) -->
-  <g>
-    <g style="cursor: pointer;">
-      <rect x="91" y="144" width="28" height="16" rx="3.5" fill="#1c1608" stroke="#3a2a10" stroke-width="0.4"></rect>
-      <text x="105" y="152" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="5.2" fill="#5a4a28" letter-spacing="0.04em">FM</text>
-    </g>
-    <g style="cursor: pointer;">
-      <rect x="123" y="144" width="28" height="16" rx="3.5" fill="#1c1608" stroke="#3a2a10" stroke-width="0.4"></rect>
-      <text x="137" y="152" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="5.2" fill="#5a4a28" letter-spacing="0.04em">DLY</text>
-    </g>
-    <g style="cursor: pointer;">
-      <rect x="91" y="164" width="28" height="16" rx="3.5" fill="#1c1608" stroke="#3a2a10" stroke-width="0.4"></rect>
-      <text x="105" y="172" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="5.2" fill="#5a4a28" letter-spacing="0.04em">REV</text>
-    </g>
-    <g style="cursor: pointer;">
-      <rect x="123" y="164" width="28" height="16" rx="3.5" fill="#1c1608" stroke="#3a2a10" stroke-width="0.4"></rect>
-      <text x="137" y="172" text-anchor="middle" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="5.2" fill="#5a4a28" letter-spacing="0.04em">FLT</text>
-    </g>
-    <text x="121" y="187" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.8" font-weight="600" fill="#8a7455" letter-spacing="0.05em">FX</text>
-  </g>
-
-  <circle cx="176.25" cy="162" r="1.8" fill="#8a7455" opacity="0.22"></circle>
-
-  <!-- ========================================== -->
-  <!-- 6. PARAMETER DIALS (6 PROMINENT KNOBS)     -->
-  <!-- ========================================== -->
-  <!-- Rate (r=13) -->
-  <g>
-    <circle cx="213.75" cy="162" r="15.8" fill="none" stroke="#362a21" stroke-width="0.35" opacity="0.18"></circle>
-    <circle cx="213.75" cy="162" r="13" fill="url(#knobG)"></circle>
-    <circle cx="213.75" cy="162" r="13" fill="none" stroke="#9a8050" stroke-width="0.9" opacity="0.5"></circle>
-    <circle cx="206.5" cy="154.7" r="1.5" fill="#9a8050" opacity="0.9"></circle>
-    <ellipse cx="210.89" cy="158.1" rx="3.9" ry="2.34" fill="white" opacity="0.05"></ellipse>
-    <text x="213.75" y="182" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.8" font-weight="600" fill="#8a7455" letter-spacing="0.05em">RATE</text>
-  </g>
-
-  <!-- Dens (r=13) -->
-  <g>
-    <circle cx="251.25" cy="162" r="15.8" fill="none" stroke="#362a21" stroke-width="0.35" opacity="0.18"></circle>
-    <circle cx="251.25" cy="162" r="13" fill="url(#knobG)"></circle>
-    <circle cx="251.25" cy="162" r="13" fill="none" stroke="#9a8050" stroke-width="0.9" opacity="0.5"></circle>
-    <circle cx="248.6" cy="152.1" r="1.5" fill="#9a8050" opacity="0.9"></circle>
-    <ellipse cx="248.39" cy="158.1" rx="3.9" ry="2.34" fill="white" opacity="0.05"></ellipse>
-    <text x="251.25" y="182" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.8" font-weight="600" fill="#8a7455" letter-spacing="0.05em">DENS</text>
-  </g>
-
-  <!-- Timb (r=13) -->
-  <g>
-    <circle cx="288.75" cy="162" r="15.8" fill="none" stroke="#362a21" stroke-width="0.35" opacity="0.18"></circle>
-    <circle cx="288.75" cy="162" r="13" fill="url(#knobG)"></circle>
-    <circle cx="288.75" cy="162" r="13" fill="none" stroke="#9a8050" stroke-width="0.9" opacity="0.5"></circle>
-    <circle cx="290.5" cy="151.9" r="1.5" fill="#9a8050" opacity="0.9"></circle>
-    <ellipse cx="285.89" cy="158.1" rx="3.9" ry="2.34" fill="white" opacity="0.05"></ellipse>
-    <text x="288.75" y="182" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.8" font-weight="600" fill="#8a7455" letter-spacing="0.05em">TIMB</text>
-  </g>
-
-  <!-- Text (r=13) -->
-  <g>
-    <circle cx="326.25" cy="162" r="15.8" fill="none" stroke="#362a21" stroke-width="0.35" opacity="0.18"></circle>
-    <circle cx="326.25" cy="162" r="13" fill="url(#knobG)"></circle>
-    <circle cx="326.25" cy="162" r="13" fill="none" stroke="#9a8050" stroke-width="0.9" opacity="0.5"></circle>
-    <circle cx="331.35" cy="153.1" r="1.5" fill="#9a8050" opacity="0.9"></circle>
-    <ellipse cx="323.39" cy="158.1" rx="3.9" ry="2.34" fill="white" opacity="0.05"></ellipse>
-    <text x="326.25" y="182" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.8" font-weight="600" fill="#8a7455" letter-spacing="0.05em">TEXT</text>
-  </g>
-
-  <!-- Sprd (r=13) -->
-  <g>
-    <circle cx="363.75" cy="162" r="15.8" fill="none" stroke="#362a21" stroke-width="0.35" opacity="0.18"></circle>
-    <circle cx="363.75" cy="162" r="13" fill="url(#knobG)"></circle>
-    <circle cx="363.75" cy="162" r="13" fill="none" stroke="#9a8050" stroke-width="0.9" opacity="0.5"></circle>
-    <circle cx="360.2" cy="152.4" r="1.5" fill="#9a8050" opacity="0.9"></circle>
-    <ellipse cx="360.89" cy="158.1" rx="3.9" ry="2.34" fill="white" opacity="0.05"></ellipse>
-    <text x="363.75" y="182" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.8" font-weight="600" fill="#8a7455" letter-spacing="0.05em">SPRD</text>
-  </g>
-
-  <!-- Dyn (r=13) -->
-  <g>
-    <circle cx="401.25" cy="162" r="15.8" fill="none" stroke="#362a21" stroke-width="0.35" opacity="0.18"></circle>
-    <circle cx="401.25" cy="162" r="13" fill="url(#knobG)"></circle>
-    <circle cx="401.25" cy="162" r="13" fill="none" stroke="#9a8050" stroke-width="0.9" opacity="0.5"></circle>
-    <circle cx="408.4" cy="154.7" r="1.5" fill="#9a8050" opacity="0.9"></circle>
-    <ellipse cx="398.39" cy="158.1" rx="3.9" ry="2.34" fill="white" opacity="0.05"></ellipse>
-    <text x="401.25" y="182" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.8" font-weight="600" fill="#8a7455" letter-spacing="0.05em">DYN</text>
-  </g>
-
-  <!-- ========================================== -->
-  <!-- 7. LEVEL FADERS (NUMBERS REPOSITIONED)     -->
-  <!-- ========================================== -->
-  <!-- Fader 1 -->
-  <g>
-    <g>
-      <line x1="58.75" y1="198" x2="60.75" y2="198" stroke="#8a7455" stroke-width="0.5" opacity="0.7"></line>
-      <text x="56.75" y="198" text-anchor="end" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="3.2" fill="#b0a07a" letter-spacing="0.04em">+6</text>
-    </g>
-    <g>
-      <line x1="58.75" y1="216.3" x2="60.75" y2="216.3" stroke="#8a7455" stroke-width="0.5" opacity="0.7"></line>
-      <text x="56.75" y="216.3" text-anchor="end" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="3.2" fill="#b0a07a" letter-spacing="0.04em">0</text>
-    </g>
-    <g>
-      <line x1="58.75" y1="234.6" x2="60.75" y2="234.6" stroke="#8a7455" stroke-width="0.5" opacity="0.7"></line>
-      <text x="56.75" y="234.6" text-anchor="end" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="3.2" fill="#b0a07a" letter-spacing="0.04em">−6</text>
-    </g>
-    <g>
-      <line x1="58.75" y1="253" x2="60.75" y2="253" stroke="#8a7455" stroke-width="0.5" opacity="0.7"></line>
-      <text x="56.75" y="253" text-anchor="end" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="3.2" fill="#b0a07a" letter-spacing="0.04em">−∞</text>
-    </g>
-    <rect x="61.25" y="198" width="5" height="55" rx="2.5" fill="#c8bda0"></rect>
-    <rect x="62.75" y="201" width="2" height="49" rx="1" fill="#b0a07a"></rect>
-    <rect x="56.25" y="209" width="15" height="11" rx="3" fill="#5a4e38"></rect>
-    <rect x="57.75" y="213.5" width="12" height="2.5" rx="1" fill="#8a7a5a"></rect>
-    <!-- Repositioned Label: Below the track -->
-    <text x="63.75" y="261" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">1</text>
-  </g>
-
-  <!-- Fader 2 -->
-  <g>
-    <g>
-      <line x1="96.25" y1="198" x2="98.25" y2="198" stroke="#8a7455" stroke-width="0.5" opacity="0.7"></line>
-      <text x="40.75" y="198" text-anchor="end" dominant-baseline="central" font-family="'Share Tech Mono',monospace" font-size="3.2" fill="transparent" letter-spacing="0.04em">+6</text>
-    </g>
-    <rect x="98.75" y="198" width="5" height="55" rx="2.5" fill="#c8bda0"></rect>
-    <rect x="100.25" y="201" width="2" height="49" rx="1" fill="#b0a07a"></rect>
-    <rect x="93.75" y="218" width="15" height="11" rx="3" fill="#5a4e38"></rect>
-    <rect x="95.25" y="222.5" width="12" height="2.5" rx="1" fill="#8a7a5a"></rect>
-    <text x="101.25" y="261" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">2</text>
-  </g>
-
-  <!-- Fader 3 -->
-  <g>
-    <rect x="136.25" y="198" width="5" height="55" rx="2.5" fill="#c8bda0"></rect>
-    <rect x="137.75" y="201" width="2" height="49" rx="1" fill="#b0a07a"></rect>
-    <rect x="131.25" y="202.4" width="15" height="11" rx="3" fill="#5a4e38"></rect>
-    <rect x="132.75" y="206.9" width="12" height="2.5" rx="1" fill="#8a7a5a"></rect>
-    <text x="138.75" y="261" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">3</text>
-  </g>
-
-  <!-- Fader 4 -->
-  <g>
-    <rect x="173.75" y="198" width="5" height="55" rx="2.5" fill="#c8bda0"></rect>
-    <rect x="175.25" y="201" width="2" height="49" rx="1" fill="#b0a07a"></rect>
-    <rect x="168.75" y="217.2" width="15" height="11" rx="3" fill="#5a4e38"></rect>
-    <rect x="170.25" y="221.7" width="12" height="2.5" rx="1" fill="#8a7a5a"></rect>
-    <text x="176.25" y="261" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">4</text>
-  </g>
-
-  <!-- Fader 5 -->
-  <g>
-    <rect x="211.25" y="198" width="5" height="55" rx="2.5" fill="#c8bda0"></rect>
-    <rect x="212.75" y="201" width="2" height="49" rx="1" fill="#b0a07a"></rect>
-    <rect x="206.25" y="214.5" width="15" height="11" rx="3" fill="#5a4e38"></rect>
-    <rect x="207.75" y="219" width="12" height="2.5" rx="1" fill="#8a7a5a"></rect>
-    <text x="213.75" y="261" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">5</text>
-  </g>
-
-  <!-- Fader 6 -->
-  <g>
-    <rect x="248.75" y="198" width="5" height="55" rx="2.5" fill="#c8bda0"></rect>
-    <rect x="250.25" y="201" width="2" height="49" rx="1" fill="#b0a07a"></rect>
-    <rect x="243.75" y="226.6" width="15" height="11" rx="3" fill="#5a4e38"></rect>
-    <rect x="245.25" y="231.1" width="12" height="2.5" rx="1" fill="#8a7a5a"></rect>
-    <text x="251.25" y="261" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">6</text>
-  </g>
-
-  <!-- Fader 7 -->
-  <g>
-    <rect x="286.25" y="198" width="5" height="55" rx="2.5" fill="#c8bda0"></rect>
-    <rect x="287.75" y="201" width="2" height="49" rx="1" fill="#b0a07a"></rect>
-    <rect x="281.25" y="206.2" width="15" height="11" rx="3" fill="#5a4e38"></rect>
-    <rect x="282.75" y="210.7" width="12" height="2.5" rx="1" fill="#8a7a5a"></rect>
-    <text x="288.75" y="261" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">7</text>
-  </g>
-
-  <!-- CH8 Fader (Restored/Visible fader slot under CH8!) -->
-  <g>
-    <rect x="323.75" y="198" width="5" height="55" rx="2.5" fill="#c8bda0"></rect>
-    <rect x="325.25" y="201" width="2" height="49" rx="1" fill="#b0a07a"></rect>
-    <rect x="318.75" y="220" width="15" height="11" rx="3" fill="#5a4e38"></rect>
-    <rect x="320.25" y="224.5" width="12" height="2.5" rx="1" fill="#8a7a5a"></rect>
-    <text x="326.25" y="261" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">8</text>
-  </g>
-
-  <!-- ========================================== -->
-  <!-- 8. QUANTIZATION TRIMS (ROOT & SCALE)       -->
-  <!-- ========================================== -->
-  <!-- ROOT (r=8, establishing visual hierarchy with r=13 parameters above) -->
-  <g>
-    <text x="382.5" y="190" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">QUANT</text>
-    <circle cx="363.75" cy="225" r="10.8" fill="none" stroke="#362a21" stroke-width="0.35" opacity="0.18"></circle>
-    <circle cx="363.75" cy="225" r="8" fill="url(#knobG)"></circle>
-    <circle cx="363.75" cy="225" r="8" fill="none" stroke="#c8a040" stroke-width="0.9" opacity="0.5"></circle>
-    <circle cx="359.4" cy="222" r="1.5" fill="#c8a040" opacity="0.9"></circle>
-    <ellipse cx="361.99" cy="222.6" rx="2.4" ry="1.44" fill="white" opacity="0.05"></ellipse>
-    <text x="363.75" y="240" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.2" font-weight="600" fill="#8a7455" letter-spacing="0.05em">ROOT</text>
-  </g>
-
-  <!-- SCALE (r=8, establishing visual hierarchy with r=13 parameters above) -->
-  <g>
-    <circle cx="401.25" cy="225" r="10.8" fill="none" stroke="#362a21" stroke-width="0.35" opacity="0.18"></circle>
-    <circle cx="401.25" cy="225" r="8" fill="url(#knobG)"></circle>
-    <circle cx="401.25" cy="225" r="8" fill="none" stroke="#8040c0" stroke-width="0.9" opacity="0.5"></circle>
-    <circle cx="404.5" cy="221" r="1.5" fill="#8040c0" opacity="0.9"></circle>
-    <ellipse cx="399.49" cy="222.6" rx="2.4" ry="1.44" fill="white" opacity="0.05"></ellipse>
-    <text x="401.25" y="240" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.2" font-weight="600" fill="#8a7455" letter-spacing="0.05em">SCALE</text>
-  </g>
-
-  <!-- ========================================== -->
-  <!-- 9. STEP SEQUENCER VECTOR BUTTON SOCKETS    -->
-  <!-- ========================================== -->
-  <!-- Continuous rows with empty sockets (No static text) for C++ overlays -->
-  <text x="22.5" y="293" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">MEL</text>
-  <text x="22.5" y="333" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="4.5" font-weight="600" fill="#8a7455" letter-spacing="0.05em">CHD</text>
-
-  <!-- Row 1: Melody (Steps 1 - 8) Sockets -->
-  <g id="melody-sockets">
-    <rect x="47.75" y="280" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="48.75" y="281" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="48.75" y="281" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-    
-    <rect x="85.25" y="280" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="86.25" y="281" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="86.25" y="281" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-
-    <rect x="122.75" y="280" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="123.25" y="281" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="123.25" y="281" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-
-    <rect x="159.75" y="280" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="160.75" y="281" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="160.75" y="281" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-
-    <rect x="197.25" y="280" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="198.25" y="281" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="198.25" y="281" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-
-    <rect x="234.75" y="280" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="235.75" y="281" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="235.75" y="281" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-
-    <rect x="272.25" y="280" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="273.25" y="281" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="273.25" y="281" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-
-    <rect x="309.75" y="280" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="310.75" y="281" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="310.75" y="281" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-  </g>
-
-  <!-- Row 2: Chord (Steps 9 - 16) Sockets -->
-  <g id="chord-sockets">
-    <rect x="47.75" y="320" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="48.75" y="321" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="48.75" y="321" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-
-    <rect x="85.25" y="320" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="86.25" y="321" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="86.25" y="321" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-
-    <rect x="122.75" y="320" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="123.75" y="321" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="123.75" y="321" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-
-    <rect x="160.25" y="320" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="161.25" y="321" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="161.25" y="321" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-
-    <rect x="197.75" y="320" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="198.75" y="321" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="198.75" y="321" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-
-    <rect x="235.25" y="320" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="236.25" y="321" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="236.25" y="321" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-
-    <rect x="272.75" y="320" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="273.75" y="321" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="273.75" y="321" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-
-    <rect x="310.25" y="320" width="32" height="26" rx="4.5" fill="#4a3e28" />
-    <rect x="311.25" y="321" width="30" height="24" rx="3.5" fill="#1a1508" />
-    <rect x="311.25" y="321" width="30" height="24" rx="3.5" fill="url(#sockShad)" />
-  </g>
-
-  <line x1="345.25" y1="275" x2="345.25" y2="351" stroke="#362a21" stroke-width="0.35" opacity="0.25"></line>
-  <line x1="345.25" y1="275.7" x2="345.25" y2="351.7" stroke="white" stroke-width="0.25" opacity="0.125"></line>
-
-  <!-- ========================================== -->
-  <!-- 10. SYSTEM PERFORMANCE BUTTON MAPPING      -->
-  <!-- ========================================== -->
-  <g style="cursor: pointer;">
-    <rect x="349.75" y="274" width="28" height="16" rx="3.5" fill="#cec3a0" stroke="#2d6e35" stroke-width="0.8"></rect>
-    <text x="363.75" y="282" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="5.2" font-weight="700" fill="#2d6e35" letter-spacing="0.05em">PLAY</text>
-  </g>
-  <g style="cursor: pointer;">
-    <rect x="381.75" y="274" width="28" height="16" rx="3.5" fill="#cec3a0" stroke="#8a7455" stroke-width="0.8"></rect>
-    <text x="395.75" y="282" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="5.2" font-weight="700" fill="#8a7455" letter-spacing="0.05em">SHFT</text>
-  </g>
-  <g style="cursor: pointer;">
-    <rect x="349.75" y="294" width="28" height="16" rx="3.5" fill="#cec3a0" stroke="#0066b2" stroke-width="0.8"></rect>
-    <text x="363.75" y="302" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="5.2" font-weight="700" fill="#0066b2" letter-spacing="0.05em">ARP</text>
-  </g>
-  <g style="cursor: pointer;">
-    <rect x="381.75" y="294" width="28" height="16" rx="3.5" fill="#cec3a0" stroke="#0066b2" stroke-width="0.8"></rect>
-    <text x="395.75" y="302" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="5.2" font-weight="700" fill="#0066b2" letter-spacing="0.05em">FRZ</text>
-  </g>
-  <g style="cursor: pointer;">
-    <rect x="349.75" y="314" width="28" height="16" rx="3.5" fill="#cec3a0" stroke="#7522a1" stroke-width="0.8"></rect>
-    <text x="363.75" y="322" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="5.2" font-weight="700" fill="#7522a1" letter-spacing="0.05em">CHRD</text>
-  </g>
-  <g style="cursor: pointer;">
-    <rect x="381.75" y="314" width="28" height="16" rx="3.5" fill="#cec3a0" stroke="#7522a1" stroke-width="0.8"></rect>
-    <text x="395.75" y="322" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="5.2" font-weight="700" fill="#7522a1" letter-spacing="0.05em">PROB</text>
-  </g>
-  <g style="cursor: pointer;">
-    <rect x="349.75" y="334" width="28" height="16" rx="3.5" fill="#cec3a0" stroke="#d95d12" stroke-width="0.8"></rect>
-    <text x="363.75" y="342" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="5.2" font-weight="700" fill="#d95d12" letter-spacing="0.05em">SAVE</text>
-  </g>
-  <g style="cursor: pointer;">
-    <rect x="381.75" y="334" width="28" height="16" rx="3.5" fill="#cec3a0" stroke="#d95d12" stroke-width="0.8"></rect>
-    <text x="395.75" y="342" text-anchor="middle" dominant-baseline="central" font-family="'Rajdhani',sans-serif" font-size="5.2" font-weight="700" fill="#d95d12" letter-spacing="0.05em">RCL</text>
-  </g>
-
-  <!-- ========================================== -->
-  <!-- 11. AMBIENT SHADOW OVERLAYS                -->
-  <!-- ========================================== -->
-  <rect width="420" height="380" fill="url(#vignG)" style="mix-blend-mode: multiply; pointer-events: none;"></rect>
 </svg>
