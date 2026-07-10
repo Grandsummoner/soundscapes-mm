@@ -14,7 +14,6 @@ jobs:
     name: Windows x64 Build
     runs-on: ubuntu-latest
     container:
-      # Corrected public image name for Windows compiling
       image: ghcr.io/qno/rack-plugin-toolchain-win-linux
       options: --user root
       
@@ -26,4 +25,11 @@ jobs:
       - name: Build plugin
         run: |
           export PLUGIN_DIR=$GITHUB_WORKSPACE
-          /home/build/rack-plugin-toolchain/compile-plugin.sh win-x64
+          pushd /home/build/rack-plugin-toolchain
+          make plugin-build-win-x64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: /home/build/rack-plugin-toolchain/plugin-build
+          name: win-x64
