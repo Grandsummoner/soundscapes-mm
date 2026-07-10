@@ -66,6 +66,8 @@ Soundscapes::Soundscapes() {
         voices[i].modPhase = 0.0f;
         voices[i].fbState = 0.0f;
         voices[i].subPhase = 0.0f;
+        voices[i].svfLow = 0.0f;
+        voices[i].svfBand = 0.0f;
         for (int b = 0; b < 2048; b++) {
             voices[i].delayBuffer[b] = 0.0f;
         }

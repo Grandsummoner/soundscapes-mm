@@ -153,19 +153,21 @@ struct Soundscapes : Module {
     float fxSends[4][8]; // [FM, Delay, Reverb, Filter] x [CH1-8]
     
     struct VoiceDSP {
-        float phase = 0.0f;         // Carrier phase (Voices) / drone phase (Drone & Dust)
+        float phase = 0.0f;         // Carrier phase (Voices VA osc) / drone phase (Drone & Dust)
         float freq = 220.0f;
-        float env = 0.0f;           // Amplitude / LPG envelope
+        float env = 0.0f;           // Amplitude envelope
         float delayBuffer[2048] = {0.0f};
         int writeIdx = 0;
-        float noiseState = 0.0f;    // LPG smoothing filter state
+        float noiseState = 0.0f;    // LPG smoothing filter state (Waves/Drone-Dust use)
         void trigger() { env = 1.0f; }
 
-        // --- Voices mode (FM) specific state ---
+        // --- Voices mode (VA osc + FM/ring-mod) specific state ---
         float opEnv = 0.0f;         // Independent operator/brightness envelope
         float modPhase = 0.0f;      // Modulator phase accumulator (separate from carrier)
         float fbState = 0.0f;       // Modulator self-feedback state
         float subPhase = 0.0f;      // Sub-oscillator phase (bass anchor voice only)
+        float svfLow = 0.0f;        // Per-voice resonant filter state (lowpass)
+        float svfBand = 0.0f;       // Per-voice resonant filter state (bandpass)
     } voices[8];
 
     struct FXTank {

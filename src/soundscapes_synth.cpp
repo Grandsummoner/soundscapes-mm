@@ -40,6 +40,21 @@ static float quantizePitch(float cvInput, int root, int scaleIdx) {
 }
 
 /**
+ * PolyBLEP band-limiting correction, used to anti-alias the virtual-analog
+ * sawtooth/pulse oscillators in Voices mode (t = phase 0-1, dt = phase increment per sample)
+ */
+static float polyBlep(float t, float dt) {
+    if (t < dt) {
+        t /= dt;
+        return t + t - t * t - 1.0f;
+    } else if (t > 1.0f - dt) {
+        t = (t - 1.0f) / dt;
+        return t * t + t + t + 1.0f;
+    }
+    return 0.0f;
+}
+
+/**
  * Master DSP Audio Synthesis Engine
  */
 void Soundscapes::processDSP(const ProcessArgs& args) {
@@ -67,23 +82,42 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
     float dynamicsVal = params[DYNAMICS_PARAM].getValue();
 
     // 2. Synthesize 8 Independent Channels
+    // If VOCT_INPUT is patched with a polyphonic cable (e.g. from an external keyboard
+    // or poly sequencer), each incoming channel drives one physical voice directly --
+    // true polyphonic performance. Voices beyond the incoming channel count (or all
+    // voices, if the cable is monophonic/unpatched) keep using the internal diatonic
+    // harmonizer + step sequencer as before, so live poly playing and generative
+    // harmony can coexist across the 8 channels.
+    int voctChannels = inputs[VOCT_INPUT].getChannels();
+    bool polyPitchActive = voctChannels > 1;
+
     for (int i = 0; i < 8; i++) {
         VoiceDSP& voice = voices[i];
         float channelOutputSignal = 0.0f;
 
-        // --- DIATONIC CONSTELLATION MAPPING ---
-        int chordOffsetDegree = i * 2; // Harmonizes in thirds
-        int chordOctaveOffset = chordOffsetDegree / 7;
-        int scaleDegreeIndex = chordOffsetDegree % 7;
+        bool externalPolyVoice = polyPitchActive && (i < voctChannels);
 
-        int relativeNoteOffset = SCALES[scaleIdx][scaleDegreeIndex] + (chordOctaveOffset * 12);
-        
-        // Channel 1 acts as the dedicated bass anchor note (transposed down 1 octave)
-        if (i == 0) {
-            relativeNoteOffset = -12;
+        float voiceMidiNote;
+        if (externalPolyVoice) {
+            // Each incoming poly channel is quantized on its own -- the external
+            // source dictates the voicing/chord directly, no internal harmony offset.
+            float noteCV = inputs[VOCT_INPUT].getPolyVoltage(i);
+            voiceMidiNote = quantizePitch(noteCV, rootNote, scaleIdx);
+        } else {
+            // --- DIATONIC CONSTELLATION MAPPING (internal generative harmony) ---
+            int chordOffsetDegree = i * 2; // Harmonizes in thirds
+            int chordOctaveOffset = chordOffsetDegree / 7;
+            int scaleDegreeIndex = chordOffsetDegree % 7;
+
+            int relativeNoteOffset = SCALES[scaleIdx][scaleDegreeIndex] + (chordOctaveOffset * 12);
+
+            // Channel 1 acts as the dedicated bass anchor note (transposed down 1 octave)
+            if (i == 0) {
+                relativeNoteOffset = -12;
+            }
+            voiceMidiNote = baseMidiNote + relativeNoteOffset;
         }
 
-        float voiceMidiNote = baseMidiNote + relativeNoteOffset;
         voice.freq = 440.0f * std::pow(2.0f, (voiceMidiNote - 69.0f) / 12.0f);
 
         // --- ATTACK-RELEASE (AR) ENVELOPE GENERATOR ---
@@ -95,7 +129,12 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
 
         // Calculate gated step duration (gated to stay high for exactly 50% of step length)
         bool voiceGate = false;
-        if (isPlaying) {
+        if (externalPolyVoice) {
+            // True polyphonic performance: gate follows the external GATE cable directly
+            // (getPolyVoltage gracefully falls back to the mono gate if GATE_INPUT itself
+            // isn't polyphonic, so a single shared gate still works for all poly notes).
+            voiceGate = inputs[GATE_INPUT].getPolyVoltage(i) > 1.0f;
+        } else if (isPlaying) {
             float stepPeriod = 1.0f / (1.0f + rateVal * 19.0f);
             float activeGateDuration = stepPeriod * 0.50f; // 50% gate duration
             bool isGateActive = (stepTimeElapsed < activeGateDuration);
@@ -121,18 +160,18 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
 
         // --- SYNTHESIS MODEL ROUTER ---
         if (activeSynthMode == MODE_VOICES) {
-            // Two-operator phase-modulation "Voices" engine.
-            // TIMBRE selects the modulator:carrier ratio from a curated table spanning
-            // harmonic (bell/organ-like, low end) through mildly inharmonic (metallic/vocal,
-            // high end) tones -- more musically useful than a bare integer multiplier.
+            // "Voices": a virtual-analog voice per channel (band-limited VA oscillator ->
+            // resonant filter -> AR envelope). The FM modulator built below is NOT the main
+            // tone source here -- it's a coloration/processing stage. When EXT_INPUT is
+            // patched, that same modulator instead ring-modulates the external audio, so the
+            // 8 harmonized channels act as an 8-voice FM-flavored harmonizer on outside audio.
             static const float RATIO_TABLE[8] = {0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 5.0f, 7.0f};
             int ratioIdx = math::clamp((int)std::round(timbreVal * 7.0f), 0, 7);
             float modulatorFreq = voice.freq * RATIO_TABLE[ratioIdx];
 
-            // Independent operator (brightness) envelope: decays faster than the amplitude
-            // envelope, so FM index -- and therefore harmonic content -- falls away during
-            // the sustain. This gives each voice a bright pluck attack that mellows into a
-            // rounder sustain, rather than a static, buzzy tone held at constant brightness.
+            // Independent operator (brightness/modulation) envelope: decays faster than the
+            // amplitude envelope so the modulator's effect fades during sustain, whether it's
+            // lightly FM-ing the VA oscillator's pitch or ring-modding external audio.
             float opDecayCoeff = sampleTime / (0.05f + dynamicsVal * 0.4f);
             if (voiceGate) {
                 voice.opEnv += attackCoeff * (1.05f - voice.opEnv);
@@ -141,42 +180,75 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             }
             voice.opEnv = math::clamp(voice.opEnv, 0.0f, 1.0f);
 
-            float modIndex = textureVal * 6.0f * voice.opEnv;
-
-            // Modulator runs on its OWN phase accumulator (previously this shared the
-            // carrier's accumulator and got incremented twice per sample, which silently
-            // broke the intended ratio -- fixed here).
+            // Modulator runs on its own phase accumulator with light self-feedback
+            // (DENSITY) for extra harmonic edge/growl.
             voice.modPhase += modulatorFreq * sampleTime;
             if (voice.modPhase >= 1.0f) voice.modPhase -= 1.0f;
-
-            // Light self-feedback on the modulator adds harmonic edge/growl at high DENSITY,
-            // useful for turning "Voices" channels into leads or basses without a 3rd operator.
             float feedbackAmount = 0.3f * densityVal;
             float modOut = std::sin(voice.modPhase * 2.0f * M_PI + voice.fbState * feedbackAmount);
             voice.fbState = modOut;
 
-            // Carrier phase advances at a constant rate; the modulator only displaces its
-            // READ point (true phase modulation == FM for sinusoidal operators).
-            voice.phase += voice.freq * sampleTime;
-            if (voice.phase >= 1.0f) voice.phase -= 1.0f;
+            float rawOscSignal;
+            bool extConnected = inputs[EXT_INPUT].isConnected();
 
-            float rawOscSignal = std::sin(voice.phase * 2.0f * M_PI + modOut * modIndex);
+            if (extConnected) {
+                // --- External audio path: FM-flavored ring-modulation harmonizer ---
+                // DENSITY is the dry/processed blend; the modulator's own envelope (opEnv)
+                // scales how much ring-mod sideband content comes through, so the effect
+                // swells in sync with this channel's gate rather than running constantly.
+                float extSignal = inputs[EXT_INPUT].getVoltage() / 5.0f;
+                float ringModded = extSignal * modOut;
+                float wetAmount = densityVal * voice.opEnv;
+                rawOscSignal = extSignal * (1.0f - wetAmount) + ringModded * wetAmount;
+            } else {
+                // --- Internal virtual-analog oscillator path (PolyBLEP band-limited) ---
+                float dt = voice.freq / sampleRate;
 
-            // Bass anchor voice (channel 1): blend in a clean sub-octave sine for low-end
-            // weight, since it's the fixed root note and benefits from more fundamental.
-            if (i == 0) {
-                voice.subPhase += (voice.freq * 0.5f) * sampleTime;
-                if (voice.subPhase >= 1.0f) voice.subPhase -= 1.0f;
-                rawOscSignal = rawOscSignal * 0.7f + std::sin(voice.subPhase * 2.0f * M_PI) * 0.3f;
+                // Subtle through-zero FM on the VA oscillator's own pitch, driven by DENSITY,
+                // so the modulator still does useful work even with nothing patched into EXT IN.
+                voice.phase += dt + (modOut * densityVal * 0.05f);
+                if (voice.phase >= 1.0f) voice.phase -= 1.0f;
+                if (voice.phase < 0.0f) voice.phase += 1.0f;
+
+                float saw = 2.0f * voice.phase - 1.0f;
+                saw -= polyBlep(voice.phase, dt);
+
+                float pulseWidth = 0.5f;
+                float pulsePhase = voice.phase + (1.0f - pulseWidth);
+                if (pulsePhase >= 1.0f) pulsePhase -= 1.0f;
+                float pulse = (voice.phase < pulseWidth) ? 1.0f : -1.0f;
+                pulse += polyBlep(voice.phase, dt);
+                pulse -= polyBlep(pulsePhase, dt);
+
+                // TEXTURE morphs the waveshape from sawtooth to pulse -- classic analog
+                // waveshape control, giving Voices real tonal range beyond a single timbre.
+                float shapeMorph = textureVal;
+                rawOscSignal = saw * (1.0f - shapeMorph) + pulse * shapeMorph;
+
+                // Bass anchor voice (channel 1): blend in a clean sub-octave sine for
+                // low-end weight, since it's the fixed root note.
+                if (i == 0) {
+                    voice.subPhase += (voice.freq * 0.5f) * sampleTime;
+                    if (voice.subPhase >= 1.0f) voice.subPhase -= 1.0f;
+                    rawOscSignal = rawOscSignal * 0.7f + std::sin(voice.subPhase * 2.0f * M_PI) * 0.3f;
+                }
             }
 
-            // First-order LPG Filter Emulation (envelope drives cutoff -> brightness tracks
-            // amplitude, vactrol-style), followed by gentle saturation for warmth/character.
-            float lpgCutoff = voice.env * 3000.0f + 100.0f;
-            float alpha = (lpgCutoff * 2.0f * M_PI * sampleTime) / (1.0f + lpgCutoff * 2.0f * M_PI * sampleTime);
+            // Shared resonant lowpass (trapezoidal SVF, envelope-tracked cutoff -- louder
+            // notes open the filter, analog-synth style), then gentle saturation for warmth.
+            float cutoffHz = math::clamp(150.0f + voice.env * 5000.0f, 50.0f, 15000.0f);
+            float g = std::tan(M_PI * cutoffHz / sampleRate);
+            float k = 1.2f; // fixed moderate resonance
+            float a1 = 1.0f / (1.0f + g * (g + k));
+            float a2 = g * a1;
 
-            voice.noiseState += alpha * (rawOscSignal - voice.noiseState);
-            float saturated = std::tanh(voice.noiseState * 1.3f);
+            float v3 = rawOscSignal - voice.svfBand;
+            float v1 = a1 * voice.svfLow + a2 * v3;
+            float v2 = voice.svfBand + g * v1;
+            voice.svfLow = 2.0f * v1 - voice.svfLow;
+            voice.svfBand = 2.0f * v2 - voice.svfBand;
+
+            float saturated = std::tanh(v2 * 1.2f);
             channelOutputSignal = saturated * voice.env * channelVolumes[i];
 
         } else if (activeSynthMode == MODE_WAVES) {
