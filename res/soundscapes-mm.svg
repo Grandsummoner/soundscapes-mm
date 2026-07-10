@@ -59,35 +59,36 @@
     <line x1="46" y1="0" x2="46" y2="380" stroke="#ffffff" stroke-width="1" opacity="0.9"/>
 
     <!-- ================================================================= -->
-    <!-- I. LEFT INPUT SIDEBAR (X = 22.5) & STATUS LEDs (X = 34.5)        -->
+    <!-- I. LEFT INPUT SIDEBAR (X = 22.5) & STATUS LEDs (X = 36.5)        -->
     <!-- ================================================================= -->
+    <!-- LEDs moved to X = 36.5 to give a clean 3.05px gap after the jack bezel -->
     <g id="sidebar-inputs">
         <use href="#jack-placeholder" x="22.5" y="55"/>
-        <use href="#status-led" x="34.5" y="55"/>
+        <use href="#status-led" x="36.5" y="55"/>
         <text x="22.5" y="69" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">CLK</text>
 
         <use href="#jack-placeholder" x="22.5" y="102"/>
-        <use href="#status-led" x="34.5" y="102"/>
+        <use href="#status-led" x="36.5" y="102"/>
         <text x="22.5" y="116" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">RST</text>
 
         <use href="#jack-placeholder" x="22.5" y="149"/>
-        <use href="#status-led" x="34.5" y="149"/>
+        <use href="#status-led" x="36.5" y="149"/>
         <text x="22.5" y="163" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">V/OCT</text>
 
         <use href="#jack-placeholder" x="22.5" y="196"/>
-        <use href="#status-led" x="34.5" y="196"/>
+        <use href="#status-led" x="36.5" y="196"/>
         <text x="22.5" y="210" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">GATE</text>
 
         <use href="#jack-placeholder" x="22.5" y="243"/>
-        <use href="#status-led" x="34.5" y="243"/>
+        <use href="#status-led" x="36.5" y="243"/>
         <text x="22.5" y="257" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#7d7160" text-anchor="middle">VEL</text>
 
         <use href="#jack-amber" x="22.5" y="290"/>
-        <use href="#status-led" x="34.5" y="290"/>
+        <use href="#status-led" x="36.5" y="290"/>
         <text x="22.5" y="304" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#d47d00" text-anchor="middle">EXT IN</text>
 
         <use href="#jack-red" x="22.5" y="337"/>
-        <use href="#status-led" x="34.5" y="337"/>
+        <use href="#status-led" x="36.5" y="337"/>
         <text x="22.5" y="351" font-family="'Roboto Mono', monospace" font-size="5.5" font-weight="bold" fill="#d0021b" text-anchor="middle">DUCK</text>
     </g>
 
@@ -105,56 +106,56 @@
     <!-- Grid points mapped on 44px interval starting at X=79:
          CH1: 79 | CH2: 123 | CH3: 167 | CH4: 211 | CH5: 254 | CH6: 298 | CH7: 342 | CH8: 386 -->
     <g id="row1-expanded-grid">
-        <!-- CH1 -->
+        <!-- CH1 (X = 79) -->
         <use href="#jack-placeholder" x="79" y="55"/>
         <circle cx="79" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="79" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">1</text>
         <rect x="65" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <text x="79" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">1</text>
 
-        <!-- CH2 -->
+        <!-- CH2 (X = 123) -->
         <use href="#jack-placeholder" x="123" y="55"/>
         <circle cx="123" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="123" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">2</text>
         <rect x="109" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <text x="123" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">2</text>
 
-        <!-- CH3 -->
+        <!-- CH3 (X = 167) -->
         <use href="#jack-placeholder" x="167" y="55"/>
         <circle cx="167" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="167" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">3</text>
         <rect x="153" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <text x="167" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">3</text>
 
-        <!-- CH4 -->
+        <!-- CH4 (X = 211) -->
         <use href="#jack-placeholder" x="211" y="55"/>
         <circle cx="211" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="211" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">4</text>
         <rect x="197" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <text x="211" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">4</text>
 
-        <!-- CH5 -->
+        <!-- CH5 (X = 254) -->
         <use href="#jack-placeholder" x="254" y="55"/>
         <circle cx="254" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="254" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">5</text>
         <rect x="240" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <text x="254" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">5</text>
 
-        <!-- CH6 -->
+        <!-- CH6 (X = 298) -->
         <use href="#jack-placeholder" x="298" y="55"/>
         <circle cx="298" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="298" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">6</text>
         <rect x="284" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <text x="298" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">6</text>
 
-        <!-- CH7 -->
+        <!-- CH7 (X = 342) -->
         <use href="#jack-placeholder" x="342" y="55"/>
         <circle cx="342" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="342" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">7</text>
         <rect x="328" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <text x="342" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">7</text>
 
-        <!-- CH8 -->
+        <!-- CH8 (X = 386) -->
         <use href="#jack-placeholder" x="386" y="55"/>
         <circle cx="386" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="386" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">8</text>
@@ -163,11 +164,8 @@
     </g>
 
     <!-- ================================================================= -->
-    <!-- IV. ROW 2 (THE SYNTH DECK - LOCKED ALIGNMENT & EQUAL GAPS)        -->
+    <!-- IV. ROW 2 (THE SYNTH DECK)                                        -->
     <!-- ================================================================= -->
-    <!-- MODE aligned on CH1 (79). FX Block aligned on CH2 (113) & CH3 (147).
-         6 Knobs start at CH4 (181) and spread evenly with 41px intervals to CH8 (386).
-         Skins MODE to use premium Bronze smoked glass matching displays. -->
     <g id="synth-deck">
         <!-- MODE Window (X = 67 to 91 - Centered at 79) -->
         <rect x="67" y="150" width="24" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
