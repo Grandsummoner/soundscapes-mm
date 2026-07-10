@@ -33,11 +33,12 @@ target_sources(soundscapes-mm PRIVATE
     src/soundscapes_fx.cpp
 )
 
-# Invoke the SDK packaging macro to link, pack, and create the final binary plugins (.mmplugin).
-# Note: PLUGIN_JSON must point strictly to the standard VCV plugin.json.
+# Invoke the SDK packaging macro. 
+# Note: Added the DESTINATION argument to resolve the cmake_path error in plugin.cmake.
 create_plugin(
     SOURCE_LIB soundscapes-mm
     PLUGIN_NAME soundscapes-mm
     PLUGIN_JSON ${CMAKE_CURRENT_LIST_DIR}/plugin.json
     SOURCE_ASSETS ${CMAKE_CURRENT_LIST_DIR}/res
+    DESTINATION ${CMAKE_CURRENT_LIST_DIR}/metamodule-plugins
 )
