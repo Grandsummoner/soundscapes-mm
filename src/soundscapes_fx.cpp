@@ -10,9 +10,9 @@ struct StereoSVF {
     float ic1eq_R = 0.0f, ic2eq_R = 0.0f;
 
     void process(float inputL, float inputR, float cutoffHz, float resonance, float sampleRate, float& outL, float& outR) {
-        // Clamp parameters for stability
-        cutoffHz = std::clamp(cutoffHz, 20.0f, 18000.0f);
-        resonance = std::clamp(resonance, 0.01f, 0.99f);
+        // Clamp parameters for stability using VCV math::clamp (C++11 compatible)
+        cutoffHz = math::clamp(cutoffHz, 20.0f, 18000.0f);
+        resonance = math::clamp(resonance, 0.01f, 0.99f);
         float q = 1.0f / (2.0f * (1.0f - resonance)); // Q-factor mapping
 
         // Prewarp cutoff frequency
@@ -99,7 +99,7 @@ void Soundscapes::process(const ProcessArgs& args) {
 
     // C. Cascade FX Tank Bus Processing
     float sampleRate = args.sampleRate;
-    float sampleTime = args.sampleTime;
+    // float sampleTime = args.sampleTime; // Commented out to clear unused variable warning
 
     float inputBusL = 0.0f;
     float inputBusR = 0.0f;
