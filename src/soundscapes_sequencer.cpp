@@ -38,6 +38,7 @@ void Soundscapes::handleFocusToggle(int channel) {
  */
 void Soundscapes::handleFaderMapping() {
     shiftActive = params[SHFT_PARAM].getValue() > 0.5f;
+    isPlaying = params[PLAY_PARAM].getValue() > 0.5f;
 
     // Mutually Exclusive Radio Button logic for FM, DELAY, REVERB, and FILTER
     static float prevFm = 0.0f, prevDelay = 0.0f, prevReverb = 0.0f, prevFilter = 0.0f;
@@ -136,13 +137,11 @@ void Soundscapes::processSequencer(float sampleTime) {
     bool playClicked = playClickTrigger.process(params[PLAY_PARAM].getValue());
     if (playClicked) {
         if (shiftActive) {
-            // SHFT + PLAY = Rewind playhead to 0 without stopping/starting transport!
             melodyTrack.playhead = 0;
             chordTrack.playhead = 0;
             // Retain actual play state on latching toggle
             params[PLAY_PARAM].setValue(isPlaying ? 1.0f : 0.0f);
         } else {
-            // Toggle play/pause
             isPlaying = !isPlaying;
         }
     }
@@ -188,26 +187,21 @@ void Soundscapes::processSequencer(float sampleTime) {
         }
     }
 
+    // Increments timing or resets it cleanly on step transitions
+    if (nextStep) {
+        stepTimeElapsed = 0.0f;
+        // Roll probabilities EXACTLY once at the start of the step (prevents gate flicker)
+        for (int i = 0; i < 8; i++) {
+            voiceTriggerActive[i] = ((rand() % 100) < melodyTrack.steps[i].probability);
+            chordTriggerActive[i] = ((rand() % 100) < chordTrack.steps[i].probability);
+        }
+    } else {
+        stepTimeElapsed += sampleTime;
+    }
+
     if (nextStep && isPlaying) {
         melodyTrack.playhead = (melodyTrack.playhead + 1) % 8;
         chordTrack.playhead = (chordTrack.playhead + 1) % 8;
-
-        int melIdx = melodyTrack.playhead;
-        int chdIdx = chordTrack.playhead;
-
-        if (melodyTrack.steps[melIdx].active) {
-            int roll = (int)(rand() % 100);
-            if (roll < melodyTrack.steps[melIdx].probability) {
-                voices[melIdx].trigger();
-            }
-        }
-
-        if (chordTrack.steps[chdIdx].active) {
-            int roll = (int)(rand() % 100);
-            if (roll < chordTrack.steps[chdIdx].probability) {
-                voices[chdIdx].trigger();
-            }
-        }
     }
 
     // Update LED step lights for visual tracker
