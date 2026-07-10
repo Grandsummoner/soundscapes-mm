@@ -2,9 +2,10 @@
 
 Plugin* pluginInstance;
 
+// Global VCV Rack initialisation function, called on plugin load
 void init(Plugin* p) {
     pluginInstance = p;
 
-    // Registers the Soundscapes model with the VCV system
+    // Register the Soundscapes model with the central engine
     p->addModel(modelSoundscapes);
 }
