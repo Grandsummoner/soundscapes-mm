@@ -1,6 +1,7 @@
 #include "soundscapes.hpp"
 
 // Static trigger helpers for sequencer and interface controls
+static dsp::SchmittTrigger playClickTrigger;
 static dsp::SchmittTrigger clockTrigger;
 static dsp::SchmittTrigger resetTrigger;
 
@@ -36,19 +37,53 @@ void Soundscapes::handleFocusToggle(int channel) {
  * Handle complex fader mappings based on Global Mixer vs. Focus Mode
  */
 void Soundscapes::handleFaderMapping() {
-    // Corrected: Binds shiftActive and isPlaying directly to parameters (fixes play button getting stuck)
     shiftActive = params[SHFT_PARAM].getValue() > 0.5f;
-    isPlaying = params[PLAY_PARAM].getValue() > 0.5f;
 
+    // Mutually Exclusive Radio Button logic for FM, DELAY, REVERB, and FILTER
+    static float prevFm = 0.0f, prevDelay = 0.0f, prevReverb = 0.0f, prevFilter = 0.0f;
+    float currFm = params[FM_PARAM].getValue();
+    float currDelay = params[DELAY_PARAM].getValue();
+    float currReverb = params[REVERB_PARAM].getValue();
+    float currFilter = params[FILTER_PARAM].getValue();
+
+    // Check which FX button was newly clicked ON, disabling all other three options
+    if (currFm > 0.5f && prevFm <= 0.5f) {
+        params[DELAY_PARAM].setValue(0.0f);
+        params[REVERB_PARAM].setValue(0.0f);
+        params[FILTER_PARAM].setValue(0.0f);
+        currDelay = currReverb = currFilter = 0.0f;
+    } else if (currDelay > 0.5f && prevDelay <= 0.5f) {
+        params[FM_PARAM].setValue(0.0f);
+        params[REVERB_PARAM].setValue(0.0f);
+        params[FILTER_PARAM].setValue(0.0f);
+        currFm = currReverb = currFilter = 0.0f;
+    } else if (currReverb > 0.5f && prevReverb <= 0.5f) {
+        params[FM_PARAM].setValue(0.0f);
+        params[DELAY_PARAM].setValue(0.0f);
+        params[FILTER_PARAM].setValue(0.0f);
+        currFm = currDelay = currFilter = 0.0f;
+    } else if (currFilter > 0.5f && prevFilter <= 0.5f) {
+        params[FM_PARAM].setValue(0.0f);
+        params[DELAY_PARAM].setValue(0.0f);
+        params[REVERB_PARAM].setValue(0.0f);
+        currFm = currDelay = currReverb = 0.0f;
+    }
+
+    prevFm = currFm;
+    prevDelay = currDelay;
+    prevReverb = currReverb;
+    prevFilter = currFilter;
+
+    // Determine active fader routing mode based on the cleared selection
     if (shiftActive) {
         activeFaderState = FADER_MIXER; 
-    } else if (params[FM_PARAM].getValue() > 0.5f) {
+    } else if (currFm > 0.5f) {
         activeFaderState = FADER_FM_SEND;
-    } else if (params[DELAY_PARAM].getValue() > 0.5f) {
+    } else if (currDelay > 0.5f) {
         activeFaderState = FADER_DELAY_SEND;
-    } else if (params[REVERB_PARAM].getValue() > 0.5f) {
+    } else if (currReverb > 0.5f) {
         activeFaderState = FADER_REVERB_SEND;
-    } else if (params[FILTER_PARAM].getValue() > 0.5f) {
+    } else if (currFilter > 0.5f) {
         activeFaderState = FADER_FILTER_SEND;
     } else {
         activeFaderState = FADER_MIXER;
@@ -98,9 +133,18 @@ void Soundscapes::processSequencer(float sampleTime) {
     }
 
     // 2. Play/Stop Transport / Rewind
-    if (isPlaying && shiftActive) {
-        melodyTrack.playhead = 0;
-        chordTrack.playhead = 0;
+    bool playClicked = playClickTrigger.process(params[PLAY_PARAM].getValue());
+    if (playClicked) {
+        if (shiftActive) {
+            // SHFT + PLAY = Rewind playhead to 0 without stopping/starting transport!
+            melodyTrack.playhead = 0;
+            chordTrack.playhead = 0;
+            // Retain actual play state on latching toggle
+            params[PLAY_PARAM].setValue(isPlaying ? 1.0f : 0.0f);
+        } else {
+            // Toggle play/pause
+            isPlaying = !isPlaying;
+        }
     }
 
     // 3. Clear/Initialize Sequence toggle
