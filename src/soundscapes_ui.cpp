@@ -48,7 +48,7 @@ struct OpaqueDisplay : Widget {
 /**
  * 2. Procedural Step Sequencer Pad Widget
  */
-struct StepPadWidget : SvgSwitch {
+struct StepPadWidget : app::SvgSwitch {
     int padId = 0; // Range 0 - 15
 
     StepPadWidget() {
@@ -101,7 +101,7 @@ struct StepPadWidget : SvgSwitch {
 /**
  * 3. Procedural Slide Fader Handle
  */
-struct SoundscapesFader : SvgSlider {
+struct SoundscapesFader : app::SvgSlider {
     SoundscapesFader() {
         box.size = Vec(14.0f, 20.0f);
     }
@@ -130,7 +130,7 @@ struct SoundscapesFader : SvgSlider {
 /**
  * 4. Procedural Utility/Performance Buttons
  */
-struct PerformanceButtonWidget : SvgSwitch {
+struct PerformanceButtonWidget : app::SvgSwitch {
     int buttonId = 0; // 0 to 7
 
     PerformanceButtonWidget() {
@@ -170,7 +170,7 @@ struct PerformanceButtonWidget : SvgSwitch {
 /**
  * 5. Procedural Large White Knob Widget (No external SVG dependencies)
  */
-struct SoundscapesKnob : Knob {
+struct SoundscapesKnob : app::Knob {
     SoundscapesKnob() {
         box.size = Vec(26.0f, 26.0f); // Large diameter: 26px
     }
@@ -214,7 +214,7 @@ struct SoundscapesKnob : Knob {
 /**
  * 6. Procedural Small White Knob Widget (Diagonal Quantizer Knobs)
  */
-struct SoundscapesSmallKnob : Knob {
+struct SoundscapesSmallKnob : SoundscapesKnob {
     SoundscapesSmallKnob() {
         box.size = Vec(20.0f, 20.0f); // Small diameter: 20px
     }
@@ -258,7 +258,7 @@ struct SoundscapesSmallKnob : Knob {
 /**
  * 7. Procedural MODE Selection Window Param Trigger
  */
-struct ModeButtonWidget : ParamWidget {
+struct ModeButtonWidget : app::ParamWidget {
     ModeButtonWidget() {
         box.size = Vec(24.0f, 40.0f); // Spans the exact mode bronze background screen
     }
@@ -278,7 +278,7 @@ struct ModeButtonWidget : ParamWidget {
 /**
  * 8. Procedural FX Selection Buttons
  */
-struct FXButtonWidget : ParamWidget {
+struct FXButtonWidget : app::ParamWidget {
     std::string label;
 
     FXButtonWidget() {
