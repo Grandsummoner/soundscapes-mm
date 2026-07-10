@@ -62,11 +62,11 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
     float baseMidiNote = quantizePitch(rootCV, rootNote, scaleIdx);
 
     // Parse macro parameter control dials
-    float rateVal = params[RATE_PARAM].getValue();
+    // float rateVal = params[RATE_PARAM].getValue(); // Commented out to clear unused variable warning
     float densityVal = params[DENSITY_PARAM].getValue();
     float timbreVal = params[TIMBRE_PARAM].getValue();
     float textureVal = params[TEXTURE_PARAM].getValue();
-    float spreadVal = params[SPREAD_PARAM].getValue();
+    // float spreadVal = params[SPREAD_PARAM].getValue(); // Commented out to clear unused variable warning
     float dynamicsVal = params[DYNAMICS_PARAM].getValue();
 
     // 2. Synthesize 8 Independent Channels
@@ -180,7 +180,9 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
         if (inputs[DUCK_INPUT].isConnected()) {
             float duckVolts = inputs[DUCK_INPUT].getVoltage();
             float duckAmount = params[DYNAMICS_PARAM].getValue() * (duckVolts / 10.0f);
-            float duckAtten = 1.0f - std::clamp(duckAmount, 0.0f, 1.0f);
+            
+            // Replaced std::clamp with math::clamp for C++11 compiler compatibility
+            float duckAtten = 1.0f - math::clamp(duckAmount, 0.0f, 1.0f);
             channelOutputSignal *= duckAtten;
         }
 
