@@ -143,18 +143,29 @@ struct Soundscapes : Module {
     float displayValueTimer[8] = {};
     int displayType[8] = {};       // 0: Percentage, 1: Root Note, 2: Scale Type
 
+    // Sequencer Timing & Probability tracking
+    bool voiceTriggerActive[8] = {};
+    bool chordTriggerActive[8] = {};
+    float stepTimeElapsed = 0.0f;  // Keeps track of physical elapsed step duration in seconds
+
     // DSP Processing Variables
     float channelVolumes[8] = {0.8f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f};
     float fxSends[4][8]; // [FM, Delay, Reverb, Filter] x [CH1-8]
     
     struct VoiceDSP {
-        float phase = 0.0f;
+        float phase = 0.0f;         // Carrier phase (Voices) / drone phase (Drone & Dust)
         float freq = 220.0f;
-        float env = 0.0f;
+        float env = 0.0f;           // Amplitude / LPG envelope
         float delayBuffer[2048] = {0.0f};
         int writeIdx = 0;
-        float noiseState = 0.0f;
+        float noiseState = 0.0f;    // LPG smoothing filter state
         void trigger() { env = 1.0f; }
+
+        // --- Voices mode (FM) specific state ---
+        float opEnv = 0.0f;         // Independent operator/brightness envelope
+        float modPhase = 0.0f;      // Modulator phase accumulator (separate from carrier)
+        float fbState = 0.0f;       // Modulator self-feedback state
+        float subPhase = 0.0f;      // Sub-oscillator phase (bass anchor voice only)
     } voices[8];
 
     struct FXTank {

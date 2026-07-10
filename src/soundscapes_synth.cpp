@@ -121,26 +121,63 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
 
         // --- SYNTHESIS MODEL ROUTER ---
         if (activeSynthMode == MODE_VOICES) {
-            float modulatorFreq = voice.freq * (1.0f + std::round(timbreVal * 4.0f));
-            float modIndex = textureVal * 4.0f * voice.env;
+            // Two-operator phase-modulation "Voices" engine.
+            // TIMBRE selects the modulator:carrier ratio from a curated table spanning
+            // harmonic (bell/organ-like, low end) through mildly inharmonic (metallic/vocal,
+            // high end) tones -- more musically useful than a bare integer multiplier.
+            static const float RATIO_TABLE[8] = {0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 5.0f, 7.0f};
+            int ratioIdx = math::clamp((int)std::round(timbreVal * 7.0f), 0, 7);
+            float modulatorFreq = voice.freq * RATIO_TABLE[ratioIdx];
 
-            voice.phase += modulatorFreq * sampleTime;
+            // Independent operator (brightness) envelope: decays faster than the amplitude
+            // envelope, so FM index -- and therefore harmonic content -- falls away during
+            // the sustain. This gives each voice a bright pluck attack that mellows into a
+            // rounder sustain, rather than a static, buzzy tone held at constant brightness.
+            float opDecayCoeff = sampleTime / (0.05f + dynamicsVal * 0.4f);
+            if (voiceGate) {
+                voice.opEnv += attackCoeff * (1.05f - voice.opEnv);
+            } else {
+                voice.opEnv += opDecayCoeff * (0.0f - voice.opEnv);
+            }
+            voice.opEnv = math::clamp(voice.opEnv, 0.0f, 1.0f);
+
+            float modIndex = textureVal * 6.0f * voice.opEnv;
+
+            // Modulator runs on its OWN phase accumulator (previously this shared the
+            // carrier's accumulator and got incremented twice per sample, which silently
+            // broke the intended ratio -- fixed here).
+            voice.modPhase += modulatorFreq * sampleTime;
+            if (voice.modPhase >= 1.0f) voice.modPhase -= 1.0f;
+
+            // Light self-feedback on the modulator adds harmonic edge/growl at high DENSITY,
+            // useful for turning "Voices" channels into leads or basses without a 3rd operator.
+            float feedbackAmount = 0.3f * densityVal;
+            float modOut = std::sin(voice.modPhase * 2.0f * M_PI + voice.fbState * feedbackAmount);
+            voice.fbState = modOut;
+
+            // Carrier phase advances at a constant rate; the modulator only displaces its
+            // READ point (true phase modulation == FM for sinusoidal operators).
+            voice.phase += voice.freq * sampleTime;
             if (voice.phase >= 1.0f) voice.phase -= 1.0f;
-            float modSignal = std::sin(voice.phase * 2.0f * M_PI) * modIndex;
 
-            float carrierFreq = voice.freq + (modSignal * voice.freq);
-            float carrierPhaseStep = carrierFreq * sampleTime;
-            voice.phase += carrierPhaseStep;
-            if (voice.phase >= 1.0f) voice.phase -= 1.0f;
+            float rawOscSignal = std::sin(voice.phase * 2.0f * M_PI + modOut * modIndex);
 
-            float rawOscSignal = std::sin(voice.phase * 2.0f * M_PI);
+            // Bass anchor voice (channel 1): blend in a clean sub-octave sine for low-end
+            // weight, since it's the fixed root note and benefits from more fundamental.
+            if (i == 0) {
+                voice.subPhase += (voice.freq * 0.5f) * sampleTime;
+                if (voice.subPhase >= 1.0f) voice.subPhase -= 1.0f;
+                rawOscSignal = rawOscSignal * 0.7f + std::sin(voice.subPhase * 2.0f * M_PI) * 0.3f;
+            }
 
-            // First-order LPG Filter Emulation
+            // First-order LPG Filter Emulation (envelope drives cutoff -> brightness tracks
+            // amplitude, vactrol-style), followed by gentle saturation for warmth/character.
             float lpgCutoff = voice.env * 3000.0f + 100.0f;
             float alpha = (lpgCutoff * 2.0f * M_PI * sampleTime) / (1.0f + lpgCutoff * 2.0f * M_PI * sampleTime);
-            
+
             voice.noiseState += alpha * (rawOscSignal - voice.noiseState);
-            channelOutputSignal = voice.noiseState * voice.env * channelVolumes[i];
+            float saturated = std::tanh(voice.noiseState * 1.3f);
+            channelOutputSignal = saturated * voice.env * channelVolumes[i];
 
         } else if (activeSynthMode == MODE_WAVES) {
             int delayLength = (int)(sampleRate / voice.freq);
