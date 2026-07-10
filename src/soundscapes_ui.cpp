@@ -36,7 +36,8 @@ struct OpaqueDisplay : Widget {
 
     void onButton(const event::Button& e) override {
         Widget::onButton(e);
-        if (e.action == event::Button::PRESS && e.button == event::Button::LEFT) {
+        // Corrected: Using the standard GLFW input macros for v2 event handling
+        if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
             if (module) {
                 module->handleFocusToggle(channelId);
             }
