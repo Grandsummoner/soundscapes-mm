@@ -15,12 +15,18 @@ static const int SCALES[5][12] = {
  * Diatonic Pitch Quantization Helper
  */
 static float quantizePitch(float cvInput, int root, int scaleIdx) {
+    // Clamp input to a standard safe Eurorack voltage range
+    cvInput = math::clamp(cvInput, -5.0f, 5.0f);
+    
+    // Convert 1V/Oct to raw MIDI note centered around middle C (60)
     float rawNote = cvInput * 12.0f + 60.0f;
     int octave = std::floor(rawNote / 12.0f);
     int noteInOctave = (int)std::floor(rawNote) % 12;
 
-    noteInOctave = (noteInOctave - root + 12) % 12;
+    // Shift relative to selected root note, adding 24 to guarantee a positive modulo result
+    noteInOctave = (noteInOctave - root + 24) % 12;
 
+    // Find the closest active scale degree in selected scale template
     const int* scale = SCALES[scaleIdx];
     int bestDegree = scale[0];
     int minDiff = 99;
@@ -33,6 +39,7 @@ static float quantizePitch(float cvInput, int root, int scaleIdx) {
         }
     }
 
+    // Return the absolute quantized MIDI note number
     return (octave * 12) + bestDegree + root;
 }
 
@@ -47,7 +54,7 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
     int rootNote = (int)std::round(params[ROOT_PARAM].getValue() * 11.0f); // 0 (C) - 11 (B)
     int scaleIdx = (int)std::round(params[SCALE_PARAM].getValue() * 4.0f); // 0 - 4
     
-    // Updated: Maps active mode directly to the discrete 3-way switch selection
+    // Maps active mode directly to the discrete 3-way switch selection
     activeSynthMode = (SynthMode)clamp((int)std::round(params[MODE_PARAM].getValue()), 0, 2);
 
     // Read continuous 1V/Oct CV modulation input
@@ -105,25 +112,26 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
 
         } else if (activeSynthMode == MODE_WAVES) {
             int delayLength = (int)(sampleRate / voice.freq);
-            if (delayLength > 2047) delayLength = 2047;
-            if (delayLength < 4) delayLength = 4;
+            delayLength = math::clamp(delayLength, 4, 2047); // Protect waveguide limits
 
             if (voice.env > 0.98f) {
                 voice.delayBuffer[voice.writeIdx] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f;
             }
 
-            int readIdx = (voice.writeIdx - delayLength + 2048) % 2048;
+            // Safe Bitwise AND index masking (prevents negative modulo memory reading)
+            int readIdx = (voice.writeIdx - delayLength + 2048) & 2047;
             float currentSample = voice.delayBuffer[readIdx];
 
-            int nextIdx = (readIdx + 1) % 2048;
+            // Corrected: Uses bitwise mask & 2047 (prevents out-of-bounds index 2048)
+            int nextIdx = (readIdx + 1) & 2047;
             float nextSample = voice.delayBuffer[nextIdx];
             float dampSample = (currentSample + nextSample) * 0.5f;
 
             float feedbackMult = 0.9f + (dynamicsVal * 0.098f);
             float feedbackSample = dampSample * feedbackMult;
 
+            voice.writeIdx = (voice.writeIdx + 1) & 2047;
             voice.delayBuffer[voice.writeIdx] = feedbackSample;
-            voice.writeIdx = (voice.writeIdx + 1) % 2048;
 
             channelOutputSignal = currentSample * channelVolumes[i] * 0.8f;
 
@@ -151,7 +159,7 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             channelOutputSignal *= duckAtten;
         }
 
-        // 3. Write individual output jacks
+        // Write individual output jacks
         if (outputs[CH1_OUTPUT + i].isConnected()) {
             outputs[CH1_OUTPUT + i].setVoltage(channelOutputSignal * 5.0f);
         }
