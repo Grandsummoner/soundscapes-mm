@@ -23,7 +23,6 @@ struct SoundscapesButton : app::ParamWidget {
 
     void onButton(const event::Button& e) override {
         ParamWidget::onButton(e);
-        // Corrected: Accessing setValue and getValue through getParamQuantity() safely
         if (getParamQuantity()) {
             if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
                 if (momentary) {
@@ -44,7 +43,7 @@ struct SoundscapesButton : app::ParamWidget {
 };
 
 /**
- * 1. Custom Smoked Bronze Channel Display Widget (with amber glow focus indicators)
+ * 1. Custom Smoked Bronze Channel Display Widget (with centered alignment and glows)
  */
 struct OpaqueDisplay : Widget {
     Soundscapes* module = nullptr;
@@ -70,7 +69,7 @@ struct OpaqueDisplay : Widget {
 
         bool isFocused = (module->focusedChannel == channelId);
         
-        // Draw physical glowing aura/outline if focused
+        // Draw physical glowing aura/outline if focused (perfectly aligned with backplate now)
         if (isFocused) {
             nvgBeginPath(args.vg);
             nvgRoundedRect(args.vg, -2.0f, -2.0f, box.size.x + 4.0f, box.size.y + 4.0f, 5.0f);
@@ -78,7 +77,7 @@ struct OpaqueDisplay : Widget {
             nvgStrokeWidth(args.vg, 2.0f);
             nvgStroke(args.vg);
 
-            // Corrected: Using the accurate NanoVG type NVGpaint instead of nvgPaint
+            // Diffusion blur glow
             NVGpaint glowPaint = nvgBoxGradient(args.vg, -4.0f, -4.0f, box.size.x + 8.0f, box.size.y + 8.0f, 6.0f, 4.0f, nvgRGBA(0xff, 0x9d, 0x00, 0x7f), nvgRGBA(0, 0, 0, 0));
             nvgBeginPath(args.vg);
             nvgRoundedRect(args.vg, -6.0f, -6.0f, box.size.x + 12.0f, box.size.y + 12.0f, 7.0f);
@@ -96,7 +95,8 @@ struct OpaqueDisplay : Widget {
             nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xdf));
 
             std::string text = std::to_string(channelId + 1);
-            nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, text.c_str(), NULL);
+            // Adjusted: Y-coordinate mathematically aligned to the dead-center
+            nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f + 1.5f, text.c_str(), NULL);
         }
     }
 };
@@ -154,7 +154,7 @@ struct StepPadWidget : app::SvgSwitch {
 };
 
 /**
- * 3. Procedural Slide Fader Handle (Corrected sizing to permit smooth movement tracking)
+ * 3. Procedural Slide Fader Handle
  */
 struct SoundscapesFader : app::SvgSlider {
     SoundscapesFader() {
@@ -168,7 +168,7 @@ struct SoundscapesFader : app::SvgSlider {
         nvgFillColor(args.vg, nvgRGBA(13, 12, 11, 255)); // #0d0c0b
         nvgFill(args.vg);
 
-        // Position of cap handle relative to dynamic value travel
+        // Position of cap handle relative to travel range
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.8f;
         float handleHeight = 16.0f;
         float handleY = (1.0f - value) * (box.size.y - handleHeight);
@@ -194,14 +194,13 @@ struct SoundscapesFader : app::SvgSlider {
 };
 
 /**
- * 4. Procedural Utility/Performance Buttons
+ * 4. Procedural Utility/Performance Buttons (Enhanced selection contrast)
  */
 struct PerformanceButtonWidget : SoundscapesButton {
     int buttonId = 0; // 0 to 7
     std::shared_ptr<Font> font;
 
     PerformanceButtonWidget() {
-        // PLAY and SHFT buttons toggle; others momentary
         momentary = (buttonId != 0 && buttonId != 1);
         box.size = Vec(18.0f, 14.0f);
         font = loadRobustFont();
@@ -229,9 +228,11 @@ struct PerformanceButtonWidget : SoundscapesButton {
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.0f;
         if (litState) {
             if (buttonId == 0) {
-                nvgFillColor(args.vg, nvgRGBA(0x2e, 0xcc, 0x71, 0xff)); // PLAY lit green
+                // Highly colorful bright green active selection fill
+                nvgFillColor(args.vg, nvgRGBA(0x2e, 0xcc, 0x71, 0xff)); 
             } else {
-                nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // SHFT lit amber
+                // Highly colorful deep amber-orange shift active selection fill
+                nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); 
             }
         } else if (value > 0.5f) {
             nvgFillColor(args.vg, nvgRGBA(0xee, 0xee, 0xee, 0xff));     // Pressed grey
@@ -240,8 +241,14 @@ struct PerformanceButtonWidget : SoundscapesButton {
         }
         nvgFill(args.vg);
 
-        nvgStrokeColor(args.vg, nvgRGBA(0xcc, 0xc4, 0xb6, 0xff));
-        nvgStrokeWidth(args.vg, 1.0f);
+        // Bold white stroke to highlight active state
+        if (litState) {
+            nvgStrokeColor(args.vg, nvgRGBA(255, 255, 255, 255));
+            nvgStrokeWidth(args.vg, 1.5f);
+        } else {
+            nvgStrokeColor(args.vg, nvgRGBA(0xcc, 0xc4, 0xb6, 0xff));
+            nvgStrokeWidth(args.vg, 1.0f);
+        }
         nvgStroke(args.vg);
 
         // Render Dynamic Text Label inside the button
@@ -392,7 +399,7 @@ struct ModeThreeWaySwitch : app::ParamWidget {
 };
 
 /**
- * 8. Procedural FX Selection Buttons (Now fully interactive)
+ * 8. Procedural FX Selection Buttons (Now colorful when selected)
  */
 struct FXButtonWidget : SoundscapesButton {
     std::string label;
@@ -427,7 +434,8 @@ struct FXButtonWidget : SoundscapesButton {
 
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.0f;
         if (isActive) {
-            nvgFillColor(args.vg, nvgRGBA(0x34, 0x98, 0xdb, 0xff)); // Active blue glow
+            // Highly obvious glowing neon-amber selection fill to match display digits
+            nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); 
         } else if (value > 0.5f) {
             nvgFillColor(args.vg, nvgRGBA(0xee, 0xee, 0xee, 0xff)); // Pressed grey
         } else {
@@ -435,8 +443,14 @@ struct FXButtonWidget : SoundscapesButton {
         }
         nvgFill(args.vg);
 
-        nvgStrokeColor(args.vg, nvgRGBA(0xcc, 0xc4, 0xb6, 0xff));
-        nvgStrokeWidth(args.vg, 1.0f);
+        // Highlight stroke for active selection
+        if (isActive) {
+            nvgStrokeColor(args.vg, nvgRGBA(255, 255, 255, 255));
+            nvgStrokeWidth(args.vg, 1.5f);
+        } else {
+            nvgStrokeColor(args.vg, nvgRGBA(0xcc, 0xc4, 0xb6, 0xff));
+            nvgStrokeWidth(args.vg, 1.0f);
+        }
         nvgStroke(args.vg);
 
         // Centered Button Label text drawn using verified monospaced font
