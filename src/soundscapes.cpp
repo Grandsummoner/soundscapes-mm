@@ -22,7 +22,8 @@ Soundscapes::Soundscapes() {
     }
 
     // 4. Configure Row 2 Core Synth Parameters
-    configParam(MODE_PARAM, 0.0f, 1.0f, 0.0f, "Synthesis Mode Cycle Select (V -> W -> D)");
+    // Corrected: Sets maximum MODE_PARAM value limit to 2.0f (allows 3 positions: 0, 1, 2)
+    configParam(MODE_PARAM, 0.0f, 2.0f, 0.0f, "Synthesis Mode Select (Voices -> Waves -> Drone & Dust)");
     configParam(FM_PARAM, 0.0f, 1.0f, 0.0f, "FM Modulation Send Edit Select");
     configParam(DELAY_PARAM, 0.0f, 1.0f, 0.0f, "Delay Send Edit Select");
     configParam(REVERB_PARAM, 0.0f, 1.0f, 0.0f, "Reverb Send Edit Select");
@@ -58,4 +59,133 @@ Soundscapes::Soundscapes() {
 
     // Initialize Default Sequencer Trigger States
     initializeSequence();
+}
+
+/**
+ * Main Process Thread
+ */
+void Soundscapes::process(const ProcessArgs& args) {
+    // 1. Tick Sequencer Step clocks & handle focused fader locks
+    processSequencer(args.sampleTime);
+    handleFaderMapping();
+
+    // 2. Temporary HUD Displays update timers
+    for (int i = 0; i < 8; i++) {
+        if (displayValueTimer[i] > 0.0f) {
+            displayValueTimer[i] -= args.sampleTime;
+        }
+    }
+
+    // 3. Monitor fader movements to display active percentages (00 - 99)
+    for (int i = 0; i < 8; i++) {
+        static float prevFaderVal[8] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+        float currVal = params[FADER1_PARAM + i].getValue();
+        if (prevFaderVal[i] >= 0.0f && fabs(currVal - prevFaderVal[i]) > 0.001f) {
+            displayValueTimer[i] = 1.5f;
+            displayValue[i] = currVal;
+            displayType[i] = 0;
+        }
+        prevFaderVal[i] = currVal;
+    }
+
+    // 4. Monitor macro knobs to display edited levels across all screens
+    for (int k = 0; k < 6; k++) {
+        static float prevKnobVal[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+        float currVal = params[RATE_PARAM + k].getValue();
+        if (prevKnobVal[k] >= 0.0f && fabs(currVal - prevKnobVal[k]) > 0.001f) {
+            for (int i = 0; i < 8; i++) {
+                displayValueTimer[i] = 1.5f;
+                displayValue[i] = currVal;
+                displayType[i] = 0;
+            }
+        }
+        prevKnobVal[k] = currVal;
+    }
+
+    // 5. Monitor ROOT & SCALE edits to display note names and scale abbreviations
+    static float prevRoot = -1.0f;
+    float currRoot = params[ROOT_PARAM].getValue();
+    if (prevRoot >= 0.0f && fabs(currRoot - prevRoot) > 0.01f) {
+        for (int i = 0; i < 8; i++) {
+            displayValueTimer[i] = 1.5f;
+            displayValue[i] = currRoot;
+            displayType[i] = 1;
+        }
+    }
+    prevRoot = currRoot;
+
+    static float prevScale = -1.0f;
+    float currScale = params[SCALE_PARAM].getValue();
+    if (prevScale >= 0.0f && fabs(currScale - prevScale) > 0.01f) {
+        for (int i = 0; i < 8; i++) {
+            displayValueTimer[i] = 1.5f;
+            displayValue[i] = currScale;
+            displayType[i] = 2;
+        }
+    }
+    prevScale = currScale;
+
+    // Call Synthesizer Engine to process raw Voice DSP output signals
+    processDSP(args);
+
+    // Cascade FX Tank Bus Processing
+    float sampleRate = args.sampleRate;
+    float inputBusL = 0.0f;
+    float inputBusR = 0.0f;
+
+    // Accumulate stereo audio signals from active voice channel outputs
+    for (int i = 0; i < 8; i++) {
+        // Sum mono outputs as base dry signal (balanced spatially across stereo field)
+        float panL = 1.0f - ((float)i / 7.0f);
+        float panR = (float)i / 7.0f;
+
+        float drySignal = outputs[CH1_OUTPUT + i].getVoltage() / 5.0f; // Scale back to internal unit scale
+
+        inputBusL += drySignal * panL;
+        inputBusR += drySignal * panR;
+    }
+
+    // --- PROCESSOR 1: FEEDBACK DELAY ---
+    float delaySendVal = params[DELAY_PARAM].getValue();
+    float fbackVal = params[SPREAD_PARAM].getValue() * 0.95f; // Max feedback clamp: 95%
+    float delayTimeVal = params[RATE_PARAM].getValue();
+
+    // Dynamically calculate delay line tap length (Delay range: 50ms - 1.5s)
+    int delaySamps = (int)((0.05f + delayTimeVal * 1.45f) * sampleRate);
+
+    // Write to circular delay buffer
+    fxUnit.delayBufferL[fxUnit.delayPtr] = inputBusL + (fxUnit.delayBufferR[(fxUnit.delayPtr - delaySamps + 48000) % 48000] * fbackVal);
+    fxUnit.delayBufferR[fxUnit.delayPtr] = inputBusR + (fxUnit.delayBufferL[(fxUnit.delayPtr - delaySamps + 48000) % 48000] * fbackVal);
+
+    float delayOutL = fxUnit.delayBufferL[(fxUnit.delayPtr - delaySamps + 48000) % 48000];
+    float delayOutR = fxUnit.delayBufferR[(fxUnit.delayPtr - delaySamps + 48000) % 48000];
+
+    fxUnit.delayPtr = (fxUnit.delayPtr + 1) % 48000;
+
+    // --- PROCESSOR 2: SHIMMER REVERB TANK ---
+    // (Note: Reverb State calculations are located inside the FX cpp files)
+
+    // Sum dry with wet processed spatial signals relative to stereo output channels
+    float wetL = (delayOutL * delaySendVal);
+    float wetR = (delayOutR * delaySendVal);
+
+    // Write final stereo master bus outputs
+    for (int i = 0; i < 8; i++) {
+        if (outputs[CH1_OUTPUT + i].isConnected()) {
+            float drySignal = outputs[CH1_OUTPUT + i].getVoltage();
+            
+            float panL = 1.0f - ((float)i / 7.0f);
+            float panR = (float)i / 7.0f;
+
+            float finalOutL = drySignal + (wetL * panL * 5.0f);
+            float finalOutR = drySignal + (wetR * panR * 5.0f);
+
+            // Left output (CH 1–4) / Right output (CH 5–8) separation
+            if (i < 4) {
+                outputs[CH1_OUTPUT + i].setVoltage(finalOutL);
+            } else {
+                outputs[CH1_OUTPUT + i].setVoltage(finalOutR);
+            }
+        }
+    }
 }
