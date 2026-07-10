@@ -328,4 +328,18 @@
     <g id="performance-block">
         <!-- Row 1 (Y = 275 - top aligned with Melody pads top edge) -->
         <rect x="342" y="275" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
-        <re
+        <rect x="377" y="275" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
+
+        <!-- Row 2 (Y = 294) -->
+        <rect x="342" y="294" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
+        <rect x="377" y="294" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
+
+        <!-- Row 3 (Y = 313) -->
+        <rect x="342" y="313" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
+        <rect x="377" y="313" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
+
+        <!-- Row 4 (Y = 332 - bottom edge at 346px, matching Chord pads) -->
+        <rect x="342" y="332" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
+        <rect x="377" y="332" width="18" height="14" rx="2.5" ry="2.5" fill="#ffffff" stroke="#ccc4b6" stroke-width="1"/>
+    </g>
+</svg>
