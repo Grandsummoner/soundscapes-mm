@@ -56,6 +56,25 @@ Soundscapes::Soundscapes() {
     configParam(SAVE_PARAM, 0.0f, 1.0f, 0.0f, "Save Active Sequencer Pattern");
     configParam(RCL_PARAM, 0.0f, 1.0f, 0.0f, "Recall Saved Pattern");
 
+    // Clear and zero out voice buffers to guarantee clean startup
+    for (int i = 0; i < 8; i++) {
+        voices[i].writeIdx = 0;
+        voices[i].phase = 0.0f;
+        voices[i].env = 0.0f;
+        voices[i].noiseState = 0.0f;
+        for (int b = 0; b < 2048; b++) {
+            voices[i].delayBuffer[b] = 0.0f;
+        }
+    }
+
+    // Clear FX Unit circular line buffers
+    fxUnit.delayPtr = 0;
+    fxUnit.reverbState = 0.0f;
+    for (int b = 0; b < 48000; b++) {
+        fxUnit.delayBufferL[b] = 0.0f;
+        fxUnit.delayBufferR[b] = 0.0f;
+    }
+
     // Initialize Default Sequencer Trigger States
     initializeSequence();
 }
