@@ -138,6 +138,11 @@ struct Soundscapes : Module {
     float flashTimer = 0.0f;
     bool displayFlashState = false;
 
+    // Dynamic value display HUD arrays
+    float displayValue[8] = {};
+    float displayValueTimer[8] = {};
+    int displayType[8] = {};       // 0: Percentage, 1: Root Note, 2: Scale Type
+
     // DSP Processing Variables
     float channelVolumes[8] = {0.8f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f};
     float fxSends[4][8]; // [FM, Delay, Reverb, Filter] x [CH1-8]
