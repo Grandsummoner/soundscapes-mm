@@ -85,21 +85,77 @@ void Soundscapes::process(const ProcessArgs& args) {
     processSequencer(args.sampleTime);
     handleFaderMapping();
 
-    // B. Call Synthesizer Engine to process raw Voice DSP output signals
+    // B. Temporary HUD Displays update timers
+    for (int i = 0; i < 8; i++) {
+        if (displayValueTimer[i] > 0.0f) {
+            displayValueTimer[i] -= args.sampleTime;
+        }
+    }
+
+    // C. Monitor fader movements to display active percentages (00 - 99)
+    for (int i = 0; i < 8; i++) {
+        static float prevFaderVal[8] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+        float currVal = params[FADER1_PARAM + i].getValue();
+        if (prevFaderVal[i] >= 0.0f && fabs(currVal - prevFaderVal[i]) > 0.001f) {
+            displayValueTimer[i] = 1.5f;
+            displayValue[i] = currVal;
+            displayType[i] = 0;
+        }
+        prevFaderVal[i] = currVal;
+    }
+
+    // D. Monitor macro knobs to display edited levels across all screens
+    for (int k = 0; k < 6; k++) {
+        static float prevKnobVal[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+        float currVal = params[RATE_PARAM + k].getValue();
+        if (prevKnobVal[k] >= 0.0f && fabs(currVal - prevKnobVal[k]) > 0.001f) {
+            for (int i = 0; i < 8; i++) {
+                displayValueTimer[i] = 1.5f;
+                displayValue[i] = currVal;
+                displayType[i] = 0;
+            }
+        }
+        prevKnobVal[k] = currVal;
+    }
+
+    // E. Monitor ROOT & SCALE edits to display note names and scale abbreviations
+    static float prevRoot = -1.0f;
+    float currRoot = params[ROOT_PARAM].getValue();
+    if (prevRoot >= 0.0f && fabs(currRoot - prevRoot) > 0.01f) {
+        for (int i = 0; i < 8; i++) {
+            displayValueTimer[i] = 1.5f;
+            displayValue[i] = currRoot;
+            displayType[i] = 1;
+        }
+    }
+    prevRoot = currRoot;
+
+    static float prevScale = -1.0f;
+    float currScale = params[SCALE_PARAM].getValue();
+    if (prevScale >= 0.0f && fabs(currScale - prevScale) > 0.01f) {
+        for (int i = 0; i < 8; i++) {
+            displayValueTimer[i] = 1.5f;
+            displayValue[i] = currScale;
+            displayType[i] = 2;
+        }
+    }
+    prevScale = currScale;
+
+    // F. Call Synthesizer Engine to process raw Voice DSP output signals
     processDSP(args);
 
-    // C. Cascade FX Tank Bus Processing
+    // G. Cascade FX Tank Bus Processing
     float sampleRate = args.sampleRate;
     float inputBusL = 0.0f;
     float inputBusR = 0.0f;
 
     // Accumulate stereo audio signals from active voice channel outputs
     for (int i = 0; i < 8; i++) {
-        // Sum mono outputs as base dry signal (balanced spatially across stereo field)
         float panL = 1.0f - ((float)i / 7.0f);
         float panR = (float)i / 7.0f;
 
-        float drySignal = outputs[CH1_OUTPUT + i].getVoltage() / 5.0f; // Scale back to internal unit scale
+        // Retrieve raw synthesized voice signals directly
+        float drySignal = outputs[CH1_OUTPUT + i].getVoltage() / 5.0f; 
 
         inputBusL += drySignal * panL;
         inputBusR += drySignal * panR;
@@ -110,8 +166,9 @@ void Soundscapes::process(const ProcessArgs& args) {
     float fbackVal = params[SPREAD_PARAM].getValue() * 0.95f; // Max feedback clamp: 95%
     float delayTimeVal = params[RATE_PARAM].getValue();
 
-    // Dynamically calculate delay line tap length (Delay range: 50ms - 1.5s)
-    int delaySamps = (int)((0.05f + delayTimeVal * 1.45f) * sampleRate);
+    // Corrected: Clamp delaySamps strictly to stay within 48000 buffer boundaries (prevents negative modulo)
+    int delaySamps = (int)((0.05f + delayTimeVal * 0.9f) * sampleRate);
+    delaySamps = math::clamp(delaySamps, 10, 47900);
 
     // Write to circular delay buffer
     fxUnit.delayBufferL[fxUnit.delayPtr] = inputBusL + (fxUnit.delayBufferR[(fxUnit.delayPtr - delaySamps + 48000) % 48000] * fbackVal);
@@ -124,7 +181,7 @@ void Soundscapes::process(const ProcessArgs& args) {
 
     // --- PROCESSOR 2: SHIMMER REVERB TANK ---
     float reverbSendVal = params[REVERB_PARAM].getValue();
-    float revDecayVal = params[DYNAMICS_PARAM].getValue() * 0.97f; // Max decay clamp: 97%
+    float revDecayVal = params[DYNAMICS_PARAM].getValue() * 0.95f; // Max decay clamp: 95%
     float timbrePitchShiftVal = params[TIMBRE_PARAM].getValue();
 
     // Reverb loop processing
@@ -132,12 +189,16 @@ void Soundscapes::process(const ProcessArgs& args) {
     float revInputR = inputBusR + delayOutR * delaySendVal;
 
     // Pitch shift reverb feedback trails for shimmer effect
-    float feedbackShiftL = shimmerShiftL.process(fxUnit.reverbState) * timbrePitchShiftVal;
-    float feedbackShiftR = shimmerShiftR.process(fxUnit.reverbState) * timbrePitchShiftVal;
+    float feedbackShiftL = shimmerShiftL.process(fxUnit.reverbState);
+    float feedbackShiftR = shimmerShiftR.process(fxUnit.reverbState);
 
-    // FDN feedback accumulation
-    float revL = revInputL + (fxUnit.reverbState + feedbackShiftL) * revDecayVal;
-    float revR = revInputR + (fxUnit.reverbState + feedbackShiftR) * revDecayVal;
+    // Corrected: Crossfade shimmer contribution to guarantee feedback path gain remains strictly stable (< 1.0)
+    float shimmerAmount = timbrePitchShiftVal * 0.45f; // Max shimmer blend
+    float feedbackSampleL = (fxUnit.reverbState * (1.0f - shimmerAmount) + feedbackShiftL * shimmerAmount) * revDecayVal;
+    float feedbackSampleR = (fxUnit.reverbState * (1.0f - shimmerAmount) + feedbackShiftR * shimmerAmount) * revDecayVal;
+
+    float revL = revInputL + feedbackSampleL;
+    float revR = revInputR + feedbackSampleR;
 
     // Store mono damp accumulator
     fxUnit.reverbState = (revL + revR) * 0.5f;
@@ -160,10 +221,8 @@ void Soundscapes::process(const ProcessArgs& args) {
     // Write final stereo master bus outputs
     for (int i = 0; i < 8; i++) {
         if (outputs[CH1_OUTPUT + i].isConnected()) {
-            // Read active dry signal
             float drySignal = outputs[CH1_OUTPUT + i].getVoltage();
             
-            // Sum dry with wet processed spatial signals relative to stereo output channels
             float panL = 1.0f - ((float)i / 7.0f);
             float panR = (float)i / 7.0f;
 
