@@ -3,7 +3,6 @@
 // Static trigger helpers for sequencer and interface controls
 static dsp::SchmittTrigger clockTrigger;
 static dsp::SchmittTrigger resetTrigger;
-static dsp::SchmittTrigger playTrigger;
 
 /**
  * Initialise default sequencer sequences
@@ -37,7 +36,9 @@ void Soundscapes::handleFocusToggle(int channel) {
  * Handle complex fader mappings based on Global Mixer vs. Focus Mode
  */
 void Soundscapes::handleFaderMapping() {
+    // Corrected: Binds shiftActive and isPlaying directly to parameters (fixes play button getting stuck)
     shiftActive = params[SHFT_PARAM].getValue() > 0.5f;
+    isPlaying = params[PLAY_PARAM].getValue() > 0.5f;
 
     if (shiftActive) {
         activeFaderState = FADER_MIXER; 
@@ -96,14 +97,10 @@ void Soundscapes::processSequencer(float sampleTime) {
         displayFlashState = !displayFlashState;
     }
 
-    // 2. Play/Stop Transport toggle
-    if (playTrigger.process(params[PLAY_PARAM].getValue())) {
-        if (shiftActive) {
-            melodyTrack.playhead = 0;
-            chordTrack.playhead = 0;
-        } else {
-            isPlaying = !isPlaying;
-        }
+    // 2. Play/Stop Transport / Rewind
+    if (isPlaying && shiftActive) {
+        melodyTrack.playhead = 0;
+        chordTrack.playhead = 0;
     }
 
     // 3. Clear/Initialize Sequence toggle
@@ -122,8 +119,9 @@ void Soundscapes::processSequencer(float sampleTime) {
         chordTrack.steps[i].active = (params[STEP_PARAM_START + 8 + i].getValue() > 0.5f);
     }
 
-    // 5. Schmitt triggers for external hardware signals
-    bool externalClock = clockTrigger.process(inputs[CLK_INPUT].getVoltage());
+    // 5. Standalone Internal Clock Fallback (advances playhead automatically when CLK input is unpatched)
+    bool nextStep = false;
+    bool externalClockConnected = inputs[CLK_INPUT].isConnected();
     bool externalReset = resetTrigger.process(inputs[RST_INPUT].getVoltage());
 
     if (externalReset) {
@@ -131,7 +129,22 @@ void Soundscapes::processSequencer(float sampleTime) {
         chordTrack.playhead = 0;
     }
 
-    if (externalClock && isPlaying) {
+    if (externalClockConnected) {
+        nextStep = clockTrigger.process(inputs[CLK_INPUT].getVoltage());
+    } else {
+        // Internal Clock fallback (cycles from 1Hz to 20Hz matching RATE_PARAM)
+        float rateVal = params[RATE_PARAM].getValue();
+        float period = 1.0f / (1.0f + rateVal * 19.0f);
+        
+        static float clockAccumulator = 0.0f;
+        clockAccumulator += sampleTime;
+        if (clockAccumulator >= period) {
+            clockAccumulator = 0.0f;
+            nextStep = true;
+        }
+    }
+
+    if (nextStep && isPlaying) {
         melodyTrack.playhead = (melodyTrack.playhead + 1) % 8;
         chordTrack.playhead = (chordTrack.playhead + 1) % 8;
 
