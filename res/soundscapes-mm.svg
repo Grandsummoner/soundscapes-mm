@@ -103,48 +103,56 @@
     <!-- III. ROW 1 (EXPANDED OUTPUTS AND SMOKED BRONZE DISPLAYS - 44px GRID)-->
     <!-- ================================================================= -->
     <g id="row1-expanded-grid">
+        <!-- CH1 (X = 79) -->
         <use href="#jack-placeholder" x="79" y="55"/>
         <circle cx="79" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="79" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">1</text>
         <rect x="65" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <text x="79" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">1</text>
 
+        <!-- CH2 (X = 123) -->
         <use href="#jack-placeholder" x="123" y="55"/>
         <circle cx="123" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="123" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">2</text>
         <rect x="109" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <text x="123" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">2</text>
 
+        <!-- CH3 (X = 167) -->
         <use href="#jack-placeholder" x="167" y="55"/>
         <circle cx="167" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="167" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">3</text>
         <rect x="153" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <text x="167" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">3</text>
 
+        <!-- CH4 (X = 211) -->
         <use href="#jack-placeholder" x="211" y="55"/>
         <circle cx="211" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="211" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">4</text>
         <rect x="197" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <text x="211" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">4</text>
 
+        <!-- CH5 (X = 254) -->
         <use href="#jack-placeholder" x="254" y="55"/>
         <circle cx="254" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="254" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">5</text>
         <rect x="240" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <text x="254" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">5</text>
 
+        <!-- CH6 (X = 298) -->
         <use href="#jack-placeholder" x="298" y="55"/>
         <circle cx="298" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="298" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">6</text>
         <rect x="284" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <text x="298" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">6</text>
 
+        <!-- CH7 (X = 342) -->
         <use href="#jack-placeholder" x="342" y="55"/>
         <circle cx="342" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="342" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">7</text>
         <rect x="328" y="95" width="28" height="40" rx="3" ry="3" fill="url(#bronze-display)" stroke="#534a41" stroke-width="1"/>
         <text x="342" y="143" font-family="'Roboto Mono', monospace" font-size="6.5" font-weight="bold" fill="#5c5346" text-anchor="middle">7</text>
 
+        <!-- CH8 (X = 386) -->
         <use href="#jack-placeholder" x="386" y="55"/>
         <circle cx="386" cy="71" r="1.8" fill="#1b5b1b" stroke="#2ecc71" stroke-width="0.5"/>
         <text x="386" y="81" font-family="'Roboto Mono', monospace" font-size="6" font-weight="bold" fill="#5c5346" text-anchor="middle">8</text>
@@ -189,7 +197,7 @@
     </g>
 
     <!-- ================================================================= -->
-    <!-- V. ROW 3 (DARK FADERS 1-8 AND DIAGONAL ROOT / SCALE KNOBS)         -->
+    <!-- V. ROW 3 (DARK FADERS 1-8 AND DIAGONAL ROOT / SCALE KNOBS)        -->
     <!-- ================================================================= -->
     <g id="fader-row">
         <rect x="77" y="210" width="4" height="46" rx="1.5" ry="1.5" fill="url(#track-shadow)" stroke="#221e1a" stroke-width="0.8"/>
