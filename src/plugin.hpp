@@ -3,8 +3,8 @@
 
 using namespace rack;
 
-// The global pointer to your plugin instance
+// The global Plugin instance pointer, allocated by the rack main thread during loading
 extern Plugin* pluginInstance;
 
-// Reference to the Soundscapes model declaration
+// Model pointer representing our Soundscapes module
 extern Model* modelSoundscapes;
