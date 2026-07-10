@@ -1,98 +1,188 @@
 #pragma once
-#include <rack.hpp>
-#include "plugin.hpp"
+
+#include "rack.hpp"
 
 using namespace rack;
 
+// Forward declare the plugin instance
+extern Plugin* pluginInstance;
+
+/**
+ * Soundscapes Coordinate Constants (Singular Source of Truth)
+ * Match the exact grid positions of res/soundscapes-mm.svg
+ */
+namespace SoundscapesCoords {
+    // Left Sidebar Inputs
+    const float SIDEBAR_JACK_X = 22.5f;
+    const float SIDEBAR_LED_X = 36.5f;
+    const float SIDEBAR_Y_START = 55.0f;
+    const float SIDEBAR_Y_SPACING = 47.0f;
+
+    // Row 1: Expanded 8-Channel Outputs & Displays (44px spacing)
+    const float CH_COLS[8] = {79.0f, 123.0f, 167.0f, 211.0f, 254.0f, 298.0f, 342.0f, 386.0f};
+    const float ROW1_JACK_Y = 55.0f;
+    const float ROW1_LED_Y = 71.0f;
+    const float ROW1_DISPLAY_Y = 115.0f;
+
+    // Row 2: Centralized Synth Deck
+    const float MODE_X = 79.0f;
+    const float MODE_Y = 170.0f;
+    const float FX_COLS[2] = {113.0f, 147.0f};
+    const float FX_ROWS[2] = {163.0f, 189.0f};
+    const float KNOB_COLS[6] = {181.0f, 222.0f, 263.0f, 304.0f, 345.0f, 386.0f};
+    const float ROW2_KNOB_Y = 170.0f;
+
+    // Row 3 & 4: 10-Column Grid (34px spacing)
+    const float GRID_COLS[10] = {79.0f, 113.0f, 147.0f, 181.0f, 215.0f, 249.0f, 283.0f, 317.0f, 351.0f, 386.0f};
+    const float ROW3_FADER_Y = 233.0f;
+    const float ROOT_Y = 220.0f;
+    const float SCALE_Y = 246.0f;
+
+    // Row 4: Step Sequencer Pads & Buttons
+    const float ROW4_MELODY_PAD_Y = 288.0f;
+    const float ROW4_CHORD_PAD_Y = 336.0f;
+    const float ROW4_BUTTON_ROWS[4] = {275.0f, 294.0f, 313.0f, 332.0f};
+}
+
+/**
+ * Soundscapes Struct Definitions
+ */
+struct StepData {
+    uint8_t note = 0;         // Midi pitch offset (relative to scale quantization)
+    uint8_t velocity = 100;   // 0 - 127
+    uint8_t probability = 100; // 0 - 100% trigger chance
+    bool active = false;      // True if step is active
+};
+
+struct SequencerTrack {
+    StepData steps[8];        // 8 contiguous steps
+    int playhead = 0;         // Active playhead step
+};
+
+enum SynthMode {
+    MODE_VOICES,       // "V" - Subtractive / Dual-Operator FM with virtual LPGs
+    MODE_WAVES,        // "W" - Karplus-Strong string waveguide resonators
+    MODE_DRONE_DUST    // "D" - Granular dust cloud + non-phasing drone pads
+};
+
+enum FaderState {
+    FADER_MIXER,       // Global mixer mode: faders control channel volume
+    FADER_FM_SEND,     // Send level to FM modulation bus
+    FADER_DELAY_SEND,  // Send level to delay processor
+    FADER_REVERB_SEND, // Send level to shimmer reverb tank
+    FADER_FILTER_SEND, // Send level to SVF filter
+    FADER_VEL_FOCUS,   // Focused channel step velocity offset (SHFT OFF)
+    FADER_PROB_FOCUS   // Focused channel step probability trigger weight (SHFT ON)
+};
+
+/**
+ * Main soundscapes-mm Module Class
+ */
 struct Soundscapes : Module {
     enum ParamId {
-        ROOT_PARAM, SCALE_PARAM, RATE_PARAM, DENSITY_PARAM, TIMBRE_PARAM, TEXTURE_PARAM, SPREAD_PARAM, DYNAMICS_PARAM,
-        MODE_PARAM, // Added 3-way voice engine selector
-        FM_PARAM, DELAY_PARAM, REVERB_PARAM, FILTER_PARAM,
-        PLAY_PARAM, SHFT_PARAM, ARP_PARAM, FRZ_PARAM, CHRD_PARAM, PROB_PARAM, SAVE_PARAM, RCL_PARAM,
-        FADER_1_PARAM, FADER_2_PARAM, FADER_3_PARAM, FADER_4_PARAM, FADER_5_PARAM, FADER_6_PARAM, FADER_7_PARAM, FADER_8_PARAM,
-        PAD_1_PARAM, PAD_2_PARAM, PAD_3_PARAM, PAD_4_PARAM, PAD_5_PARAM, PAD_6_PARAM, PAD_7_PARAM, PAD_8_PARAM,
-        PAD_9_PARAM, PAD_10_PARAM, PAD_11_PARAM, PAD_12_PARAM, PAD_13_PARAM, PAD_14_PARAM, PAD_15_PARAM, PAD_16_PARAM,
-        PARAMS_LEN
+        MODE_PARAM,
+        FM_PARAM,
+        DELAY_PARAM,
+        REVERB_PARAM,
+        FILTER_PARAM,
+        RATE_PARAM,
+        DENSITY_PARAM,
+        TIMBRE_PARAM,
+        TEXTURE_PARAM,
+        SPREAD_PARAM,
+        DYNAMICS_PARAM,
+        FADER1_PARAM, FADER2_PARAM, FADER3_PARAM, FADER4_PARAM,
+        FADER5_PARAM, FADER6_PARAM, FADER7_PARAM, FADER8_PARAM,
+        ROOT_PARAM,
+        SCALE_PARAM,
+        PLAY_PARAM, SHFT_PARAM,
+        ARP_PARAM, FRZ_PARAM,
+        CHRD_PARAM, PROB_PARAM,
+        SAVE_PARAM, RCL_PARAM,
+        // Step pad parameters for MIDI/automation
+        STEP_PARAM_START,
+        STEP_PARAM_END = STEP_PARAM_START + 16,
+        NUM_PARAMS
     };
-    enum InputId { CLK_INPUT, RST_INPUT, VOCT_INPUT, GATE_INPUT, VEL_INPUT, EXTIN_INPUT, DUCK_INPUT, INPUTS_LEN };
-    enum OutputId { PORT_1_OUTPUT, PORT_2_OUTPUT, PORT_3_OUTPUT, PORT_4_OUTPUT, PORT_5_OUTPUT, PORT_6_OUTPUT, PORT_7_OUTPUT, PORT_8_OUTPUT, OUTPUTS_LEN };
+
+    enum InputId {
+        CLK_INPUT,
+        RST_INPUT,
+        VOCT_INPUT,
+        GATE_INPUT,
+        VEL_INPUT,
+        EXT_INPUT,
+        DUCK_INPUT,
+        NUM_INPUTS
+    };
+
+    enum OutputId {
+        CH1_OUTPUT, CH2_OUTPUT, CH3_OUTPUT, CH4_OUTPUT,
+        CH5_OUTPUT, CH6_OUTPUT, CH7_OUTPUT, CH8_OUTPUT,
+        NUM_OUTPUTS
+    };
+
     enum LightId {
-        PORT_1_LIGHT, PORT_2_LIGHT, PORT_3_LIGHT, PORT_4_LIGHT, PORT_5_LIGHT, PORT_6_LIGHT, PORT_7_LIGHT, PORT_8_LIGHT,
-        PAD_1_LIGHT, PAD_2_LIGHT, PAD_3_LIGHT, PAD_4_LIGHT, PAD_5_LIGHT, PAD_6_LIGHT, PAD_7_LIGHT, PAD_8_LIGHT,
-        PAD_9_LIGHT, PAD_10_LIGHT, PAD_11_LIGHT, PAD_12_LIGHT, PAD_13_LIGHT, PAD_14_LIGHT, PAD_15_LIGHT, PAD_16_LIGHT,
-        FM_LIGHT_BLUE, DELAY_LIGHT_BLUE, REVERB_LIGHT_BLUE, FILTER_LIGHT_BLUE,
-        PLAY_LIGHT_GREEN, SHFT_LIGHT_YELLOW, ARP_LIGHT_BLUE, FRZ_LIGHT_BLUE, CHRD_LIGHT_PURPLE, PROB_LIGHT_PURPLE, SAVE_LIGHT_ORANGE, RCL_LIGHT_ORANGE,
-        LIGHTS_LEN
+        // Sidebar LEDs
+        CLK_LED, RST_LED, VOCT_LED, GATE_LED, VEL_LED, EXT_LED, DUCK_LED,
+        // Active Voice Channels LEDs
+        CH1_LED, CH2_LED, CH3_LED, CH4_LED, CH5_LED, CH6_LED, CH7_LED, CH8_LED,
+        // Step LEDs (Melody & Chord rows)
+        STEP_LED_START,
+        STEP_LED_END = STEP_LED_START + 16,
+        // Button LEDs
+        PLAY_LED, SHFT_LED, ARP_LED, FRZ_LED, CHRD_LED, PROB_LED, SAVE_LED, RCL_LED,
+        NUM_LIGHTS
     };
 
-    // State machine tracking
-    int focusedChannel = -1;
-    int focusedFX = -1;
-    bool shftMode = false;
-    bool probMode = false;
-    bool chordMode = false;
-    bool playMode = false;
-    bool saveMode = false;
-    bool rclMode = false;
-    bool arpMode = false;
-    bool frzMode = false;
-    bool fxActive[4] = {false};
+    // --- Sequencer & Latching State Variables ---
+    SequencerTrack melodyTrack;
+    SequencerTrack chordTrack;
+    
+    int focusedChannel = -1;       // Range: -1 (Global Mixer) to 0-7 (Channel Focus 1–8)
+    bool shiftActive = false;      // SHFT toggle switch state
+    bool isPlaying = true;         // Transport state
+    SynthMode activeSynthMode = MODE_VOICES;
+    FaderState activeFaderState = FADER_MIXER;
 
-    // Sequencer Storage Matrix
-    float stepVelocity[8][16];
-    float stepProbability[8][16];
-    float stepPitch[8][16];
-    int stepOctave[8][16];
-    bool stepGate[8][16];
-    bool stepChordGate[8][16];
+    // Flashing display clock trackers for UI
+    float flashTimer = 0.0f;
+    bool displayFlashState = false;
 
-    // Playback control registers
-    float channelAmplitudes[8];
-    float channelFxSends[4][8];
-    int loopLength[8];
-    float playheadPhases[8];
-    int currentSteps[8];
-
-    // Trigger Processors
-    dsp::SchmittTrigger clockTrigger;
-    dsp::SchmittTrigger resetTrigger;
-    dsp::SchmittTrigger fxTriggers[4];
-    dsp::SchmittTrigger btnTriggers[8];
-    dsp::SchmittTrigger padTriggers[16];
-
-    // Dynamic Voice Registers
-    struct Voice {
+    // --- DSP Processing Variables ---
+    float channelVolumes[8] = {0.8f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f};
+    float fxSends[4][8]; // [FM, Delay, Reverb, Filter] x [CH1-8]
+    
+    // Core engine constructs (Instantiated in soundscapes_synth.cpp & soundscapes_fx.cpp)
+    struct VoiceDSP {
         float phase = 0.0f;
+        float freq = 220.0f;
         float env = 0.0f;
-        float filterState = 0.0f;
-        float pitch = 0.0f;
-        float noiseState = 0.0f;
+        // Karplus-Strong physical modeling variables
         float delayBuffer[2048] = {0.0f};
         int writeIdx = 0;
-        float dustTimer = 0.0f;
+        // Granular / Drone variables
+        float noiseState = 0.0f;
+        
+        void trigger() { env = 1.0f; }
     } voices[8];
 
-    // Stereo FX buffers
-    struct DelayProcessor {
-        float buffer[48000] = {0.0f};
-        int writeIdx = 0;
-    } delayLineL, delayLineR;
-
-    struct ReverbProcessor {
-        float bufferL[24000] = {0.0f};
-        float bufferR[24000] = {0.0f};
-        int idxL = 0, idxR = 0;
-    } reverbUnit;
-
-    float duckEnv = 1.0f;
+    struct FXTank {
+        float delayBufferL[48000] = {0.0f};
+        float delayBufferR[48000] = {0.0f};
+        int delayPtr = 0;
+        float reverbState = 0.0f;
+        float sidechainEnv = 0.0f;
+    } fxUnit;
 
     Soundscapes();
-
-    void process(const ProcessArgs& args) override;
-    void toggleChannelFocus(int channelId);
     
-    void processSequencer(const ProcessArgs& args);
-    float processSynthVoice(int chan, const ProcessArgs& args);
-    void processFXAndOutputs(float* drySignals, const ProcessArgs& args);
+    void process(const ProcessArgs& args) override;
+    
+    // --- Helper Methods (Implemented across corresponding source files) ---
+    void processSequencer(float sampleTime);
+    void processDSP(const ProcessArgs& args);
+    void handleFocusToggle(int channel);
+    void handleFaderMapping();
+    void initializeSequence();
 };
