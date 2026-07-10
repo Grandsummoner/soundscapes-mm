@@ -23,19 +23,22 @@ struct SoundscapesButton : app::ParamWidget {
 
     void onButton(const event::Button& e) override {
         ParamWidget::onButton(e);
-        if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
-            if (momentary) {
-                setValue(1.0f);
-            } else {
-                float newVal = (getValue() > 0.5f) ? 0.0f : 1.0f;
-                setValue(newVal);
+        // Corrected: Accessing setValue and getValue through getParamQuantity() safely
+        if (getParamQuantity()) {
+            if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
+                if (momentary) {
+                    getParamQuantity()->setValue(1.0f);
+                } else {
+                    float newVal = (getParamQuantity()->getValue() > 0.5f) ? 0.0f : 1.0f;
+                    getParamQuantity()->setValue(newVal);
+                }
+                e.consume(this);
+            } else if (e.action == GLFW_RELEASE && e.button == GLFW_MOUSE_BUTTON_LEFT) {
+                if (momentary) {
+                    getParamQuantity()->setValue(0.0f);
+                }
+                e.consume(this);
             }
-            e.consume(this);
-        } else if (e.action == GLFW_RELEASE && e.button == GLFW_MOUSE_BUTTON_LEFT) {
-            if (momentary) {
-                setValue(0.0f);
-            }
-            e.consume(this);
         }
     }
 };
@@ -75,8 +78,8 @@ struct OpaqueDisplay : Widget {
             nvgStrokeWidth(args.vg, 2.0f);
             nvgStroke(args.vg);
 
-            // Diffusion blur glow
-            nvgPaint glowPaint = nvgBoxGradient(args.vg, -4.0f, -4.0f, box.size.x + 8.0f, box.size.y + 8.0f, 6.0f, 4.0f, nvgRGBA(0xff, 0x9d, 0x00, 0x7f), nvgRGBA(0, 0, 0, 0));
+            // Corrected: Using the accurate NanoVG type NVGpaint instead of nvgPaint
+            NVGpaint glowPaint = nvgBoxGradient(args.vg, -4.0f, -4.0f, box.size.x + 8.0f, box.size.y + 8.0f, 6.0f, 4.0f, nvgRGBA(0xff, 0x9d, 0x00, 0x7f), nvgRGBA(0, 0, 0, 0));
             nvgBeginPath(args.vg);
             nvgRoundedRect(args.vg, -6.0f, -6.0f, box.size.x + 12.0f, box.size.y + 12.0f, 7.0f);
             nvgFillPaint(args.vg, glowPaint);
