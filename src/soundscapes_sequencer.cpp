@@ -4,10 +4,7 @@
 static dsp::SchmittTrigger clockTrigger;
 static dsp::SchmittTrigger resetTrigger;
 static dsp::SchmittTrigger playTrigger;
-static dsp::SchmittTrigger shiftTrigger;
 static dsp::SchmittTrigger stepTriggers[16];
-static dsp::SchmittTrigger fxTriggers[4];
-static dsp::SchmittTrigger modeTrigger;
 
 /**
  * Initialise default sequencer sequences
