@@ -206,7 +206,7 @@ void Soundscapes::process(const ProcessArgs& args) {
     // --- PROCESSOR 3: STATE-VARIABLE FILTER (SVF) ---
     float filterSendVal = params[FILTER_PARAM].getValue();
     float cutoffVal = params[TEXTURE_PARAM].getValue() * 12000.0f + 100.0f; // Cutoff: 100Hz - 12.1kHz
-    float resonanceVal = params[DENSITY_PARAM].getValue() * 0.95f; // Resonance: 0% to 95%
+    float resonanceVal = 0.35f; // Fixed moderate resonance -- musical, stays clear of self-oscillation
 
     float filteredOutL = 0.0f;
     float filteredOutR = 0.0f;

@@ -1,5 +1,6 @@
 #include "soundscapes.hpp"
 #include "plugin.hpp"
+#include <cstring>
 
 /**
  * Robust Font Loading Helper
@@ -106,14 +107,21 @@ struct OpaqueDisplay : Widget {
             }
             lastFader[channelId] = currFader;
 
-            // 2. Detect global knob edits (RATE to DYNAMICS)
+            // 2. Detect global knob edits (RATE to DYNAMICS) -- spell the knob's current
+            // function name across all 8 displays (one character each) so its role is
+            // unambiguous no matter which mode/patch state it's operating under.
             for (int k = 0; k < 6; k++) {
                 float currKnob = module->params[Soundscapes::RATE_PARAM + k].getValue();
                 static float lastKnob[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
                 if (lastKnob[k] >= 0.0f && fabs(currKnob - lastKnob[k]) > 0.001f) {
-                    module->displayValueTimer[channelId] = 1.5f;
-                    module->displayValue[channelId] = currKnob;
-                    module->displayType[channelId] = 0;
+                    int paramId = Soundscapes::RATE_PARAM + k;
+                    const char* fn = module->macroFunctionName(paramId);
+                    snprintf(module->macroFunctionText, sizeof(module->macroFunctionText), "%s", fn);
+                    module->macroFunctionActive = module->isMacroActive(paramId);
+                    for (int c = 0; c < 8; c++) {
+                        module->displayValueTimer[c] = 1.5f;
+                        module->displayType[c] = 4;
+                    }
                 }
                 lastKnob[k] = currKnob;
             }
@@ -170,6 +178,23 @@ struct OpaqueDisplay : Widget {
                     m = clamp(m, 0, 2);
                     const char* modesText[3] = {"VO", "WA", "DR"};
                     snprintf(text, sizeof(text), "%s", modesText[m]);
+                } else if (module->displayType[channelId] == 4) {
+                    int len = (int)strlen(module->macroFunctionText);
+                    char c = (channelId < len) ? module->macroFunctionText[channelId] : ' ';
+                    snprintf(text, sizeof(text), "%c", c);
+
+                    // Active = bright green glow, inactive = dim gray -- same signal as
+                    // the knob black/white tint, so the flash and the knob agree.
+                    NVGcolor glowColor = module->macroFunctionActive
+                        ? nvgRGBA(0x2e, 0xcc, 0x71, 0xff)
+                        : nvgRGBA(0x88, 0x88, 0x88, 0xff);
+                    nvgFillColor(args.vg, glowColor);
+
+                    NVGpaint textGlow = nvgBoxGradient(args.vg, -3.0f, -3.0f, box.size.x + 6.0f, box.size.y + 6.0f, 4.0f, 5.0f, nvgRGBA(glowColor.r * 255, glowColor.g * 255, glowColor.b * 255, 0x50), nvgRGBA(0, 0, 0, 0));
+                    nvgBeginPath(args.vg);
+                    nvgRoundedRect(args.vg, -4.0f, -4.0f, box.size.x + 8.0f, box.size.y + 8.0f, 5.0f);
+                    nvgFillPaint(args.vg, textGlow);
+                    nvgFill(args.vg);
                 } else {
                     int pct = (int)std::round(module->displayValue[channelId] * 99.0f);
                     pct = clamp(pct, 0, 99);
@@ -192,6 +217,33 @@ struct StepPadWidget : app::SvgSwitch {
     StepPadWidget() {
         momentary = false;
         box.size = Vec(24.0f, 20.0f);
+    }
+
+    void onButton(const event::Button& e) override {
+        Soundscapes* mod = dynamic_cast<Soundscapes*>(this->module);
+        if (mod && e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT
+            && !mod->chordModeActive && mod->shiftActive && mod->focusedChannel != -1) {
+            // SHFT+click while a channel is focused reassigns this step's target
+            // channel instead of toggling it -- decouples timing position from which
+            // harmonic role it plays. A normal click still just toggles active/inactive.
+            bool isChord = (padId >= 8);
+            int stepIndex = isChord ? (padId - 8) : padId;
+            SequencerTrack& track = isChord ? mod->chordTrack : mod->melodyTrack;
+            track.steps[stepIndex].targetChannel = (int8_t)mod->focusedChannel;
+
+            // Flash a confirmation across the 7-segment displays, e.g. "M3->C5"
+            char buf[9];
+            snprintf(buf, sizeof(buf), "%c%d-C%d", isChord ? 'C' : 'M', stepIndex + 1, mod->focusedChannel + 1);
+            snprintf(mod->macroFunctionText, sizeof(mod->macroFunctionText), "%s", buf);
+            mod->macroFunctionActive = true;
+            for (int c = 0; c < 8; c++) {
+                mod->displayValueTimer[c] = 1.5f;
+                mod->displayType[c] = 4;
+            }
+            e.consume(this);
+            return;
+        }
+        SvgSwitch::onButton(e);
     }
 
     void draw(const DrawArgs& args) override {
@@ -240,6 +292,20 @@ struct StepPadWidget : app::SvgSwitch {
         nvgStrokeColor(args.vg, nvgRGBA(0xd5, 0xcf, 0xc5, 0xff));
         nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
+
+        // Small dark dot in the corner marks a step whose target channel has been
+        // reassigned away from its own index (timing decoupled from harmonic role).
+        if (module && !module->chordModeActive) {
+            bool isChord = (padId >= 8);
+            int stepIndex = isChord ? (padId - 8) : padId;
+            const SequencerTrack& track = isChord ? module->chordTrack : module->melodyTrack;
+            if (track.steps[stepIndex].targetChannel != stepIndex) {
+                nvgBeginPath(args.vg);
+                nvgCircle(args.vg, box.size.x - 4.0f, 4.0f, 2.0f);
+                nvgFillColor(args.vg, nvgRGBA(0x2b, 0x28, 0x24, 0xff));
+                nvgFill(args.vg);
+            }
+        }
     }
 };
 
@@ -292,13 +358,14 @@ struct PerformanceButtonWidget : SoundscapesButton {
     std::shared_ptr<Font> font;
 
     PerformanceButtonWidget() {
-        box.size = Vec(18.0f, 14.0f);
+        box.size = Vec(22.0f, 18.0f);
         font = loadRobustFont();
     }
 
     void onButton(const event::Button& e) override {
-        // PLAY(0), SHFT(1), and CHRD(4) are latching mode switches; the rest are momentary.
-        momentary = (buttonId != 0 && buttonId != 1 && buttonId != 4);
+        // PLAY(0), SHFT(1), ARP(2), FRZ(3), and CHRD(4) are latching mode switches;
+        // the rest are momentary.
+        momentary = (buttonId != 0 && buttonId != 1 && buttonId != 2 && buttonId != 3 && buttonId != 4);
         SoundscapesButton::onButton(e);
     }
 
@@ -309,6 +376,8 @@ struct PerformanceButtonWidget : SoundscapesButton {
         if (module) {
             if (buttonId == 0) litState = module->isPlaying;       // PLAY Button
             if (buttonId == 1) litState = module->shiftActive;     // SHFT Button
+            if (buttonId == 2) litState = module->arpActive;       // ARP Button
+            if (buttonId == 3) litState = module->freezeActive;    // FRZ Button
             if (buttonId == 4) litState = module->chordModeActive; // CHRD Button (STEP <-> CHRD mode)
         }
 
@@ -360,12 +429,14 @@ struct PerformanceButtonWidget : SoundscapesButton {
         // Render Dynamic Text Label inside the button
         if (font) {
             nvgFontFaceId(args.vg, font->handle);
-            nvgFontSize(args.vg, 5.0f);
-            nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-            nvgFillColor(args.vg, (litState || value > 0.5f) ? nvgRGBA(0xff, 0xff, 0xff, 0xff) : nvgRGBA(0x5c, 0x53, 0x46, 0xff));
+            nvgFontSize(args.vg, 6.0f);
             
             const char* labels[8] = {"PLAY", "SHFT", "ARP", "FRZ", "CHRD", "PROB", "SAVE", "RCL"};
-            nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, labels[buttonId], NULL);
+            const char* labelText = labels[buttonId];
+            if (buttonId == 4) {
+                labelText = (litState || value > 0.5f) ? "CHRD" : "STEP";
+            }
+            nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, labelText, NULL);
         }
     }
 };
@@ -603,7 +674,7 @@ struct FXButtonWidget : SoundscapesButton {
         // Centered Button Label text drawn using verified monospaced font
         if (font) {
             nvgFontFaceId(args.vg, font->handle);
-            nvgFontSize(args.vg, 5.0f);
+            nvgFontSize(args.vg, 6.5f);
             nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
             nvgFillColor(args.vg, isActive ? nvgRGBA(0xff, 0xff, 0xff, 0xff) : nvgRGBA(0x5c, 0x53, 0x46, 0xff));
             nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, label.c_str(), NULL);
@@ -629,7 +700,7 @@ struct FaceplateLabels : Widget {
             nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
             
             // A. Draw Module Main Header
-            nvgFontSize(args.vg, 14.5f);
+            nvgFontSize(args.vg, 13.0f);
             nvgFontFaceId(args.vg, font->handle);
             nvgFillColor(args.vg, nvgRGBA(0x11, 0x11, 0x11, 0xff)); // Dark bold
             nvgText(args.vg, 232.5f, 25.0f, "SOUNDSCAPES", NULL);
@@ -643,7 +714,7 @@ struct FaceplateLabels : Widget {
             const char* sidebarLabels[7] = {"CLK", "RST", "V/OCT", "GATE", "VEL", "EXT IN", "DUCK"};
             for (int i = 0; i < 7; i++) {
                 float y = SoundscapesCoords::SIDEBAR_Y_START + (i * SoundscapesCoords::SIDEBAR_Y_SPACING);
-                nvgFontSize(args.vg, 5.5f);
+                nvgFontSize(args.vg, 6.5f);
                 if (i == 5) nvgFillColor(args.vg, nvgRGBA(0xd4, 0x7d, 0x00, 0xff)); // Orange for EXT IN
                 else if (i == 6) nvgFillColor(args.vg, nvgRGBA(0xd0, 0x02, 0x1b, 0xff)); // Red for DUCK
                 else nvgFillColor(args.vg, nvgRGBA(0x7d, 0x71, 0x60, 0xff));
@@ -654,7 +725,7 @@ struct FaceplateLabels : Widget {
             // D. Output Jack Column Numbers (1 to 8)
             for (int i = 0; i < 8; i++) {
                 float x = SoundscapesCoords::CH_COLS[i];
-                nvgFontSize(args.vg, 6.0f);
+                nvgFontSize(args.vg, 6.5f);
                 nvgText(args.vg, x, SoundscapesCoords::ROW1_JACK_Y + 16.0f, std::to_string(i + 1).c_str(), NULL);
                 nvgText(args.vg, x, SoundscapesCoords::ROW1_DISPLAY_Y + 28.0f, std::to_string(i + 1).c_str(), NULL);
             }
@@ -662,24 +733,24 @@ struct FaceplateLabels : Widget {
             // E. Fader Numbers (1 to 8)
             for (int i = 0; i < 8; i++) {
                 float x = SoundscapesCoords::GRID_COLS[i];
-                nvgFontSize(args.vg, 6.0f);
+                nvgFontSize(args.vg, 6.5f);
                 nvgText(args.vg, x, SoundscapesCoords::ROW3_FADER_Y + 34.0f, std::to_string(i + 1).c_str(), NULL);
             }
 
             // F. Macro Knob Labels
             const char* knobLabels[6] = {"RATE", "DENSITY", "TIMBRE", "TEXTURE", "SPREAD", "DYNAMICS"};
             for (int i = 0; i < 6; i++) {
-                nvgFontSize(args.vg, 5.0f);
+                nvgFontSize(args.vg, 6.5f);
                 nvgText(args.vg, SoundscapesCoords::KNOB_COLS[i], SoundscapesCoords::ROW2_KNOB_Y + 21.0f, knobLabels[i], NULL);
             }
 
             // G. Root & Scale Labels
-            nvgFontSize(args.vg, 5.0f);
+            nvgFontSize(args.vg, 6.0f);
             nvgText(args.vg, SoundscapesCoords::GRID_COLS[8], SoundscapesCoords::ROOT_Y + 21.0f, "ROOT", NULL);
             nvgText(args.vg, SoundscapesCoords::GRID_COLS[9], SoundscapesCoords::SCALE_Y + 21.0f, "SCALE", NULL);
 
             // H. Melody & Chord Labels
-            nvgFontSize(args.vg, 5.5f);
+            nvgFontSize(args.vg, 6.0f);
             for (int i = 0; i < 8; i++) {
                 float x = SoundscapesCoords::GRID_COLS[i];
                 nvgText(args.vg, x, SoundscapesCoords::ROW4_MELODY_PAD_Y + 18.0f, std::to_string(i + 1).c_str(), NULL);
@@ -687,7 +758,7 @@ struct FaceplateLabels : Widget {
             }
 
             // Section Labels
-            nvgFontSize(args.vg, 6.0f);
+            nvgFontSize(args.vg, 7.0f);
             nvgText(args.vg, 198.0f, 315.0f, "MELODY", NULL);
             nvgText(args.vg, 198.0f, 363.0f, "CHORD", NULL);
         }

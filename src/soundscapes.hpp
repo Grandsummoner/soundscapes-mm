@@ -41,7 +41,7 @@ namespace SoundscapesCoords {
     // Row 4: Step Sequencer Pads & Buttons
     const float ROW4_MELODY_PAD_Y = 288.0f;
     const float ROW4_CHORD_PAD_Y = 336.0f;
-    const float ROW4_BUTTON_ROWS[4] = {275.0f, 294.0f, 313.0f, 332.0f};
+    const float ROW4_BUTTON_ROWS[4] = {273.0f, 295.0f, 317.0f, 339.0f};
 }
 
 struct StepData {
@@ -49,6 +49,10 @@ struct StepData {
     uint8_t velocity = 100;   // 0 - 127
     uint8_t probability = 100; // 0 - 100% trigger chance
     bool active = false;      // True if step is active
+    int8_t targetChannel = -1; // Which channel (0-7) this step triggers; -1 = "own index"
+                                // (set at construction to match the step's own index by
+                                // default, but reassignable via SHFT+click while a channel
+                                // is focused, decoupling timing position from harmonic role)
 };
 
 struct SequencerTrack {
@@ -127,45 +131,93 @@ struct Soundscapes : Module {
     // Sequencer & Latching State
     SequencerTrack melodyTrack;
     SequencerTrack chordTrack;
+
+    // SAVE/RCL: single-slot pattern scene buffer. SAVE snapshots both tracks' full
+    // step data (active/velocity/probability/targetChannel); RCL restores it.
+    StepData melodySceneBuffer[8];
+    StepData chordSceneBuffer[8];
+    bool sceneSaved = false;
     
     int focusedChannel = -1;       // Range: -1 (Global Mixer) to 0-7 (Focus 1–8)
     bool shiftActive = false;      // SHFT toggle switch state
     bool isPlaying = true;         // Transport state
+    bool arpActive = false;        // ARP: round-robins through all 8 channels, bypassing
+                                    // the programmed pattern -- quick "arpeggiate the
+                                    // whole chord" performance gesture.
+    bool freezeActive = false;     // FRZ: holds all envelopes at their current value
+                                    // indefinitely, ignoring RELEASE and new triggers --
+                                    // a sustain/hold for whatever's currently ringing.
     SynthMode activeSynthMode = MODE_VOICES;
     FaderState activeFaderState = FADER_MIXER;
+
+    // When a macro knob is turned, its current function name is spelled across all 8
+    // 7-segment displays (one character each) so its role is unambiguous regardless of
+    // which mode/patch state it's currently operating under.
+    char macroFunctionText[9] = "";
+    bool macroFunctionActive = false;
 
     // Determines whether a macro knob (RATE..DYNAMICS) currently has any audible
     // effect, given the active synth mode, EXT IN connection, and FX send levels --
     // used to visually distinguish "in use" knobs from inert ones on the panel.
     bool isMacroActive(int paramId) {
         bool extConnected = inputs[EXT_INPUT].isConnected();
-        bool filterSendUp = params[FILTER_PARAM].getValue() > 0.001f;
         bool reverbSendUp = params[REVERB_PARAM].getValue() > 0.001f;
 
         switch (paramId) {
             case RATE_PARAM:
                 return true; // Always drives sequencer step timing (and delay time)
             case DENSITY_PARAM:
-                // Voices (unison/wet-blend) and Drone & Dust (dust rate) always use it;
-                // in Waves mode it only matters if the Filter FX send is turned up.
-                return activeSynthMode == MODE_VOICES
-                    || activeSynthMode == MODE_DRONE_DUST
-                    || filterSendUp;
+                // Always does something now: note density (Voices, no EXT), domain
+                // blend (Voices, EXT patched), string unison/chorus (Waves), dust rate
+                // (Drone & Dust). No longer tied to filter resonance (now a fixed value).
+                return true;
             case TIMBRE_PARAM:
                 // Only does anything in Voices mode when EXT IN is patched (FM ratio),
                 // or when the Reverb FX send is up (shimmer pitch-shift amount).
                 return (activeSynthMode == MODE_VOICES && extConnected)
                     || reverbSendUp;
-            case TEXTURE_PARAM:
+            case TEXTURE_PARAM: {
+                bool filterSendUp = params[FILTER_PARAM].getValue() > 0.001f;
                 // Only does anything in Voices mode when EXT IN is NOT patched (VA
                 // waveshape), or when the Filter FX send is up (cutoff).
                 return (activeSynthMode == MODE_VOICES && !extConnected)
                     || filterSendUp;
+            }
             case SPREAD_PARAM:
             case DYNAMICS_PARAM:
                 return true; // Always drive the shared Release/Attack envelope
             default:
                 return true;
+        }
+    }
+
+    // Returns an up-to-8-character label describing what a macro knob is currently
+    // doing, spelled one character per display across all 8 7-segment displays when
+    // that knob is turned. Kept honest to the actual current implementation -- a knob
+    // that's inert right now says so via isMacroActive(), not via a hopeful label.
+    const char* macroFunctionName(int paramId) {
+        bool extConnected = inputs[EXT_INPUT].isConnected();
+        switch (paramId) {
+            case RATE_PARAM:
+                return "RATE";
+            case DENSITY_PARAM:
+                if (activeSynthMode == MODE_VOICES) {
+                    return extConnected ? "AUDIOMIX" : "NOTEDENS";
+                } else if (activeSynthMode == MODE_WAVES) {
+                    return "CHORUS";
+                } else {
+                    return "DUSTRATE";
+                }
+            case TIMBRE_PARAM:
+                return (activeSynthMode == MODE_VOICES && extConnected) ? "FMRATIO" : "TIMBRE";
+            case TEXTURE_PARAM:
+                return (activeSynthMode == MODE_VOICES && !extConnected) ? "OSCSHAPE" : "TEXTURE";
+            case SPREAD_PARAM:
+                return "RELEASE";
+            case DYNAMICS_PARAM:
+                return "ATTACK";
+            default:
+                return "";
         }
     }
 
@@ -206,7 +258,8 @@ struct Soundscapes : Module {
         // --- Voices mode (VA osc + FM/ring-mod) specific state ---
         float opEnv = 0.0f;         // Independent operator/brightness envelope
         float modPhase = 0.0f;      // Modulator phase accumulator (EXT IN ring-mod, Voices mode)
-        float unisonPhase = 0.0f;   // Detuned unison oscillator phase (DENSITY thickness, Voices mode)
+        float unisonDelayBuffer[2048] = {0.0f}; // Detuned 2nd string voice (DENSITY chorus, Waves mode)
+        int unisonWriteIdx = 0;
         float subPhase = 0.0f;      // Sub-oscillator phase (bass anchor voice only)
         float svfLow = 0.0f;        // Per-voice resonant filter state (lowpass)
         float svfBand = 0.0f;       // Per-voice resonant filter state (bandpass)

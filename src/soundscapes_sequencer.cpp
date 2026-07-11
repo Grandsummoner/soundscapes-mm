@@ -4,6 +4,8 @@
 static dsp::SchmittTrigger playClickTrigger;
 static dsp::SchmittTrigger clockTrigger;
 static dsp::SchmittTrigger resetTrigger;
+static dsp::SchmittTrigger saveClickTrigger;
+static dsp::SchmittTrigger rclClickTrigger;
 
 /**
  * Initialise default sequencer sequences
@@ -249,10 +251,23 @@ void Soundscapes::processSequencer(float sampleTime) {
     // Increments timing or resets it cleanly on step transitions
     if (nextStep) {
         stepTimeElapsed = 0.0f;
-        // Roll probabilities EXACTLY once at the start of the step (prevents gate flicker)
+        // Roll probabilities EXACTLY once at the start of the step (prevents gate flicker).
+        // In Voices mode with nothing patched into EXT IN, DENSITY acts as a global note
+        // density control: it scales every step's fire-probability up or down together,
+        // thinning or thickening the whole pattern live without touching what's actually
+        // programmed per-step. Unity (matches the programmed pattern exactly) sits at the
+        // knob's center; below that thins everything, above that thickens everything,
+        // even waking up low-probability steps toward guaranteed-fire at full CW.
+        float globalDensityScale = 1.0f;
+        if (activeSynthMode == MODE_VOICES && !inputs[EXT_INPUT].isConnected()) {
+            float densityVal = params[DENSITY_PARAM].getValue();
+            globalDensityScale = 0.2f + densityVal * 1.6f;
+        }
         for (int i = 0; i < 8; i++) {
-            voiceTriggerActive[i] = ((rand() % 100) < melodyTrack.steps[i].probability);
-            chordTriggerActive[i] = ((rand() % 100) < chordTrack.steps[i].probability);
+            int melProb = (int)math::clamp(melodyTrack.steps[i].probability * globalDensityScale, 0.0f, 100.0f);
+            int chdProb = (int)math::clamp(chordTrack.steps[i].probability * globalDensityScale, 0.0f, 100.0f);
+            voiceTriggerActive[i] = ((rand() % 100) < melProb);
+            chordTriggerActive[i] = ((rand() % 100) < chdProb);
         }
     } else {
         stepTimeElapsed += sampleTime;
@@ -275,4 +290,50 @@ void Soundscapes::processSequencer(float sampleTime) {
     lights[PLAY_LED].setBrightness(isPlaying ? 1.0f : 0.0f);
     lights[SHFT_LED].setBrightness(shiftActive ? 1.0f : 0.0f);
     lights[CHRD_LED].setBrightness(chordModeActive ? 1.0f : 0.0f);
+    arpActive = params[ARP_PARAM].getValue() > 0.5f;
+    freezeActive = params[FRZ_PARAM].getValue() > 0.5f;
+    lights[ARP_LED].setBrightness(arpActive ? 1.0f : 0.0f);
+    lights[FRZ_LED].setBrightness(freezeActive ? 1.0f : 0.0f);
+
+    // SAVE: snapshot the full pattern (both tracks, all step data) into a single
+    // scene buffer. RCL: restore it. Both are one-shot momentary presses.
+    if (saveClickTrigger.process(params[SAVE_PARAM].getValue())) {
+        for (int i = 0; i < 8; i++) {
+            melodySceneBuffer[i] = melodyTrack.steps[i];
+            chordSceneBuffer[i] = chordTrack.steps[i];
+        }
+        sceneSaved = true;
+        snprintf(macroFunctionText, sizeof(macroFunctionText), "SAVED");
+        macroFunctionActive = true;
+        for (int c = 0; c < 8; c++) {
+            displayValueTimer[c] = 1.5f;
+            displayType[c] = 4;
+        }
+    }
+
+    if (rclClickTrigger.process(params[RCL_PARAM].getValue())) {
+        if (sceneSaved) {
+            for (int i = 0; i < 8; i++) {
+                melodyTrack.steps[i] = melodySceneBuffer[i];
+                chordTrack.steps[i] = chordSceneBuffer[i];
+                // .active is normally mirrored FROM params every frame in STEP mode, so
+                // push the recalled state back into the params too, or next frame's
+                // mirroring would immediately overwrite what we just restored. Skip this
+                // while CHRD mode has the pads repurposed as an option selector -- the
+                // existing CHRD-exit logic already restores pads from step data.
+                if (!chordModeActive) {
+                    params[STEP_PARAM_START + i].setValue(melodyTrack.steps[i].active ? 1.0f : 0.0f);
+                    params[STEP_PARAM_START + 8 + i].setValue(chordTrack.steps[i].active ? 1.0f : 0.0f);
+                }
+            }
+            snprintf(macroFunctionText, sizeof(macroFunctionText), "RECALLED");
+        } else {
+            snprintf(macroFunctionText, sizeof(macroFunctionText), "EMPTY");
+        }
+        macroFunctionActive = sceneSaved;
+        for (int c = 0; c < 8; c++) {
+            displayValueTimer[c] = 1.5f;
+            displayType[c] = 4;
+        }
+    }
 }

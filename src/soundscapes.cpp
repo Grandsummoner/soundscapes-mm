@@ -64,13 +64,18 @@ Soundscapes::Soundscapes() {
         voices[i].noiseState = 0.0f;
         voices[i].opEnv = 0.0f;
         voices[i].modPhase = 0.0f;
-        voices[i].unisonPhase = 0.0f;
+        voices[i].unisonWriteIdx = 0;
+        for (int b = 0; b < 2048; b++) {
+            voices[i].unisonDelayBuffer[b] = 0.0f;
+        }
         voices[i].subPhase = 0.0f;
         voices[i].svfLow = 0.0f;
         voices[i].svfBand = 0.0f;
         for (int b = 0; b < 2048; b++) {
             voices[i].delayBuffer[b] = 0.0f;
         }
+        melodyTrack.steps[i].targetChannel = i;
+        chordTrack.steps[i].targetChannel = i;
     }
 
     // Clear FX Unit circular line buffers

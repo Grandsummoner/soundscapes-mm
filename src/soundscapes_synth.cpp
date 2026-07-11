@@ -159,19 +159,47 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             float activeGateDuration = stepPeriod * 0.50f; // 50% gate duration
             bool isGateActive = (stepTimeElapsed < activeGateDuration);
 
-            // Melody Voice check
-            if (melodyTrack.playhead == i && melodyTrack.steps[i].active && isGateActive && voiceTriggerActive[i]) {
-                voiceGate = true;
-                triggerVelocityNorm = melodyTrack.steps[i].velocity / 127.0f;
-            }
-            // Chord Voice check
-            if (chordTrack.playhead == i && chordTrack.steps[i].active && isGateActive && chordTriggerActive[i]) {
-                voiceGate = true;
-                triggerVelocityNorm = chordTrack.steps[i].velocity / 127.0f;
+            // Both tracks' playheads always advance in lockstep, so there's really one
+            // current step position; each track independently decides whether it fires
+            // and which channel it targets (decoupled from the step's own index, so a
+            // step's timing position no longer has to match the harmonic role it plays).
+            int currentStep = melodyTrack.playhead;
+
+            if (arpActive) {
+                // ARP override: bypass the programmed pattern entirely and round-robin
+                // through all 8 channels in order (root -> 3rd -> 5th ... -> root+2oct),
+                // using the same step timing -- a quick "arpeggiate the whole chord"
+                // gesture without needing to program a pattern first.
+                if (currentStep == i && isGateActive) {
+                    voiceGate = true;
+                    triggerVelocityNorm = 1.0f;
+                }
+            } else {
+                bool melStepFires = melodyTrack.steps[currentStep].active && isGateActive && voiceTriggerActive[currentStep];
+                int melTarget = melodyTrack.steps[currentStep].targetChannel;
+                if (melTarget < 0 || melTarget > 7) melTarget = currentStep; // safety fallback
+
+                bool chdStepFires = chordTrack.steps[currentStep].active && isGateActive && chordTriggerActive[currentStep];
+                int chdTarget = chordTrack.steps[currentStep].targetChannel;
+                if (chdTarget < 0 || chdTarget > 7) chdTarget = currentStep; // safety fallback
+
+                // Melody Voice check
+                if (melStepFires && melTarget == i) {
+                    voiceGate = true;
+                    triggerVelocityNorm = melodyTrack.steps[currentStep].velocity / 127.0f;
+                }
+                // Chord Voice check
+                if (chdStepFires && chdTarget == i) {
+                    voiceGate = true;
+                    triggerVelocityNorm = chordTrack.steps[currentStep].velocity / 127.0f;
+                }
             }
         }
 
-        if (voiceGate) {
+        if (freezeActive) {
+            // FRZ: hold whatever's currently ringing indefinitely -- envelope frozen in
+            // place, immune to both new gates and the normal release decay.
+        } else if (voiceGate) {
             // Rise phase, scaled by this trigger's velocity so quiet/hard-set steps
             // (or a patched VEL_INPUT CV, in poly mode) actually play quieter/louder.
             voice.env += attackCoeff * (triggerVelocityNorm * 1.05f - voice.env);
@@ -201,8 +229,39 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             float rawOscSignal;
             bool extConnected = inputs[EXT_INPUT].isConnected();
 
+            // --- Internal virtual-analog oscillator (PolyBLEP band-limited) ---
+            // Always computed: it's the whole voice when EXT IN is unpatched, and one
+            // side of the DENSITY domain-blend when it is.
+            float dt = voice.freq / sampleRate;
+
+            voice.phase += dt;
+            if (voice.phase >= 1.0f) voice.phase -= 1.0f;
+
+            float saw = 2.0f * voice.phase - 1.0f;
+            saw -= polyBlep(voice.phase, dt);
+
+            float pulseWidth = 0.5f;
+            float pulsePhase = voice.phase + (1.0f - pulseWidth);
+            if (pulsePhase >= 1.0f) pulsePhase -= 1.0f;
+            float pulse = (voice.phase < pulseWidth) ? 1.0f : -1.0f;
+            pulse += polyBlep(voice.phase, dt);
+            pulse -= polyBlep(pulsePhase, dt);
+
+            // TEXTURE morphs the waveshape from sawtooth to pulse -- classic analog
+            // waveshape control, giving Voices real tonal range beyond a single timbre.
+            float shapeMorph = textureVal;
+            float internalVA = saw * (1.0f - shapeMorph) + pulse * shapeMorph;
+
+            // Bass anchor voice (channel 1): blend in a clean sub-octave sine for
+            // low-end weight, since it's the fixed root note.
+            if (i == 0) {
+                voice.subPhase += (voice.freq * 0.5f) * sampleTime;
+                if (voice.subPhase >= 1.0f) voice.subPhase -= 1.0f;
+                internalVA = internalVA * 0.7f + std::sin(voice.subPhase * 2.0f * M_PI) * 0.3f;
+            }
+
             if (extConnected) {
-                // --- External audio path: FM-flavored ring-modulation harmonizer ---
+                // --- External audio domain: FM-flavored ring-modulation harmonizer ---
                 // TIMBRE selects the modulator:carrier ratio from a curated table spanning
                 // harmonic (bell/organ-like, low end) through mildly inharmonic (metallic,
                 // high end) tones. The modulator is a plain sine with NO self-feedback --
@@ -215,64 +274,23 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
                 if (voice.modPhase >= 1.0f) voice.modPhase -= 1.0f;
                 float modOut = std::sin(voice.modPhase * 2.0f * M_PI);
 
-                // DENSITY is the dry/processed blend here; opEnv scales how much ring-mod
-                // sideband content comes through, so the effect swells with this channel's
-                // gate rather than running constantly.
+                // opEnv shapes how much ring-mod sideband content comes through within
+                // the external domain itself, so it swells in with this channel's gate
+                // rather than sitting static.
                 float extSignal = inputs[EXT_INPUT].getVoltage() / 5.0f;
                 float ringModded = extSignal * modOut;
-                float wetAmount = densityVal * voice.opEnv;
-                rawOscSignal = extSignal * (1.0f - wetAmount) + ringModded * wetAmount;
+                float ringWet = 0.2f + 0.6f * voice.opEnv; // keeps a little dry ext for clarity
+                float externalDomain = extSignal * (1.0f - ringWet) + ringModded * ringWet;
+
+                // DENSITY: blends between the two audio domains -- internal VA voice
+                // (0%) and the processed external signal (100%) -- rather than a hard
+                // switch the moment something's patched into EXT IN.
+                rawOscSignal = internalVA * (1.0f - densityVal) + externalDomain * densityVal;
             } else {
-                // --- Internal virtual-analog oscillator path (PolyBLEP band-limited) ---
-                float dt = voice.freq / sampleRate;
-
-                voice.phase += dt;
-                if (voice.phase >= 1.0f) voice.phase -= 1.0f;
-
-                float saw = 2.0f * voice.phase - 1.0f;
-                saw -= polyBlep(voice.phase, dt);
-
-                float pulseWidth = 0.5f;
-                float pulsePhase = voice.phase + (1.0f - pulseWidth);
-                if (pulsePhase >= 1.0f) pulsePhase -= 1.0f;
-                float pulse = (voice.phase < pulseWidth) ? 1.0f : -1.0f;
-                pulse += polyBlep(voice.phase, dt);
-                pulse -= polyBlep(pulsePhase, dt);
-
-                // TEXTURE morphs the waveshape from sawtooth to pulse -- classic analog
-                // waveshape control, giving Voices real tonal range beyond a single timbre.
-                float shapeMorph = textureVal;
-                float mainOsc = saw * (1.0f - shapeMorph) + pulse * shapeMorph;
-
-                // DENSITY: unison/thickness. Blends in a second copy of the same
-                // oscillator, gently detuned (up to +8 cents), for a fuller analog-chorus
-                // character. This is a bounded crossfade, not a sum -- turning it up
-                // thickens the tone without ever getting louder or unpredictable.
-                float detuneRatio = std::pow(2.0f, (densityVal * 8.0f) / 1200.0f);
-                float unisonDt = (voice.freq * detuneRatio) / sampleRate;
-                voice.unisonPhase += unisonDt;
-                if (voice.unisonPhase >= 1.0f) voice.unisonPhase -= 1.0f;
-
-                float unisonSaw = 2.0f * voice.unisonPhase - 1.0f;
-                unisonSaw -= polyBlep(voice.unisonPhase, unisonDt);
-
-                float unisonPulsePhase = voice.unisonPhase + (1.0f - pulseWidth);
-                if (unisonPulsePhase >= 1.0f) unisonPulsePhase -= 1.0f;
-                float unisonPulse = (voice.unisonPhase < pulseWidth) ? 1.0f : -1.0f;
-                unisonPulse += polyBlep(voice.unisonPhase, unisonDt);
-                unisonPulse -= polyBlep(unisonPulsePhase, unisonDt);
-
-                float unisonOsc = unisonSaw * (1.0f - shapeMorph) + unisonPulse * shapeMorph;
-
-                rawOscSignal = mainOsc * (1.0f - 0.5f * densityVal) + unisonOsc * (0.5f * densityVal);
-
-                // Bass anchor voice (channel 1): blend in a clean sub-octave sine for
-                // low-end weight, since it's the fixed root note.
-                if (i == 0) {
-                    voice.subPhase += (voice.freq * 0.5f) * sampleTime;
-                    if (voice.subPhase >= 1.0f) voice.subPhase -= 1.0f;
-                    rawOscSignal = rawOscSignal * 0.7f + std::sin(voice.subPhase * 2.0f * M_PI) * 0.3f;
-                }
+                // Nothing patched into EXT IN: pure internal VA voice, no ring-mod at
+                // all. DENSITY does nothing here anymore (it's now a global note-density
+                // control at the sequencer level instead -- see processSequencer).
+                rawOscSignal = internalVA;
             }
 
             // Shared resonant lowpass (trapezoidal SVF, envelope-tracked cutoff -- louder
@@ -315,7 +333,30 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             voice.writeIdx = (voice.writeIdx + 1) & 2047;
             voice.delayBuffer[voice.writeIdx] = feedbackSample;
 
-            channelOutputSignal = currentSample * voice.env * channelVolumes[i] * 0.8f;
+            // DENSITY: string unison/chorus. A second Karplus-Strong voice, gently
+            // detuned (up to +8 cents), plucked at the same moment as the main string
+            // and crossfaded in -- thickens the tone into a 12-string/chorus character
+            // without ever getting louder or less predictable.
+            float detuneRatio = std::pow(2.0f, (densityVal * 8.0f) / 1200.0f);
+            int unisonDelayLength = math::clamp((int)(sampleRate / (voice.freq * detuneRatio)), 4, 2047);
+
+            if (voiceGate && voice.env < 0.05f) {
+                voice.unisonDelayBuffer[voice.unisonWriteIdx] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f;
+            }
+
+            int unisonReadIdx = (voice.unisonWriteIdx - unisonDelayLength + 2048) & 2047;
+            float unisonCurrentSample = voice.unisonDelayBuffer[unisonReadIdx];
+            int unisonNextIdx = (unisonReadIdx + 1) & 2047;
+            float unisonNextSample = voice.unisonDelayBuffer[unisonNextIdx];
+            float unisonDampSample = (unisonCurrentSample + unisonNextSample) * 0.5f;
+            float unisonFeedbackSample = unisonDampSample * feedbackMult;
+
+            voice.unisonWriteIdx = (voice.unisonWriteIdx + 1) & 2047;
+            voice.unisonDelayBuffer[voice.unisonWriteIdx] = unisonFeedbackSample;
+
+            float blendedString = currentSample * (1.0f - 0.5f * densityVal) + unisonCurrentSample * (0.5f * densityVal);
+
+            channelOutputSignal = blendedString * voice.env * channelVolumes[i] * 0.8f;
 
         } else if (activeSynthMode == MODE_DRONE_DUST) {
             float phaseShiftOffset = (float)i * 0.125f;
