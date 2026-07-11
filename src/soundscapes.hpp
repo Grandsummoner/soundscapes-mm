@@ -134,6 +134,41 @@ struct Soundscapes : Module {
     SynthMode activeSynthMode = MODE_VOICES;
     FaderState activeFaderState = FADER_MIXER;
 
+    // Determines whether a macro knob (RATE..DYNAMICS) currently has any audible
+    // effect, given the active synth mode, EXT IN connection, and FX send levels --
+    // used to visually distinguish "in use" knobs from inert ones on the panel.
+    bool isMacroActive(int paramId) {
+        bool extConnected = inputs[EXT_INPUT].isConnected();
+        bool filterSendUp = params[FILTER_PARAM].getValue() > 0.001f;
+        bool reverbSendUp = params[REVERB_PARAM].getValue() > 0.001f;
+
+        switch (paramId) {
+            case RATE_PARAM:
+                return true; // Always drives sequencer step timing (and delay time)
+            case DENSITY_PARAM:
+                // Voices (unison/wet-blend) and Drone & Dust (dust rate) always use it;
+                // in Waves mode it only matters if the Filter FX send is turned up.
+                return activeSynthMode == MODE_VOICES
+                    || activeSynthMode == MODE_DRONE_DUST
+                    || filterSendUp;
+            case TIMBRE_PARAM:
+                // Only does anything in Voices mode when EXT IN is patched (FM ratio),
+                // or when the Reverb FX send is up (shimmer pitch-shift amount).
+                return (activeSynthMode == MODE_VOICES && extConnected)
+                    || reverbSendUp;
+            case TEXTURE_PARAM:
+                // Only does anything in Voices mode when EXT IN is NOT patched (VA
+                // waveshape), or when the Filter FX send is up (cutoff).
+                return (activeSynthMode == MODE_VOICES && !extConnected)
+                    || filterSendUp;
+            case SPREAD_PARAM:
+            case DYNAMICS_PARAM:
+                return true; // Always drive the shared Release/Attack envelope
+            default:
+                return true;
+        }
+    }
+
     // CHRD mode: latching switch that repurposes the 16 step pads as a radio-select
     // option menu (mutually exclusive with normal step editing -- entering CHRD mode
     // freezes the step pattern rather than letting the two be edited simultaneously).

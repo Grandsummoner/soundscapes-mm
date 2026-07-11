@@ -379,6 +379,23 @@ struct SoundscapesKnob : app::Knob {
     }
 
     void draw(const DrawArgs& args) override {
+        // For the 6 macro knobs (RATE..DYNAMICS), check whether this knob currently
+        // has any audible effect given the module's mode/patch state, and tint it
+        // accordingly so an inert knob doesn't leave the user wondering why turning
+        // it did nothing.
+        bool active = true;
+        if (getParamQuantity() && getParamQuantity()->module) {
+            Soundscapes* mod = dynamic_cast<Soundscapes*>(getParamQuantity()->module);
+            int paramId = getParamQuantity()->paramId;
+            if (mod && paramId >= Soundscapes::RATE_PARAM && paramId <= Soundscapes::DYNAMICS_PARAM) {
+                active = mod->isMacroActive(paramId);
+            }
+        }
+
+        NVGcolor bodyFill = active ? nvgRGBA(0x2b, 0x28, 0x24, 0xff) : nvgRGBA(0xfa, 0xf9, 0xf6, 0xff);
+        NVGcolor bodyStroke = active ? nvgRGBA(0x00, 0x00, 0x00, 0xff) : nvgRGBA(0xcb, 0xc4, 0xb5, 0xff);
+        NVGcolor indicatorColor = active ? nvgRGBA(0xff, 0xff, 0xff, 0xff) : nvgRGBA(0x60, 0x55, 0x48, 0xff);
+
         // Drop shadow
         nvgBeginPath(args.vg);
         nvgCircle(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, 13.0f);
@@ -388,10 +405,10 @@ struct SoundscapesKnob : app::Knob {
         // Knob Body
         nvgBeginPath(args.vg);
         nvgCircle(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, 12.0f);
-        nvgFillColor(args.vg, nvgRGBA(0xfa, 0xf9, 0xf6, 0xff)); // Cream-white
+        nvgFillColor(args.vg, bodyFill);
         nvgFill(args.vg);
 
-        nvgStrokeColor(args.vg, nvgRGBA(0xcb, 0xc4, 0xb5, 0xff));
+        nvgStrokeColor(args.vg, bodyStroke);
         nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
 
@@ -408,7 +425,7 @@ struct SoundscapesKnob : app::Knob {
         nvgBeginPath(args.vg);
         nvgMoveTo(args.vg, cx + std::sin(rad) * 4.0f, cy - std::cos(rad) * 4.0f);
         nvgLineTo(args.vg, px, py);
-        nvgStrokeColor(args.vg, nvgRGBA(0x60, 0x55, 0x48, 0xff)); // Dark charcoal indicator
+        nvgStrokeColor(args.vg, indicatorColor);
         nvgStrokeWidth(args.vg, 1.6f);
         nvgStroke(args.vg);
     }
