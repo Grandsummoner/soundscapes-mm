@@ -220,7 +220,15 @@ struct StepPadWidget : app::SvgSwitch {
         nvgBeginPath(args.vg);
         nvgRoundedRect(args.vg, 0.0f, 0.0f, box.size.x, box.size.y, 3.5f);
 
-        if (isPlayhead) {
+        if (module && module->chordModeActive) {
+            // In CHRD mode the pads are a 16-slot option selector, not step toggles --
+            // tint purple (matching the CHRD button) so it reads as a different mode.
+            if (stepActive) {
+                nvgFillColor(args.vg, nvgRGBA(155, 89, 182, 255)); // Vivid Royal Purple
+            } else {
+                nvgFillColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff));
+            }
+        } else if (isPlayhead) {
             nvgFillColor(args.vg, nvgRGBA(0x2e, 0xcc, 0x71, 0xff)); // Active green playhead
         } else if (stepActive) {
             nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // Active step amber
@@ -289,7 +297,8 @@ struct PerformanceButtonWidget : SoundscapesButton {
     }
 
     void onButton(const event::Button& e) override {
-        momentary = (buttonId != 0 && buttonId != 1);
+        // PLAY(0), SHFT(1), and CHRD(4) are latching mode switches; the rest are momentary.
+        momentary = (buttonId != 0 && buttonId != 1 && buttonId != 4);
         SoundscapesButton::onButton(e);
     }
 
@@ -300,6 +309,7 @@ struct PerformanceButtonWidget : SoundscapesButton {
         if (module) {
             if (buttonId == 0) litState = module->isPlaying;       // PLAY Button
             if (buttonId == 1) litState = module->shiftActive;     // SHFT Button
+            if (buttonId == 4) litState = module->chordModeActive; // CHRD Button (STEP <-> CHRD mode)
         }
 
         // Soft shadow

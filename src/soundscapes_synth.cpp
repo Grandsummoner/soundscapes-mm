@@ -23,16 +23,24 @@ static float quantizePitch(float cvInput, int root, int scaleIdx) {
     // Shift relative to selected root note, ensuring positive modulo results
     noteInOctave = (noteInOctave - root + 24) % 12;
 
-    // Find the closest active scale degree in selected scale template
+    // Find the closest active scale degree. Checks the same octave AND the octaves
+    // immediately above/below, so a note near the top or bottom of the octave can
+    // snap across the boundary to a nearby degree instead of always being pulled
+    // toward whatever's closest within 0-11 (which previously biased quantization
+    // downward near the octave edge on 4 of the 5 built-in scales).
     const int* scale = SCALES[scaleIdx];
-    int bestDegree = scale[0];
-    int minDiff = 99;
+    int bestDegree = scale[0] % 12;
+    int minDiff = 999;
 
     for (int i = 0; i < 7; i++) {
-        int diff = std::abs(scale[i] - noteInOctave);
-        if (diff < minDiff) {
-            minDiff = diff;
-            bestDegree = scale[i];
+        int degree = scale[i] % 12;
+        for (int octShift = -12; octShift <= 12; octShift += 12) {
+            int candidate = degree + octShift;
+            int diff = std::abs(candidate - noteInOctave);
+            if (diff < minDiff) {
+                minDiff = diff;
+                bestDegree = candidate;
+            }
         }
     }
 
@@ -99,10 +107,17 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
 
         float voiceMidiNote;
         if (externalPolyVoice) {
-            // Each incoming poly channel is quantized on its own -- the external
-            // source dictates the voicing/chord directly, no internal harmony offset.
             float noteCV = inputs[VOCT_INPUT].getPolyVoltage(i);
-            voiceMidiNote = quantizePitch(noteCV, rootNote, scaleIdx);
+            if (chromaticPassthroughEnabled) {
+                // CHRD mode slot 0: bypass the scale quantizer entirely -- useful when
+                // an external sequencer/keyboard is already handling pitch/quantization
+                // and you want Soundscape to just play what it's sent.
+                voiceMidiNote = math::clamp(noteCV, -5.0f, 5.0f) * 12.0f + 60.0f;
+            } else {
+                // Each incoming poly channel is quantized on its own -- the external
+                // source dictates the voicing/chord directly, no internal harmony offset.
+                voiceMidiNote = quantizePitch(noteCV, rootNote, scaleIdx);
+            }
         } else {
             // --- DIATONIC CONSTELLATION MAPPING (internal generative harmony) ---
             int chordOffsetDegree = i * 2; // Harmonizes in thirds

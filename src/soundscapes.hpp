@@ -134,6 +134,13 @@ struct Soundscapes : Module {
     SynthMode activeSynthMode = MODE_VOICES;
     FaderState activeFaderState = FADER_MIXER;
 
+    // CHRD mode: latching switch that repurposes the 16 step pads as a radio-select
+    // option menu (mutually exclusive with normal step editing -- entering CHRD mode
+    // freezes the step pattern rather than letting the two be edited simultaneously).
+    bool chordModeActive = false;
+    int chordModeOption = -1;              // -1 = none selected, else 0-15
+    bool chromaticPassthroughEnabled = false; // CHRD mode slot 0: bypass quantizer on poly V/OCT
+
     // Flashing display clock trackers for UI
     float flashTimer = 0.0f;
     bool displayFlashState = false;

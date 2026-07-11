@@ -146,21 +146,77 @@ void Soundscapes::processSequencer(float sampleTime) {
         }
     }
 
-    // 3. Clear/Initialize Sequence toggle
-    if (params[CHRD_PARAM].getValue() > 0.5f && shiftActive) {
-        if (focusedChannel != -1) {
+    // 3. CHRD Mode: latching toggle that repurposes the 16 step pads as a radio-select
+    // option menu, mutually exclusive with normal step editing so users can't edit the
+    // pattern and browse CHRD options at the same time.
+    bool chordModeWasActive = chordModeActive;
+    chordModeActive = params[CHRD_PARAM].getValue() > 0.5f;
+
+    if (chordModeActive && !chordModeWasActive) {
+        // Just entered CHRD mode. Preserve the old SHFT+CHRD "clear focused pattern"
+        // gesture as a one-shot action on the same edge that opens CHRD mode.
+        if (shiftActive && focusedChannel != -1) {
             for (int i = 0; i < 8; i++) {
-                params[STEP_PARAM_START + i].setValue(0.0f);
-                params[STEP_PARAM_START + 8 + i].setValue(0.0f);
+                melodyTrack.steps[i].active = false;
+                chordTrack.steps[i].active = false;
             }
+        }
+        // The step pattern itself lives in melodyTrack/chordTrack .active (already
+        // captured above/before this frame), so it's safe to repurpose the raw pads
+        // as option-select buttons without losing anything.
+        for (int i = 0; i < 16; i++) {
+            params[STEP_PARAM_START + i].setValue(0.0f);
+        }
+        if (chordModeOption >= 0) {
+            params[STEP_PARAM_START + chordModeOption].setValue(1.0f);
+        }
+    } else if (!chordModeActive && chordModeWasActive) {
+        // Just left CHRD mode: restore the pads to reflect the real (frozen) pattern.
+        for (int i = 0; i < 8; i++) {
+            params[STEP_PARAM_START + i].setValue(melodyTrack.steps[i].active ? 1.0f : 0.0f);
+            params[STEP_PARAM_START + 8 + i].setValue(chordTrack.steps[i].active ? 1.0f : 0.0f);
         }
     }
 
-    // 4. Map active sequencer steps directly to the parameter values to solve the double-click bug
-    for (int i = 0; i < 8; i++) {
-        melodyTrack.steps[i].active = (params[STEP_PARAM_START + i].getValue() > 0.5f);
-        chordTrack.steps[i].active = (params[STEP_PARAM_START + 8 + i].getValue() > 0.5f);
+    if (chordModeActive) {
+        // 16-slot radio-exclusive option selector (only one slot lit at a time).
+        // Slot 0 = Chromatic Pass-Through for the polyphonic V/OCT input; slots 1-15
+        // are reserved for future CHRD-mode features.
+        static float prevOptVal[16] = {0.0f};
+        int newlyPressed = -1;
+        for (int i = 0; i < 16; i++) {
+            float cur = params[STEP_PARAM_START + i].getValue();
+            if (cur > 0.5f && prevOptVal[i] <= 0.5f) {
+                newlyPressed = i;
+            }
+            prevOptVal[i] = cur;
+        }
+
+        if (newlyPressed != -1) {
+            for (int i = 0; i < 16; i++) {
+                if (i != newlyPressed) params[STEP_PARAM_START + i].setValue(0.0f);
+            }
+            chordModeOption = newlyPressed;
+        } else {
+            // Re-clicking the already-selected slot turns it off with no replacement
+            // (SoundscapesButton toggles latching buttons off on a second click) --
+            // treat that as "no option selected."
+            bool anySelected = false;
+            for (int i = 0; i < 16; i++) {
+                if (params[STEP_PARAM_START + i].getValue() > 0.5f) anySelected = true;
+            }
+            if (!anySelected) chordModeOption = -1;
+        }
+    } else {
+        // Normal STEP mode: map active sequencer steps directly to the parameter
+        // values to solve the double-click bug.
+        for (int i = 0; i < 8; i++) {
+            melodyTrack.steps[i].active = (params[STEP_PARAM_START + i].getValue() > 0.5f);
+            chordTrack.steps[i].active = (params[STEP_PARAM_START + 8 + i].getValue() > 0.5f);
+        }
     }
+
+    chromaticPassthroughEnabled = (chordModeOption == 0);
 
     // 5. Standalone Internal Clock Fallback (advances playhead automatically when CLK input is unpatched)
     bool nextStep = false;
@@ -215,4 +271,5 @@ void Soundscapes::processSequencer(float sampleTime) {
 
     lights[PLAY_LED].setBrightness(isPlaying ? 1.0f : 0.0f);
     lights[SHFT_LED].setBrightness(shiftActive ? 1.0f : 0.0f);
+    lights[CHRD_LED].setBrightness(chordModeActive ? 1.0f : 0.0f);
 }
