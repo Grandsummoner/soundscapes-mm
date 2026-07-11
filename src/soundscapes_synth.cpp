@@ -85,9 +85,10 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
     float timbreVal = params[TIMBRE_PARAM].getValue();
     float textureVal = params[TEXTURE_PARAM].getValue();
     
-    // Remapped Envelopes: SPREAD controls Attack, DYNAMICS controls Release/Decay
-    float attackVal = params[SPREAD_PARAM].getValue();
-    float dynamicsVal = params[DYNAMICS_PARAM].getValue();
+    // Remapped Envelopes: DYNAMICS controls Attack, SPREAD controls Release/Decay
+    // (swapped from the original mapping -- these names fit the reversed roles better)
+    float attackVal = params[DYNAMICS_PARAM].getValue();
+    float releaseVal = params[SPREAD_PARAM].getValue();
 
     // 2. Synthesize 8 Independent Channels
     // If VOCT_INPUT is patched with a polyphonic cable (e.g. from an external keyboard
@@ -137,7 +138,7 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
 
         // --- ATTACK-RELEASE (AR) ENVELOPE GENERATOR ---
         float attackTime = 0.001f + attackVal * 2.0f;    // Snappy Attack: 1ms to 2s
-        float releaseTime = 0.010f + dynamicsVal * 4.0f; // SNappy Release: 10ms to 4s
+        float releaseTime = 0.010f + releaseVal * 4.0f;  // Snappy Release: 10ms to 4s
         
         float attackCoeff = sampleTime / attackTime;
         float releaseCoeff = sampleTime / releaseTime;
@@ -176,18 +177,13 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
         // --- SYNTHESIS MODEL ROUTER ---
         if (activeSynthMode == MODE_VOICES) {
             // "Voices": a virtual-analog voice per channel (band-limited VA oscillator ->
-            // resonant filter -> AR envelope). The FM modulator built below is NOT the main
-            // tone source here -- it's a coloration/processing stage. When EXT_INPUT is
-            // patched, that same modulator instead ring-modulates the external audio, so the
-            // 8 harmonized channels act as an 8-voice FM-flavored harmonizer on outside audio.
-            static const float RATIO_TABLE[8] = {0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 5.0f, 7.0f};
-            int ratioIdx = math::clamp((int)std::round(timbreVal * 7.0f), 0, 7);
-            float modulatorFreq = voice.freq * RATIO_TABLE[ratioIdx];
+            // resonant filter -> AR envelope). FM/ring-modulation only happens when
+            // EXT_INPUT is patched -- with nothing patched, this is a pure, predictable
+            // analog voice with no feedback or self-modulation anywhere in the signal path.
 
-            // Independent operator (brightness/modulation) envelope: decays faster than the
-            // amplitude envelope so the modulator's effect fades during sustain, whether it's
-            // lightly FM-ing the VA oscillator's pitch or ring-modding external audio.
-            float opDecayCoeff = sampleTime / (0.05f + dynamicsVal * 0.4f);
+            // Independent operator (brightness) envelope: decays faster than the amplitude
+            // envelope, used only to shape the EXT IN ring-mod wet amount below.
+            float opDecayCoeff = sampleTime / (0.05f + releaseVal * 0.4f);
             if (voiceGate) {
                 voice.opEnv += attackCoeff * (1.05f - voice.opEnv);
             } else {
@@ -195,22 +191,26 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             }
             voice.opEnv = math::clamp(voice.opEnv, 0.0f, 1.0f);
 
-            // Modulator runs on its own phase accumulator with light self-feedback
-            // (DENSITY) for extra harmonic edge/growl.
-            voice.modPhase += modulatorFreq * sampleTime;
-            if (voice.modPhase >= 1.0f) voice.modPhase -= 1.0f;
-            float feedbackAmount = 0.3f * densityVal;
-            float modOut = std::sin(voice.modPhase * 2.0f * M_PI + voice.fbState * feedbackAmount);
-            voice.fbState = modOut;
-
             float rawOscSignal;
             bool extConnected = inputs[EXT_INPUT].isConnected();
 
             if (extConnected) {
                 // --- External audio path: FM-flavored ring-modulation harmonizer ---
-                // DENSITY is the dry/processed blend; the modulator's own envelope (opEnv)
-                // scales how much ring-mod sideband content comes through, so the effect
-                // swells in sync with this channel's gate rather than running constantly.
+                // TIMBRE selects the modulator:carrier ratio from a curated table spanning
+                // harmonic (bell/organ-like, low end) through mildly inharmonic (metallic,
+                // high end) tones. The modulator is a plain sine with NO self-feedback --
+                // predictable and bounded, never harsh or runaway.
+                static const float RATIO_TABLE[8] = {0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 5.0f, 7.0f};
+                int ratioIdx = math::clamp((int)std::round(timbreVal * 7.0f), 0, 7);
+                float modulatorFreq = voice.freq * RATIO_TABLE[ratioIdx];
+
+                voice.modPhase += modulatorFreq * sampleTime;
+                if (voice.modPhase >= 1.0f) voice.modPhase -= 1.0f;
+                float modOut = std::sin(voice.modPhase * 2.0f * M_PI);
+
+                // DENSITY is the dry/processed blend here; opEnv scales how much ring-mod
+                // sideband content comes through, so the effect swells with this channel's
+                // gate rather than running constantly.
                 float extSignal = inputs[EXT_INPUT].getVoltage() / 5.0f;
                 float ringModded = extSignal * modOut;
                 float wetAmount = densityVal * voice.opEnv;
@@ -219,11 +219,8 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
                 // --- Internal virtual-analog oscillator path (PolyBLEP band-limited) ---
                 float dt = voice.freq / sampleRate;
 
-                // Subtle through-zero FM on the VA oscillator's own pitch, driven by DENSITY,
-                // so the modulator still does useful work even with nothing patched into EXT IN.
-                voice.phase += dt + (modOut * densityVal * 0.05f);
+                voice.phase += dt;
                 if (voice.phase >= 1.0f) voice.phase -= 1.0f;
-                if (voice.phase < 0.0f) voice.phase += 1.0f;
 
                 float saw = 2.0f * voice.phase - 1.0f;
                 saw -= polyBlep(voice.phase, dt);
@@ -238,7 +235,29 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
                 // TEXTURE morphs the waveshape from sawtooth to pulse -- classic analog
                 // waveshape control, giving Voices real tonal range beyond a single timbre.
                 float shapeMorph = textureVal;
-                rawOscSignal = saw * (1.0f - shapeMorph) + pulse * shapeMorph;
+                float mainOsc = saw * (1.0f - shapeMorph) + pulse * shapeMorph;
+
+                // DENSITY: unison/thickness. Blends in a second copy of the same
+                // oscillator, gently detuned (up to +8 cents), for a fuller analog-chorus
+                // character. This is a bounded crossfade, not a sum -- turning it up
+                // thickens the tone without ever getting louder or unpredictable.
+                float detuneRatio = std::pow(2.0f, (densityVal * 8.0f) / 1200.0f);
+                float unisonDt = (voice.freq * detuneRatio) / sampleRate;
+                voice.unisonPhase += unisonDt;
+                if (voice.unisonPhase >= 1.0f) voice.unisonPhase -= 1.0f;
+
+                float unisonSaw = 2.0f * voice.unisonPhase - 1.0f;
+                unisonSaw -= polyBlep(voice.unisonPhase, unisonDt);
+
+                float unisonPulsePhase = voice.unisonPhase + (1.0f - pulseWidth);
+                if (unisonPulsePhase >= 1.0f) unisonPulsePhase -= 1.0f;
+                float unisonPulse = (voice.unisonPhase < pulseWidth) ? 1.0f : -1.0f;
+                unisonPulse += polyBlep(voice.unisonPhase, unisonDt);
+                unisonPulse -= polyBlep(unisonPulsePhase, unisonDt);
+
+                float unisonOsc = unisonSaw * (1.0f - shapeMorph) + unisonPulse * shapeMorph;
+
+                rawOscSignal = mainOsc * (1.0f - 0.5f * densityVal) + unisonOsc * (0.5f * densityVal);
 
                 // Bass anchor voice (channel 1): blend in a clean sub-octave sine for
                 // low-end weight, since it's the fixed root note.
@@ -282,8 +301,8 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             float nextSample = voice.delayBuffer[nextIdx];
             float dampSample = (currentSample + nextSample) * 0.5f;
 
-            // Decay speed controlled by Dynamics knob (Macro 6)
-            float feedbackMult = 0.9f + (dynamicsVal * 0.098f);
+            // Decay speed controlled by the Release macro (SPREAD, Macro 5)
+            float feedbackMult = 0.9f + (releaseVal * 0.098f);
             float feedbackSample = dampSample * feedbackMult;
 
             voice.writeIdx = (voice.writeIdx + 1) & 2047;

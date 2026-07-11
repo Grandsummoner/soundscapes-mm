@@ -170,8 +170,8 @@ struct Soundscapes : Module {
 
         // --- Voices mode (VA osc + FM/ring-mod) specific state ---
         float opEnv = 0.0f;         // Independent operator/brightness envelope
-        float modPhase = 0.0f;      // Modulator phase accumulator (separate from carrier)
-        float fbState = 0.0f;       // Modulator self-feedback state
+        float modPhase = 0.0f;      // Modulator phase accumulator (EXT IN ring-mod, Voices mode)
+        float unisonPhase = 0.0f;   // Detuned unison oscillator phase (DENSITY thickness, Voices mode)
         float subPhase = 0.0f;      // Sub-oscillator phase (bass anchor voice only)
         float svfLow = 0.0f;        // Per-voice resonant filter state (lowpass)
         float svfBand = 0.0f;       // Per-voice resonant filter state (bandpass)

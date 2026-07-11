@@ -29,11 +29,11 @@ Soundscapes::Soundscapes() {
     configParam(FILTER_PARAM, 0.0f, 1.0f, 0.0f, "Filter Send Edit Select");
 
     configParam(RATE_PARAM, 0.0f, 1.0f, 0.5f, "Macro 1: Sequencer Rate / Delay Time");
-    configParam(DENSITY_PARAM, 0.0f, 1.0f, 0.5f, "Macro 2: Noise Dust Rate / Filter Resonance");
+    configParam(DENSITY_PARAM, 0.0f, 1.0f, 0.5f, "Macro 2: Voices Unison Thickness / Noise Dust Rate / Filter Resonance");
     configParam(TIMBRE_PARAM, 0.0f, 1.0f, 0.5f, "Macro 3: FM Harmonic Ratio / Reverb Shimmer Pitch");
     configParam(TEXTURE_PARAM, 0.0f, 1.0f, 0.5f, "Macro 4: FM Index Modulation / Filter Cutoff");
-    configParam(SPREAD_PARAM, 0.0f, 1.0f, 0.5f, "Macro 5: Stereo Spatial Detune / Delay Feedback");
-    configParam(DYNAMICS_PARAM, 0.0f, 1.0f, 0.5f, "Macro 6: LPG Low-pass Envelope / Reverb Decay");
+    configParam(SPREAD_PARAM, 0.0f, 1.0f, 0.5f, "Macro 5: Release Time / Stereo Spatial Detune / Delay Feedback");
+    configParam(DYNAMICS_PARAM, 0.0f, 1.0f, 0.5f, "Macro 6: Attack Time / Filter Envelope / Reverb Decay");
 
     // 5. Configure Row 3 Mixer Faders & Center Quantizers
     for (int i = 0; i < 8; i++) {
@@ -64,7 +64,7 @@ Soundscapes::Soundscapes() {
         voices[i].noiseState = 0.0f;
         voices[i].opEnv = 0.0f;
         voices[i].modPhase = 0.0f;
-        voices[i].fbState = 0.0f;
+        voices[i].unisonPhase = 0.0f;
         voices[i].subPhase = 0.0f;
         voices[i].svfLow = 0.0f;
         voices[i].svfBand = 0.0f;
