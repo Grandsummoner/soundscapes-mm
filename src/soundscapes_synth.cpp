@@ -145,11 +145,15 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
 
         // Calculate gated step duration (gated to stay high for exactly 50% of step length)
         bool voiceGate = false;
+        float triggerVelocityNorm = 1.0f; // Default: full velocity if nothing says otherwise
         if (externalPolyVoice) {
             // True polyphonic performance: gate follows the external GATE cable directly
             // (getPolyVoltage gracefully falls back to the mono gate if GATE_INPUT itself
             // isn't polyphonic, so a single shared gate still works for all poly notes).
             voiceGate = inputs[GATE_INPUT].getPolyVoltage(i) > 1.0f;
+            if (inputs[VEL_INPUT].isConnected()) {
+                triggerVelocityNorm = math::clamp(inputs[VEL_INPUT].getPolyVoltage(i) / 10.0f, 0.0f, 1.0f);
+            }
         } else if (isPlaying) {
             float stepPeriod = 1.0f / (1.0f + rateVal * 19.0f);
             float activeGateDuration = stepPeriod * 0.50f; // 50% gate duration
@@ -158,16 +162,19 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             // Melody Voice check
             if (melodyTrack.playhead == i && melodyTrack.steps[i].active && isGateActive && voiceTriggerActive[i]) {
                 voiceGate = true;
+                triggerVelocityNorm = melodyTrack.steps[i].velocity / 127.0f;
             }
             // Chord Voice check
             if (chordTrack.playhead == i && chordTrack.steps[i].active && isGateActive && chordTriggerActive[i]) {
                 voiceGate = true;
+                triggerVelocityNorm = chordTrack.steps[i].velocity / 127.0f;
             }
         }
 
         if (voiceGate) {
-            // Rise phase
-            voice.env += attackCoeff * (1.05f - voice.env);
+            // Rise phase, scaled by this trigger's velocity so quiet/hard-set steps
+            // (or a patched VEL_INPUT CV, in poly mode) actually play quieter/louder.
+            voice.env += attackCoeff * (triggerVelocityNorm * 1.05f - voice.env);
         } else {
             // Decay/Release phase
             voice.env += releaseCoeff * (0.0f - voice.env);

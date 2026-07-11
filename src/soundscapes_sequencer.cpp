@@ -109,7 +109,10 @@ void Soundscapes::handleFaderMapping() {
             }
 
             float faderVal = params[FADER1_PARAM + i].getValue();
-            int currentStep = melodyTrack.playhead; 
+            int currentStep = focusedChannel; // Each channel is a fixed step index in
+                                               // both tracks -- edit that channel's own
+                                               // step, not wherever the playhead is (that
+                                               // was overwriting a moving target before).
 
             if (shiftActive) {
                 melodyTrack.steps[currentStep].probability = (uint8_t)(faderVal * 100.0f);
