@@ -14,7 +14,7 @@ extern Plugin* pluginInstance;
 namespace SoundscapesCoords {
     // Left Sidebar Inputs
     const float SIDEBAR_JACK_X = 22.5f;
-    const float SIDEBAR_LED_X = 38.5f; // Spacious gap between jack and LED
+    const float SIDEBAR_LED_X = 41.0f; // Small gap between jack and LED
     const float SIDEBAR_Y_START = 55.0f;
     const float SIDEBAR_Y_SPACING = 47.0f;
 
@@ -189,6 +189,16 @@ struct Soundscapes : Module {
             default:
                 return true;
         }
+    }
+
+    // Returns which FX-bus accent color (if any) currently applies to a macro knob,
+    // matching that FX button's color for easy visual pairing. 0 = none, 1 = FM,
+    // 2 = DELAY, 3 = REVERB, 4 = FILTER.
+    int macroAccentGroup(int paramId) {
+        if (activeFaderState == FADER_DELAY_SEND && (paramId == RATE_PARAM || paramId == SPREAD_PARAM)) return 2;
+        if (activeFaderState == FADER_REVERB_SEND && (paramId == TIMBRE_PARAM || paramId == DYNAMICS_PARAM)) return 3;
+        if (activeFaderState == FADER_FILTER_SEND && paramId == TEXTURE_PARAM) return 4;
+        return 0;
     }
 
     // Returns an up-to-8-character label describing what a macro knob is currently

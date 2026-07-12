@@ -97,7 +97,7 @@ void Soundscapes::handleFaderMapping() {
         for (int i = 0; i < 8; i++) {
             float faderVal = params[FADER1_PARAM + i].getValue();
             if (activeFaderState == FADER_MIXER) {
-                channelVolumes[i] = faderVal;
+                channelVolumes[i] = faderVal * faderVal; // Exponential taper: finer low-end control
             } else {
                 int fxIndex = (int)activeFaderState - 1;
                 fxSends[fxIndex][i] = faderVal;

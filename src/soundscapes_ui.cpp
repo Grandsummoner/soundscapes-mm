@@ -17,6 +17,17 @@ static std::shared_ptr<Font> loadRobustFont() {
 }
 
 /**
+ * Fake-Bold Text Helper
+ * No bold weight of the loaded font is available, so this thickens strokes by
+ * drawing the text twice with a small offset -- used everywhere labels are drawn.
+ * Caller must already have set font, size, alignment, and fill color.
+ */
+static void nvgTextBold(NVGcontext* vg, float x, float y, const char* text, const char* end = NULL) {
+    nvgText(vg, x, y, text, end);
+    nvgText(vg, x + 0.4f, y, text, end);
+}
+
+/**
  * Custom base class for robust parameter clicks in VCV Rack v2
  */
 struct SoundscapesButton : app::ParamWidget {
@@ -182,19 +193,6 @@ struct OpaqueDisplay : Widget {
                     int len = (int)strlen(module->macroFunctionText);
                     char c = (channelId < len) ? module->macroFunctionText[channelId] : ' ';
                     snprintf(text, sizeof(text), "%c", c);
-
-                    // Active = bright green glow, inactive = dim gray -- same signal as
-                    // the knob black/white tint, so the flash and the knob agree.
-                    NVGcolor glowColor = module->macroFunctionActive
-                        ? nvgRGBA(0x2e, 0xcc, 0x71, 0xff)
-                        : nvgRGBA(0x88, 0x88, 0x88, 0xff);
-                    nvgFillColor(args.vg, glowColor);
-
-                    NVGpaint textGlow = nvgBoxGradient(args.vg, -3.0f, -3.0f, box.size.x + 6.0f, box.size.y + 6.0f, 4.0f, 5.0f, nvgRGBA(glowColor.r * 255, glowColor.g * 255, glowColor.b * 255, 0x50), nvgRGBA(0, 0, 0, 0));
-                    nvgBeginPath(args.vg);
-                    nvgRoundedRect(args.vg, -4.0f, -4.0f, box.size.x + 8.0f, box.size.y + 8.0f, 5.0f);
-                    nvgFillPaint(args.vg, textGlow);
-                    nvgFill(args.vg);
                 } else {
                     int pct = (int)std::round(module->displayValue[channelId] * 99.0f);
                     pct = clamp(pct, 0, 99);
@@ -203,7 +201,7 @@ struct OpaqueDisplay : Widget {
             } else {
                 snprintf(text, sizeof(text), "%d", channelId + 1);
             }
-            nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f + 1.5f, text, NULL);
+            nvgTextBold(args.vg, box.size.x / 2.0f, box.size.y / 2.0f + 1.5f, text, NULL);
         }
     }
 };
@@ -314,14 +312,15 @@ struct StepPadWidget : app::SvgSwitch {
  */
 struct SoundscapesFader : app::SvgSlider {
     SoundscapesFader() {
-        box.size = Vec(14.0f, 56.0f); // Spans full slot range track height
-        speed = 2.5f;                 // Responsive mouse dragging speed
+        box.size = Vec(14.0f, 46.0f); // Shorter travel
+        speed = 4.0f;                 // Snappier mouse dragging
     }
 
     void draw(const DrawArgs& args) override {
-        // Draw fader track groove slot programmatically
+        // Draw fader track groove -- plain rect, no rounded end-caps (those read as
+        // small "nips" poking out top/bottom on a groove this thin)
         nvgBeginPath(args.vg);
-        nvgRoundedRect(args.vg, box.size.x / 2.0f - 2.0f, 0.0f, 4.0f, box.size.y, 2.0f);
+        nvgRect(args.vg, box.size.x / 2.0f - 2.0f, 0.0f, 4.0f, box.size.y);
         nvgFillColor(args.vg, nvgRGBA(13, 12, 11, 255)); // #0d0c0b
         nvgFill(args.vg);
 
@@ -393,23 +392,14 @@ struct PerformanceButtonWidget : SoundscapesButton {
 
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.0f;
         if (litState || value > 0.5f) {
-            // Assign a unique vivid glowing color based on buttonId!
-            if (buttonId == 0) {
-                nvgFillColor(args.vg, nvgRGBA(46, 204, 113, 255)); // PLAY: Vivid Emerald Green
-            } else if (buttonId == 1) {
-                nvgFillColor(args.vg, nvgRGBA(230, 126, 34, 255)); // SHFT: Vivid Flame Orange
-            } else if (buttonId == 2) {
-                nvgFillColor(args.vg, nvgRGBA(52, 152, 219, 255)); // ARP: Vivid Electric Blue
-            } else if (buttonId == 3) {
-                nvgFillColor(args.vg, nvgRGBA(26, 188, 156, 255)); // FRZ: Vivid Icy Cyan
-            } else if (buttonId == 4) {
-                nvgFillColor(args.vg, nvgRGBA(155, 89, 182, 255)); // CHRD: Vivid Royal Purple
-            } else if (buttonId == 5) {
-                nvgFillColor(args.vg, nvgRGBA(233, 30, 99, 255));  // PROB: Vivid Hot Magenta
-            } else if (buttonId == 6) {
-                nvgFillColor(args.vg, nvgRGBA(241, 196, 15, 255)); // SAVE: Vivid Amber Gold
+            // Two colors only: green for persistent mode/state toggles (PLAY, SHFT,
+            // ARP, FRZ, CHRD), amber for momentary one-shot actions (PROB, SAVE, RCL).
+            // Color variety is reserved for the FX section instead.
+            bool isStateToggle = (buttonId <= 4);
+            if (isStateToggle) {
+                nvgFillColor(args.vg, nvgRGBA(0x2e, 0xcc, 0x71, 0xff)); // Green
             } else {
-                nvgFillColor(args.vg, nvgRGBA(231, 76, 60, 255));  // RCL: Vivid Coral Red
+                nvgFillColor(args.vg, nvgRGBA(0xf1, 0xc4, 0x0f, 0xff)); // Amber
             }
         } else {
             nvgFillColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff)); // White unlit
@@ -429,14 +419,16 @@ struct PerformanceButtonWidget : SoundscapesButton {
         // Render Dynamic Text Label inside the button
         if (font) {
             nvgFontFaceId(args.vg, font->handle);
-            nvgFontSize(args.vg, 6.0f);
-            
+            nvgFontSize(args.vg, 7.0f);
+            nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+            nvgFillColor(args.vg, (litState || value > 0.5f) ? nvgRGBA(0xff, 0xff, 0xff, 0xff) : nvgRGBA(0x3a, 0x35, 0x2e, 0xff));
+
             const char* labels[8] = {"PLAY", "SHFT", "ARP", "FRZ", "CHRD", "PROB", "SAVE", "RCL"};
             const char* labelText = labels[buttonId];
             if (buttonId == 4) {
                 labelText = (litState || value > 0.5f) ? "CHRD" : "STEP";
             }
-            nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, labelText, NULL);
+            nvgTextBold(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, labelText, NULL);
         }
     }
 };
@@ -467,11 +459,33 @@ struct SoundscapesKnob : app::Knob {
         NVGcolor bodyStroke = active ? nvgRGBA(0x00, 0x00, 0x00, 0xff) : nvgRGBA(0xcb, 0xc4, 0xb5, 0xff);
         NVGcolor indicatorColor = active ? nvgRGBA(0xff, 0xff, 0xff, 0xff) : nvgRGBA(0x60, 0x55, 0x48, 0xff);
 
+        int accentGroup = 0;
+        if (getParamQuantity() && getParamQuantity()->module) {
+            Soundscapes* mod = dynamic_cast<Soundscapes*>(getParamQuantity()->module);
+            if (mod) accentGroup = mod->macroAccentGroup(getParamQuantity()->paramId);
+        }
+
         // Drop shadow
         nvgBeginPath(args.vg);
         nvgCircle(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, 13.0f);
         nvgFillColor(args.vg, nvgRGBA(0x00, 0x00, 0x00, 0x08));
         nvgFill(args.vg);
+
+        // Accent ring: matches the associated FX button's color when that bus is
+        // currently selected, for easy visual pairing of "this knob shapes that FX".
+        if (accentGroup != 0) {
+            NVGcolor accentColor;
+            if (accentGroup == 1) accentColor = nvgRGBA(0x34, 0x98, 0xdb, 0xff);      // FM: Blue
+            else if (accentGroup == 2) accentColor = nvgRGBA(0x1a, 0xbc, 0x9c, 0xff); // DELAY: Teal
+            else if (accentGroup == 3) accentColor = nvgRGBA(0xff, 0x9d, 0x00, 0xff); // REVERB: Amber
+            else accentColor = nvgRGBA(0xe9, 0x1e, 0x63, 0xff);                       // FILTER: Magenta
+
+            nvgBeginPath(args.vg);
+            nvgCircle(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, 13.5f);
+            nvgStrokeColor(args.vg, accentColor);
+            nvgStrokeWidth(args.vg, 2.0f);
+            nvgStroke(args.vg);
+        }
 
         // Knob Body
         nvgBeginPath(args.vg);
@@ -600,9 +614,9 @@ struct ModeThreeWaySwitch : app::ParamWidget {
             nvgTextAlign(args.vg, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
             nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xdf));
 
-            nvgText(args.vg, -6.0f, 5.0f, "V", NULL);
-            nvgText(args.vg, -6.0f, box.size.y / 2.0f, "W", NULL);
-            nvgText(args.vg, -6.0f, box.size.y - 5.0f, "D", NULL);
+            nvgTextBold(args.vg, -6.0f, 5.0f, "V", NULL);
+            nvgTextBold(args.vg, -6.0f, box.size.y / 2.0f, "W", NULL);
+            nvgTextBold(args.vg, -6.0f, box.size.y - 5.0f, "D", NULL);
         }
     }
 };
@@ -653,7 +667,17 @@ struct FXButtonWidget : SoundscapesButton {
 
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.0f;
         if (isActive) {
-            nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // Active amber glow
+            // Each FX bus gets its own distinct color, shared with its associated
+            // macro knob's accent ring for easy visual identification.
+            if (label == "FM") {
+                nvgFillColor(args.vg, nvgRGBA(0x34, 0x98, 0xdb, 0xff)); // Blue
+            } else if (label == "DELAY") {
+                nvgFillColor(args.vg, nvgRGBA(0x1a, 0xbc, 0x9c, 0xff)); // Teal
+            } else if (label == "REVERB") {
+                nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // Amber
+            } else {
+                nvgFillColor(args.vg, nvgRGBA(0xe9, 0x1e, 0x63, 0xff)); // Magenta (FILTER)
+            }
         } else if (value > 0.5f) {
             nvgFillColor(args.vg, nvgRGBA(0xee, 0xee, 0xee, 0xff)); // Pressed grey
         } else {
@@ -674,10 +698,10 @@ struct FXButtonWidget : SoundscapesButton {
         // Centered Button Label text drawn using verified monospaced font
         if (font) {
             nvgFontFaceId(args.vg, font->handle);
-            nvgFontSize(args.vg, 6.5f);
+            nvgFontSize(args.vg, 7.0f);
             nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
             nvgFillColor(args.vg, isActive ? nvgRGBA(0xff, 0xff, 0xff, 0xff) : nvgRGBA(0x5c, 0x53, 0x46, 0xff));
-            nvgText(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, label.c_str(), NULL);
+            nvgTextBold(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, label.c_str(), NULL);
         }
     }
 };
@@ -703,64 +727,64 @@ struct FaceplateLabels : Widget {
             nvgFontSize(args.vg, 13.0f);
             nvgFontFaceId(args.vg, font->handle);
             nvgFillColor(args.vg, nvgRGBA(0x11, 0x11, 0x11, 0xff)); // Dark bold
-            nvgText(args.vg, 232.5f, 25.0f, "SOUNDSCAPES", NULL);
+            nvgTextBold(args.vg, 232.5f, 25.0f, "SOUNDSCAPES", NULL);
 
             // B. Draw Module Slogan
-            nvgFontSize(args.vg, 6.5f);
+            nvgFontSize(args.vg, 7.0f);
             nvgFillColor(args.vg, nvgRGBA(0x6d, 0x65, 0x58, 0xff)); // Cream-charcoal
-            nvgText(args.vg, 232.5f, 36.0f, "8-Channel Poly-Engine", NULL);
+            nvgTextBold(args.vg, 232.5f, 36.0f, "8-Channel Poly-Engine", NULL);
 
             // C. Sidebar Labels (CLK, RST, etc.)
             const char* sidebarLabels[7] = {"CLK", "RST", "V/OCT", "GATE", "VEL", "EXT IN", "DUCK"};
             for (int i = 0; i < 7; i++) {
                 float y = SoundscapesCoords::SIDEBAR_Y_START + (i * SoundscapesCoords::SIDEBAR_Y_SPACING);
-                nvgFontSize(args.vg, 6.5f);
+                nvgFontSize(args.vg, 7.0f);
                 if (i == 5) nvgFillColor(args.vg, nvgRGBA(0xd4, 0x7d, 0x00, 0xff)); // Orange for EXT IN
                 else if (i == 6) nvgFillColor(args.vg, nvgRGBA(0xd0, 0x02, 0x1b, 0xff)); // Red for DUCK
                 else nvgFillColor(args.vg, nvgRGBA(0x7d, 0x71, 0x60, 0xff));
-                nvgText(args.vg, SoundscapesCoords::SIDEBAR_JACK_X, y + 14.0f, sidebarLabels[i], NULL);
+                nvgTextBold(args.vg, SoundscapesCoords::SIDEBAR_JACK_X, y + 14.0f, sidebarLabels[i], NULL);
             }
             nvgFillColor(args.vg, nvgRGBA(0x5c, 0x53, 0x46, 0xff)); // Reset to standard charcoal
 
             // D. Output Jack Column Numbers (1 to 8)
             for (int i = 0; i < 8; i++) {
                 float x = SoundscapesCoords::CH_COLS[i];
-                nvgFontSize(args.vg, 6.5f);
-                nvgText(args.vg, x, SoundscapesCoords::ROW1_JACK_Y + 16.0f, std::to_string(i + 1).c_str(), NULL);
-                nvgText(args.vg, x, SoundscapesCoords::ROW1_DISPLAY_Y + 28.0f, std::to_string(i + 1).c_str(), NULL);
+                nvgFontSize(args.vg, 7.0f);
+                nvgTextBold(args.vg, x, SoundscapesCoords::ROW1_JACK_Y + 16.0f, std::to_string(i + 1).c_str(), NULL);
+                nvgTextBold(args.vg, x, SoundscapesCoords::ROW1_DISPLAY_Y + 28.0f, std::to_string(i + 1).c_str(), NULL);
             }
 
             // E. Fader Numbers (1 to 8)
             for (int i = 0; i < 8; i++) {
                 float x = SoundscapesCoords::GRID_COLS[i];
-                nvgFontSize(args.vg, 6.5f);
-                nvgText(args.vg, x, SoundscapesCoords::ROW3_FADER_Y + 34.0f, std::to_string(i + 1).c_str(), NULL);
+                nvgFontSize(args.vg, 7.0f);
+                nvgTextBold(args.vg, x, SoundscapesCoords::ROW3_FADER_Y + 34.0f, std::to_string(i + 1).c_str(), NULL);
             }
 
             // F. Macro Knob Labels
             const char* knobLabels[6] = {"RATE", "DENSITY", "TIMBRE", "TEXTURE", "SPREAD", "DYNAMICS"};
             for (int i = 0; i < 6; i++) {
-                nvgFontSize(args.vg, 6.5f);
-                nvgText(args.vg, SoundscapesCoords::KNOB_COLS[i], SoundscapesCoords::ROW2_KNOB_Y + 21.0f, knobLabels[i], NULL);
+                nvgFontSize(args.vg, 7.5f);
+                nvgTextBold(args.vg, SoundscapesCoords::KNOB_COLS[i], SoundscapesCoords::ROW2_KNOB_Y + 21.0f, knobLabels[i], NULL);
             }
 
             // G. Root & Scale Labels
-            nvgFontSize(args.vg, 6.0f);
-            nvgText(args.vg, SoundscapesCoords::GRID_COLS[8], SoundscapesCoords::ROOT_Y + 21.0f, "ROOT", NULL);
-            nvgText(args.vg, SoundscapesCoords::GRID_COLS[9], SoundscapesCoords::SCALE_Y + 21.0f, "SCALE", NULL);
+            nvgFontSize(args.vg, 6.5f);
+            nvgTextBold(args.vg, SoundscapesCoords::GRID_COLS[8], SoundscapesCoords::ROOT_Y + 21.0f, "ROOT", NULL);
+            nvgTextBold(args.vg, SoundscapesCoords::GRID_COLS[9], SoundscapesCoords::SCALE_Y + 21.0f, "SCALE", NULL);
 
             // H. Melody & Chord Labels
-            nvgFontSize(args.vg, 6.0f);
+            nvgFontSize(args.vg, 6.5f);
             for (int i = 0; i < 8; i++) {
                 float x = SoundscapesCoords::GRID_COLS[i];
-                nvgText(args.vg, x, SoundscapesCoords::ROW4_MELODY_PAD_Y + 18.0f, std::to_string(i + 1).c_str(), NULL);
-                nvgText(args.vg, x, SoundscapesCoords::ROW4_CHORD_PAD_Y + 18.0f, std::to_string(i + 9).c_str(), NULL);
+                nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_MELODY_PAD_Y + 18.0f, std::to_string(i + 1).c_str(), NULL);
+                nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_CHORD_PAD_Y + 18.0f, std::to_string(i + 9).c_str(), NULL);
             }
 
             // Section Labels
-            nvgFontSize(args.vg, 7.0f);
-            nvgText(args.vg, 198.0f, 315.0f, "MELODY", NULL);
-            nvgText(args.vg, 198.0f, 363.0f, "CHORD", NULL);
+            nvgFontSize(args.vg, 7.5f);
+            nvgTextBold(args.vg, 198.0f, 315.0f, "MELODY", NULL);
+            nvgTextBold(args.vg, 198.0f, 363.0f, "CHORD", NULL);
         }
     }
 };
