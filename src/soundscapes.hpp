@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rack.hpp"
+#include <cmath>
 
 using namespace rack;
 
@@ -282,6 +283,88 @@ struct Soundscapes : Module {
         float reverbState = 0.0f;
         float sidechainEnv = 0.0f;
     } fxUnit;
+
+    /**
+     * Andrew Simper/Trapezoidal Linear State-Variable Filter (SVF)
+     * (Per-instance member -- previously a file-scope static shared by every
+     * Soundscapes module in the whole VCV Rack session, and persisting for the
+     * life of the process even if the module was deleted and recreated.)
+     */
+    struct StereoSVF {
+        float ic1eq_L = 0.0f, ic2eq_L = 0.0f;
+        float ic1eq_R = 0.0f, ic2eq_R = 0.0f;
+
+        void process(float inputL, float inputR, float cutoffHz, float resonance, float sampleRate, float& outL, float& outR) {
+            cutoffHz = math::clamp(cutoffHz, 20.0f, 18000.0f);
+            resonance = math::clamp(resonance, 0.01f, 0.99f);
+            float q = 1.0f / (2.0f * (1.0f - resonance));
+
+            float g = std::tan(M_PI * cutoffHz / sampleRate);
+            float k = 1.0f / q;
+            float a1 = 1.0f / (1.0f + g * (g + k));
+            float a2 = g * a1;
+
+            float v3_L = inputL - ic2eq_L;
+            float v1_L = a1 * ic1eq_L + a2 * v3_L;
+            float v2_L = ic2eq_L + g * v1_L;
+            ic1eq_L = 2.0f * v1_L - ic1eq_L;
+            ic2eq_L = 2.0f * v2_L - ic2eq_L;
+            outL = v2_L;
+
+            float v3_R = inputR - ic2eq_R;
+            float v1_R = a1 * ic1eq_R + a2 * v3_R;
+            float v2_R = ic2eq_R + g * v1_R;
+            ic1eq_R = 2.0f * v1_R - ic1eq_R;
+            ic2eq_R = 2.0f * v2_R - ic2eq_R;
+            outR = v2_R;
+
+            // Defensive sanitization: a filter's internal state is fully recursive
+            // (each sample depends on the last), so a single NaN/Inf sample -- from
+            // any transient instability -- would otherwise poison every future
+            // sample forever, even with resonance/cutoff back in normal range.
+            if (!std::isfinite(ic1eq_L) || !std::isfinite(ic2eq_L)) { ic1eq_L = 0.0f; ic2eq_L = 0.0f; }
+            if (!std::isfinite(ic1eq_R) || !std::isfinite(ic2eq_R)) { ic1eq_R = 0.0f; ic2eq_R = 0.0f; }
+            if (!std::isfinite(outL)) outL = 0.0f;
+            if (!std::isfinite(outR)) outR = 0.0f;
+        }
+    } mainFilter;
+
+    /**
+     * Circular-Buffer Pitch-Shifter (+1 Octave) for Shimmer Reverb Feedback Loop
+     * (Per-instance member -- see StereoSVF note above.)
+     */
+    struct ShimmerPitchShifter {
+        float buffer[4096] = {0.0f};
+        int writePtr = 0;
+        float readPtr1 = 0.0f;
+        float readPtr2 = 2048.0f;
+
+        float process(float sample) {
+            if (!std::isfinite(sample)) sample = 0.0f;
+            buffer[writePtr] = sample;
+
+            readPtr1 += 2.0f;
+            readPtr2 += 2.0f;
+
+            if (readPtr1 >= 4096.0f) readPtr1 -= 4096.0f;
+            if (readPtr2 >= 4096.0f) readPtr2 -= 4096.0f;
+
+            int idx1 = (int)readPtr1;
+            float frac1 = readPtr1 - idx1;
+            float out1 = (1.0f - frac1) * buffer[idx1] + frac1 * buffer[(idx1 + 1) % 4096];
+
+            int idx2 = (int)readPtr2;
+            float frac2 = readPtr2 - idx2;
+            float out2 = (1.0f - frac2) * buffer[idx2] + frac2 * buffer[(idx2 + 1) % 4096];
+
+            float fade = std::abs(2048.0f - (float)writePtr) / 2048.0f;
+            float shiftedOutput = out1 * fade + out2 * (1.0f - fade);
+
+            writePtr = (writePtr + 1) % 4096;
+
+            return std::isfinite(shiftedOutput) ? shiftedOutput : 0.0f;
+        }
+    } shimmerShiftL, shimmerShiftR;
 
     Soundscapes();
     void process(const ProcessArgs& args) override;

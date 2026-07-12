@@ -3,82 +3,7 @@
 #include <algorithm>
 
 /**
- * 1. Andrew Simper/Trapezoidal Linear State-Variable Filter (SVF)
- */
-struct StereoSVF {
-    float ic1eq_L = 0.0f, ic2eq_L = 0.0f;
-    float ic1eq_R = 0.0f, ic2eq_R = 0.0f;
-
-    void process(float inputL, float inputR, float cutoffHz, float resonance, float sampleRate, float& outL, float& outR) {
-        cutoffHz = math::clamp(cutoffHz, 20.0f, 18000.0f);
-        resonance = math::clamp(resonance, 0.01f, 0.99f);
-        float q = 1.0f / (2.0f * (1.0f - resonance)); // Q-factor mapping
-
-        float g = std::tan(M_PI * cutoffHz / sampleRate);
-        float k = 1.0f / q;
-        float a1 = 1.0f / (1.0f + g * (g + k));
-        float a2 = g * a1;
-
-        // Left Channel Filtering
-        float v3_L = inputL - ic2eq_L;
-        float v1_L = a1 * ic1eq_L + a2 * v3_L;
-        float v2_L = ic2eq_L + g * v1_L;
-        ic1eq_L = 2.0f * v1_L - ic1eq_L;
-        ic2eq_L = 2.0f * v2_L - ic2eq_L;
-        outL = v2_L; // Lowpass output
-
-        // Right Channel Filtering
-        float v3_R = inputR - ic2eq_R;
-        float v1_R = a1 * ic1eq_R + a2 * v3_R;
-        float v2_R = ic2eq_R + g * v1_R;
-        ic1eq_R = 2.0f * v1_R - ic1eq_R;
-        ic2eq_R = 2.0f * v2_R - ic2eq_R;
-        outR = v2_R; // Lowpass output
-    }
-};
-
-static StereoSVF mainFilter;
-
-/**
- * 2. Circular-Buffer Pitch-Shifter (+1 Octave) for Shimmer Reverb Feedback Loop
- */
-struct ShimmerPitchShifter {
-    float buffer[4096] = {0.0f};
-    int writePtr = 0;
-    float readPtr1 = 0.0f;
-    float readPtr2 = 2048.0f;
-
-    float process(float sample) {
-        buffer[writePtr] = sample;
-
-        readPtr1 += 2.0f;
-        readPtr2 += 2.0f;
-
-        if (readPtr1 >= 4096.0f) readPtr1 -= 4096.0f;
-        if (readPtr2 >= 4096.0f) readPtr2 -= 4096.0f;
-
-        int idx1 = (int)readPtr1;
-        float frac1 = readPtr1 - idx1;
-        float out1 = (1.0f - frac1) * buffer[idx1] + frac1 * buffer[(idx1 + 1) % 4096];
-
-        int idx2 = (int)readPtr2;
-        float frac2 = readPtr2 - idx2;
-        float out2 = (1.0f - frac2) * buffer[idx2] + frac2 * buffer[(idx2 + 1) % 4096];
-
-        float fade = std::abs(2048.0f - (float)writePtr) / 2048.0f;
-        float shiftedOutput = out1 * fade + out2 * (1.0f - fade);
-
-        writePtr = (writePtr + 1) % 4096;
-
-        return shiftedOutput;
-    }
-};
-
-static ShimmerPitchShifter shimmerShiftL;
-static ShimmerPitchShifter shimmerShiftR;
-
-/**
- * 3. Master Consolidated Process Loop
+ * Master Consolidated Process Loop
  */
 void Soundscapes::process(const ProcessArgs& args) {
     // A. Tick Sequencer Step clocks & handle focused fader locks
@@ -171,8 +96,12 @@ void Soundscapes::process(const ProcessArgs& args) {
     delaySamps = math::clamp(delaySamps, 10, 47900);
 
     // Write to circular delay buffer
-    fxUnit.delayBufferL[fxUnit.delayPtr] = inputBusL + (fxUnit.delayBufferR[(fxUnit.delayPtr - delaySamps + 48000) % 48000] * fbackVal);
-    fxUnit.delayBufferR[fxUnit.delayPtr] = inputBusR + (fxUnit.delayBufferL[(fxUnit.delayPtr - delaySamps + 48000) % 48000] * fbackVal);
+    float delayWriteL = inputBusL + (fxUnit.delayBufferR[(fxUnit.delayPtr - delaySamps + 48000) % 48000] * fbackVal);
+    float delayWriteR = inputBusR + (fxUnit.delayBufferL[(fxUnit.delayPtr - delaySamps + 48000) % 48000] * fbackVal);
+    // Defensive: this buffer feeds back into itself every sample, so a single
+    // NaN/Inf value would otherwise persist and poison the delay forever.
+    fxUnit.delayBufferL[fxUnit.delayPtr] = std::isfinite(delayWriteL) ? delayWriteL : 0.0f;
+    fxUnit.delayBufferR[fxUnit.delayPtr] = std::isfinite(delayWriteR) ? delayWriteR : 0.0f;
 
     float delayOutL = fxUnit.delayBufferL[(fxUnit.delayPtr - delaySamps + 48000) % 48000];
     float delayOutR = fxUnit.delayBufferR[(fxUnit.delayPtr - delaySamps + 48000) % 48000];
@@ -201,7 +130,8 @@ void Soundscapes::process(const ProcessArgs& args) {
     float revR = revInputR + feedbackSampleR;
 
     // Store mono damp accumulator
-    fxUnit.reverbState = (revL + revR) * 0.5f;
+    float newReverbState = (revL + revR) * 0.5f;
+    fxUnit.reverbState = std::isfinite(newReverbState) ? newReverbState : 0.0f;
 
     // --- PROCESSOR 3: STATE-VARIABLE FILTER (SVF) ---
     float filterSendVal = params[FILTER_PARAM].getValue();
@@ -228,6 +158,8 @@ void Soundscapes::process(const ProcessArgs& args) {
 
             float finalOutL = drySignal + (wetL * panL * 5.0f);
             float finalOutR = drySignal + (wetR * panR * 5.0f);
+            if (!std::isfinite(finalOutL)) finalOutL = drySignal;
+            if (!std::isfinite(finalOutR)) finalOutR = drySignal;
 
             // Left output (CH 1–4) / Right output (CH 5–8) separation
             if (i < 4) {
