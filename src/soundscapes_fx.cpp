@@ -18,8 +18,8 @@ void Soundscapes::process(const ProcessArgs& args) {
     }
 
     // C. Monitor fader movements to display active percentages (00 - 99)
-    for (int i = 0; i < 8; i++) {
-        static float prevFaderVal[8] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+    for (int i = 0; i < 6; i++) {
+        static float prevFaderVal[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
         float currVal = params[FADER1_PARAM + i].getValue();
         if (prevFaderVal[i] >= 0.0f && fabs(currVal - prevFaderVal[i]) > 0.001f) {
             displayValueTimer[i] = 1.5f;
@@ -75,9 +75,9 @@ void Soundscapes::process(const ProcessArgs& args) {
     float inputBusR = 0.0f;
 
     // Accumulate stereo audio signals from active voice channel outputs
-    for (int i = 0; i < 8; i++) {
-        float panL = 1.0f - ((float)i / 7.0f);
-        float panR = (float)i / 7.0f;
+    for (int i = 0; i < 6; i++) {
+        float panL = 1.0f - ((float)i / 5.0f);
+        float panR = (float)i / 5.0f;
 
         // Retrieve raw synthesized voice signals directly
         float drySignal = outputs[CH1_OUTPUT + i].getVoltage() / 5.0f; 
@@ -149,24 +149,45 @@ void Soundscapes::process(const ProcessArgs& args) {
     float wetR = (delayOutR * delaySendVal) + (revR * reverbSendVal) + (filteredOutR * filterSendVal);
 
     // Write final stereo master bus outputs
-    for (int i = 0; i < 8; i++) {
+    float masterSumL = 0.0f;
+    float masterSumR = 0.0f;
+
+    for (int i = 0; i < 6; i++) {
         if (outputs[CH1_OUTPUT + i].isConnected()) {
             float drySignal = outputs[CH1_OUTPUT + i].getVoltage();
             
-            float panL = 1.0f - ((float)i / 7.0f);
-            float panR = (float)i / 7.0f;
+            float panL = 1.0f - ((float)i / 5.0f);
+            float panR = (float)i / 5.0f;
 
             float finalOutL = drySignal + (wetL * panL * 5.0f);
             float finalOutR = drySignal + (wetR * panR * 5.0f);
             if (!std::isfinite(finalOutL)) finalOutL = drySignal;
             if (!std::isfinite(finalOutR)) finalOutR = drySignal;
 
-            // Left output (CH 1–4) / Right output (CH 5–8) separation
-            if (i < 4) {
+            // Left output (CH 1-3) / Right output (CH 4-6) separation
+            if (i < 3) {
                 outputs[CH1_OUTPUT + i].setVoltage(finalOutL);
             } else {
                 outputs[CH1_OUTPUT + i].setVoltage(finalOutR);
             }
+
+            // Accumulate into the dedicated master sum -- divided by 3 (not 6) for
+            // headroom: most patches won't have all 6 voices hitting full amplitude
+            // simultaneously, so this keeps typical mixes well clear of 10V while
+            // still sounding reasonably loud rather than overly conservative.
+            masterSumL += finalOutL;
+            masterSumR += finalOutR;
         }
     }
+
+    if (outputs[MASTER_L_OUTPUT].isConnected()) {
+        float masterOutL = masterSumL / 3.0f;
+        outputs[MASTER_L_OUTPUT].setVoltage(std::isfinite(masterOutL) ? masterOutL : 0.0f);
+    }
+    if (outputs[MASTER_R_OUTPUT].isConnected()) {
+        float masterOutR = masterSumR / 3.0f;
+        outputs[MASTER_R_OUTPUT].setVoltage(std::isfinite(masterOutR) ? masterOutR : 0.0f);
+    }
+    lights[MASTER_L_LED].setBrightness(math::clamp(std::fabs(masterSumL) / 15.0f, 0.0f, 1.0f));
+    lights[MASTER_R_LED].setBrightness(math::clamp(std::fabs(masterSumR) / 15.0f, 0.0f, 1.0f));
 }

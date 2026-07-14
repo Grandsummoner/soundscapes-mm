@@ -69,7 +69,7 @@ struct OpaqueDisplay : Widget {
     void onButton(const event::Button& e) override {
         Widget::onButton(e);
         if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
-            if (module) {
+            if (module && channelId < 6) {
                 module->handleFocusToggle(channelId);
             }
             e.consume(this);
@@ -108,15 +108,18 @@ struct OpaqueDisplay : Widget {
 
             char text[16];
 
-            // 1. Detect fader edits for this channel at the 60Hz UI rate
-            float currFader = module->params[Soundscapes::FADER1_PARAM + channelId].getValue();
-            static float lastFader[8] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
-            if (lastFader[channelId] >= 0.0f && fabs(currFader - lastFader[channelId]) > 0.001f) {
-                module->displayValueTimer[channelId] = 1.5f;
-                module->displayValue[channelId] = currFader;
-                module->displayType[channelId] = 0;
+            // 1. Detect fader edits for this channel at the 60Hz UI rate (channelId 6/7
+            // are the master L/R display slots, which have no fader of their own)
+            if (channelId < 6) {
+                float currFader = module->params[Soundscapes::FADER1_PARAM + channelId].getValue();
+                static float lastFader[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+                if (lastFader[channelId] >= 0.0f && fabs(currFader - lastFader[channelId]) > 0.001f) {
+                    module->displayValueTimer[channelId] = 1.5f;
+                    module->displayValue[channelId] = currFader;
+                    module->displayType[channelId] = 0;
+                }
+                lastFader[channelId] = currFader;
             }
-            lastFader[channelId] = currFader;
 
             // 2. Detect global knob edits (RATE to DYNAMICS) -- spell the knob's current
             // function name across all 8 displays (one character each) so its role is
@@ -199,7 +202,13 @@ struct OpaqueDisplay : Widget {
                     snprintf(text, sizeof(text), "%02d", pct);
                 }
             } else {
-                snprintf(text, sizeof(text), "%d", channelId + 1);
+                if (channelId == 6) {
+                    snprintf(text, sizeof(text), "L");
+                } else if (channelId == 7) {
+                    snprintf(text, sizeof(text), "R");
+                } else {
+                    snprintf(text, sizeof(text), "%d", channelId + 1);
+                }
             }
             nvgTextBold(args.vg, box.size.x / 2.0f, box.size.y / 2.0f + 1.5f, text, NULL);
         }
@@ -210,7 +219,7 @@ struct OpaqueDisplay : Widget {
  * 2. Procedural Step Sequencer Pad Widget
  */
 struct StepPadWidget : app::SvgSwitch {
-    int padId = 0; // Range 0 - 15
+    int padId = 0; // Range 0 - 11
 
     StepPadWidget() {
         momentary = false;
@@ -219,27 +228,61 @@ struct StepPadWidget : app::SvgSwitch {
 
     void onButton(const event::Button& e) override {
         Soundscapes* mod = dynamic_cast<Soundscapes*>(this->module);
-        if (mod && e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT
-            && !mod->chordModeActive && mod->shiftActive && mod->focusedChannel != -1) {
-            // SHFT+click while a channel is focused reassigns this step's target
-            // channel instead of toggling it -- decouples timing position from which
-            // harmonic role it plays. A normal click still just toggles active/inactive.
-            bool isChord = (padId >= 8);
-            int stepIndex = isChord ? (padId - 8) : padId;
+        if (mod && e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT && !mod->chordModeActive) {
+            bool isChord = (padId >= 6);
+            int stepIndex = isChord ? (padId - 6) : padId;
             SequencerTrack& track = isChord ? mod->chordTrack : mod->melodyTrack;
-            track.steps[stepIndex].targetChannel = (int8_t)mod->focusedChannel;
 
-            // Flash a confirmation across the 7-segment displays, e.g. "M3->C5"
-            char buf[9];
-            snprintf(buf, sizeof(buf), "%c%d-C%d", isChord ? 'C' : 'M', stepIndex + 1, mod->focusedChannel + 1);
-            snprintf(mod->macroFunctionText, sizeof(mod->macroFunctionText), "%s", buf);
-            mod->macroFunctionActive = true;
-            for (int c = 0; c < 8; c++) {
-                mod->displayValueTimer[c] = 1.5f;
-                mod->displayType[c] = 4;
+            if (mod->noteModeActive) {
+                // NOTE mode: cycle this step's own melodic override up one scale degree
+                // each click (0-13, two octaves), then clear back to "use the channel's
+                // fixed harmonic role" on wrap -- lets a step carry real melodic movement
+                // independent of whatever channel it happens to target.
+                StepData& step = track.steps[stepIndex];
+                if (!step.noteOverride) {
+                    step.noteOverride = true;
+                    step.noteDegreeOffset = 0;
+                } else if (step.noteDegreeOffset < 13) {
+                    step.noteDegreeOffset++;
+                } else {
+                    step.noteOverride = false;
+                    step.noteDegreeOffset = 0;
+                }
+
+                char buf[9];
+                if (step.noteOverride) {
+                    snprintf(buf, sizeof(buf), "%c%d:DG%d", isChord ? 'C' : 'M', stepIndex + 1, step.noteDegreeOffset);
+                } else {
+                    snprintf(buf, sizeof(buf), "%c%dCLEAR", isChord ? 'C' : 'M', stepIndex + 1);
+                }
+                snprintf(mod->macroFunctionText, sizeof(mod->macroFunctionText), "%s", buf);
+                mod->macroFunctionActive = step.noteOverride;
+                for (int c = 0; c < 8; c++) {
+                    mod->displayValueTimer[c] = 1.5f;
+                    mod->displayType[c] = 4;
+                }
+                e.consume(this);
+                return;
             }
-            e.consume(this);
-            return;
+
+            if (mod->shiftActive && mod->focusedChannel != -1) {
+                // SHFT+click while a channel is focused reassigns this step's target
+                // channel instead of toggling it -- decouples timing position from which
+                // harmonic role it plays. A normal click still just toggles active/inactive.
+                track.steps[stepIndex].targetChannel = (int8_t)mod->focusedChannel;
+
+                // Flash a confirmation across the 7-segment displays, e.g. "M3->C5"
+                char buf[9];
+                snprintf(buf, sizeof(buf), "%c%d-C%d", isChord ? 'C' : 'M', stepIndex + 1, mod->focusedChannel + 1);
+                snprintf(mod->macroFunctionText, sizeof(mod->macroFunctionText), "%s", buf);
+                mod->macroFunctionActive = true;
+                for (int c = 0; c < 8; c++) {
+                    mod->displayValueTimer[c] = 1.5f;
+                    mod->displayType[c] = 4;
+                }
+                e.consume(this);
+                return;
+            }
         }
         SvgSwitch::onButton(e);
     }
@@ -250,11 +293,11 @@ struct StepPadWidget : app::SvgSwitch {
         bool isPlayhead = false;
 
         if (module) {
-            if (padId < 8) {
+            if (padId < 6) {
                 stepActive = module->params[Soundscapes::STEP_PARAM_START + padId].getValue() > 0.5f;
                 isPlayhead = (module->melodyTrack.playhead == padId) && module->isPlaying;
             } else {
-                int chordStep = padId - 8;
+                int chordStep = padId - 6;
                 stepActive = module->params[Soundscapes::STEP_PARAM_START + padId].getValue() > 0.5f;
                 isPlayhead = (module->chordTrack.playhead == chordStep) && module->isPlaying;
             }
@@ -291,16 +334,24 @@ struct StepPadWidget : app::SvgSwitch {
         nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
 
-        // Small dark dot in the corner marks a step whose target channel has been
-        // reassigned away from its own index (timing decoupled from harmonic role).
+        // Small dark dot in the top-right corner marks a step whose target channel has
+        // been reassigned away from its own index (timing decoupled from harmonic role).
         if (module && !module->chordModeActive) {
-            bool isChord = (padId >= 8);
-            int stepIndex = isChord ? (padId - 8) : padId;
+            bool isChord = (padId >= 6);
+            int stepIndex = isChord ? (padId - 6) : padId;
             const SequencerTrack& track = isChord ? module->chordTrack : module->melodyTrack;
             if (track.steps[stepIndex].targetChannel != stepIndex) {
                 nvgBeginPath(args.vg);
                 nvgCircle(args.vg, box.size.x - 4.0f, 4.0f, 2.0f);
                 nvgFillColor(args.vg, nvgRGBA(0x2b, 0x28, 0x24, 0xff));
+                nvgFill(args.vg);
+            }
+            // Small colored dot in the bottom-left corner marks a step carrying its own
+            // melodic override (plays its own note instead of the target channel's role).
+            if (track.steps[stepIndex].noteOverride) {
+                nvgBeginPath(args.vg);
+                nvgCircle(args.vg, 4.0f, box.size.y - 4.0f, 2.0f);
+                nvgFillColor(args.vg, nvgRGBA(0x34, 0x98, 0xdb, 0xff)); // Blue
                 nvgFill(args.vg);
             }
         }
@@ -362,9 +413,9 @@ struct PerformanceButtonWidget : SoundscapesButton {
     }
 
     void onButton(const event::Button& e) override {
-        // PLAY(0), SHFT(1), ARP(2), FRZ(3), and CHRD(4) are latching mode switches;
-        // the rest are momentary.
-        momentary = (buttonId != 0 && buttonId != 1 && buttonId != 2 && buttonId != 3 && buttonId != 4);
+        // PLAY(0), SHFT(1), ARP(2), FRZ(3), CHRD(4), and PROB(5) are latching mode
+        // switches; the rest are momentary.
+        momentary = (buttonId != 0 && buttonId != 1 && buttonId != 2 && buttonId != 3 && buttonId != 4 && buttonId != 5);
         SoundscapesButton::onButton(e);
     }
 
@@ -378,6 +429,7 @@ struct PerformanceButtonWidget : SoundscapesButton {
             if (buttonId == 2) litState = module->arpActive;       // ARP Button
             if (buttonId == 3) litState = module->freezeActive;    // FRZ Button
             if (buttonId == 4) litState = module->chordModeActive; // CHRD Button (STEP <-> CHRD mode)
+            if (buttonId == 5) litState = module->noteModeActive;  // PROB Button (PROB <-> NOTE mode)
         }
 
         // Soft shadow
@@ -393,9 +445,9 @@ struct PerformanceButtonWidget : SoundscapesButton {
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.0f;
         if (litState || value > 0.5f) {
             // Two colors only: green for persistent mode/state toggles (PLAY, SHFT,
-            // ARP, FRZ, CHRD), amber for momentary one-shot actions (PROB, SAVE, RCL).
+            // ARP, FRZ, CHRD, PROB), amber for momentary one-shot actions (SAVE, RCL).
             // Color variety is reserved for the FX section instead.
-            bool isStateToggle = (buttonId <= 4);
+            bool isStateToggle = (buttonId <= 5);
             if (isStateToggle) {
                 nvgFillColor(args.vg, nvgRGBA(0x2e, 0xcc, 0x71, 0xff)); // Green
             } else {
@@ -427,6 +479,8 @@ struct PerformanceButtonWidget : SoundscapesButton {
             const char* labelText = labels[buttonId];
             if (buttonId == 4) {
                 labelText = (litState || value > 0.5f) ? "CHRD" : "STEP";
+            } else if (buttonId == 5) {
+                labelText = (litState || value > 0.5f) ? "NOTE" : "PROB";
             }
             nvgTextBold(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, labelText, NULL);
         }
@@ -732,7 +786,7 @@ struct FaceplateLabels : Widget {
             // B. Draw Module Slogan
             nvgFontSize(args.vg, 7.0f);
             nvgFillColor(args.vg, nvgRGBA(0x6d, 0x65, 0x58, 0xff)); // Cream-charcoal
-            nvgTextBold(args.vg, 232.5f, 36.0f, "8-Channel Poly-Engine", NULL);
+            nvgTextBold(args.vg, 232.5f, 36.0f, "6-Channel Poly-Engine", NULL);
 
             // C. Sidebar Labels (CLK, RST, etc.)
             const char* sidebarLabels[7] = {"CLK", "RST", "V/OCT", "GATE", "VEL", "EXT IN", "DUCK"};
@@ -746,16 +800,21 @@ struct FaceplateLabels : Widget {
             }
             nvgFillColor(args.vg, nvgRGBA(0x5c, 0x53, 0x46, 0xff)); // Reset to standard charcoal
 
-            // D. Output Jack Column Numbers (1 to 8)
-            for (int i = 0; i < 8; i++) {
+            // D. Output Jack Column Numbers (1 to 6), then L/R for the master outs
+            for (int i = 0; i < 6; i++) {
                 float x = SoundscapesCoords::CH_COLS[i];
                 nvgFontSize(args.vg, 7.0f);
                 nvgTextBold(args.vg, x, SoundscapesCoords::ROW1_JACK_Y + 16.0f, std::to_string(i + 1).c_str(), NULL);
                 nvgTextBold(args.vg, x, SoundscapesCoords::ROW1_DISPLAY_Y + 28.0f, std::to_string(i + 1).c_str(), NULL);
             }
+            nvgFontSize(args.vg, 7.0f);
+            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[6], SoundscapesCoords::ROW1_JACK_Y + 16.0f, "L", NULL);
+            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[6], SoundscapesCoords::ROW1_DISPLAY_Y + 28.0f, "L", NULL);
+            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[7], SoundscapesCoords::ROW1_JACK_Y + 16.0f, "R", NULL);
+            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[7], SoundscapesCoords::ROW1_DISPLAY_Y + 28.0f, "R", NULL);
 
-            // E. Fader Numbers (1 to 8)
-            for (int i = 0; i < 8; i++) {
+            // E. Fader Numbers (1 to 6)
+            for (int i = 0; i < 6; i++) {
                 float x = SoundscapesCoords::GRID_COLS[i];
                 nvgFontSize(args.vg, 7.0f);
                 nvgTextBold(args.vg, x, SoundscapesCoords::ROW3_FADER_Y + 34.0f, std::to_string(i + 1).c_str(), NULL);
@@ -775,10 +834,10 @@ struct FaceplateLabels : Widget {
 
             // H. Melody & Chord Labels
             nvgFontSize(args.vg, 6.5f);
-            for (int i = 0; i < 8; i++) {
+            for (int i = 0; i < 6; i++) {
                 float x = SoundscapesCoords::GRID_COLS[i];
                 nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_MELODY_PAD_Y + 18.0f, std::to_string(i + 1).c_str(), NULL);
-                nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_CHORD_PAD_Y + 18.0f, std::to_string(i + 9).c_str(), NULL);
+                nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_CHORD_PAD_Y + 18.0f, std::to_string(i + 7).c_str(), NULL);
             }
 
             // Section Labels
@@ -811,10 +870,11 @@ struct SoundscapesWidget : ModuleWidget {
         }
 
         // --- II. Row 1: Outputs, LED Indicators, & Opaque Displays ---
-        for (int i = 0; i < 8; i++) {
+        // 6 synth-voice channels (unchanged style/position)
+        for (int i = 0; i < 6; i++) {
             float x = SoundscapesCoords::CH_COLS[i];
-            addOutput(createOutputCentered<PJ301MPort>(Vec(x, SoundscapesCoords::ROW1_JACK_Y), module, i));
-            addChild(createLightCentered<MediumLight<GreenLight>>(Vec(x, SoundscapesCoords::ROW1_LED_Y), module, i));
+            addOutput(createOutputCentered<PJ301MPort>(Vec(x, SoundscapesCoords::ROW1_JACK_Y), module, Soundscapes::CH1_OUTPUT + i));
+            addChild(createLightCentered<MediumLight<GreenLight>>(Vec(x, SoundscapesCoords::ROW1_LED_Y), module, Soundscapes::CH1_LED + i));
 
             // Custom Display overlays
             OpaqueDisplay* display = new OpaqueDisplay();
@@ -823,6 +883,30 @@ struct SoundscapesWidget : ModuleWidget {
             display->module = module;
             display->channelId = i;
             addChild(display);
+        }
+
+        // MASTER L/R stereo sum, occupying the jack positions that used to be
+        // channels 7/8 -- no panel repositioning needed, just a different function.
+        addOutput(createOutputCentered<PJ301MPort>(Vec(SoundscapesCoords::CH_COLS[6], SoundscapesCoords::ROW1_JACK_Y), module, Soundscapes::MASTER_L_OUTPUT));
+        addChild(createLightCentered<MediumLight<GreenLight>>(Vec(SoundscapesCoords::CH_COLS[6], SoundscapesCoords::ROW1_LED_Y), module, Soundscapes::MASTER_L_LED));
+
+        addOutput(createOutputCentered<PJ301MPort>(Vec(SoundscapesCoords::CH_COLS[7], SoundscapesCoords::ROW1_JACK_Y), module, Soundscapes::MASTER_R_OUTPUT));
+        addChild(createLightCentered<MediumLight<GreenLight>>(Vec(SoundscapesCoords::CH_COLS[7], SoundscapesCoords::ROW1_LED_Y), module, Soundscapes::MASTER_R_LED));
+
+        {
+            OpaqueDisplay* masterLDisplay = new OpaqueDisplay();
+            masterLDisplay->box.pos = Vec(SoundscapesCoords::CH_COLS[6] - 14.0f, SoundscapesCoords::ROW1_DISPLAY_Y - 20.0f);
+            masterLDisplay->box.size = Vec(28.0f, 40.0f);
+            masterLDisplay->module = module;
+            masterLDisplay->channelId = 6; // 6/7 are the master L/R display slots
+            addChild(masterLDisplay);
+
+            OpaqueDisplay* masterRDisplay = new OpaqueDisplay();
+            masterRDisplay->box.pos = Vec(SoundscapesCoords::CH_COLS[7] - 14.0f, SoundscapesCoords::ROW1_DISPLAY_Y - 20.0f);
+            masterRDisplay->box.size = Vec(28.0f, 40.0f);
+            masterRDisplay->module = module;
+            masterRDisplay->channelId = 7;
+            addChild(masterRDisplay);
         }
 
         // --- III. Row 2: Centralized Synth Deck (Using discrete 3-way switch) ---
@@ -851,8 +935,8 @@ struct SoundscapesWidget : ModuleWidget {
         }
 
         // --- IV. Row 3: Mixer Faders & Diagonal Quantizer Knobs ---
-        // 8 Volume/Send Faders centered over track positions
-        for (int i = 0; i < 8; i++) {
+        // 6 Volume/Send Faders centered over track positions
+        for (int i = 0; i < 6; i++) {
             float x = SoundscapesCoords::GRID_COLS[i];
             addParam(createParamCentered<SoundscapesFader>(Vec(x, SoundscapesCoords::ROW3_FADER_Y), module, Soundscapes::FADER1_PARAM + i));
         }
@@ -862,8 +946,8 @@ struct SoundscapesWidget : ModuleWidget {
         addParam(createParamCentered<SoundscapesSmallKnob>(Vec(SoundscapesCoords::GRID_COLS[9], SoundscapesCoords::SCALE_Y), module, Soundscapes::SCALE_PARAM));
 
         // --- V. Row 4: Step Sequencer Pads & Performance Block ---
-        // 16 Step Pad triggers (Columns 1–8)
-        for (int i = 0; i < 8; i++) {
+        // 12 Step Pad triggers (Columns 1-6): 6 melody + 6 chord
+        for (int i = 0; i < 6; i++) {
             float x = SoundscapesCoords::GRID_COLS[i];
             
             // Melody step button (Row 1)
@@ -872,8 +956,8 @@ struct SoundscapesWidget : ModuleWidget {
             addParam(melPad);
 
             // Chord step button (Row 2)
-            StepPadWidget* chdPad = createParamCentered<StepPadWidget>(Vec(x, SoundscapesCoords::ROW4_CHORD_PAD_Y), module, Soundscapes::STEP_PARAM_START + 8 + i);
-            chdPad->padId = 8 + i;
+            StepPadWidget* chdPad = createParamCentered<StepPadWidget>(Vec(x, SoundscapesCoords::ROW4_CHORD_PAD_Y), module, Soundscapes::STEP_PARAM_START + 6 + i);
+            chdPad->padId = 6 + i;
             addParam(chdPad);
         }
 

@@ -11,7 +11,7 @@ static dsp::SchmittTrigger rclClickTrigger;
  * Initialise default sequencer sequences
  */
 void Soundscapes::initializeSequence() {
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 6; i++) {
         melodyTrack.steps[i].note = i; // Diatonic step offsets
         melodyTrack.steps[i].velocity = 100;
         melodyTrack.steps[i].probability = 100;
@@ -94,7 +94,7 @@ void Soundscapes::handleFaderMapping() {
 
     if (focusedChannel == -1) {
         // --- GLOBAL MIXER MODE ---
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 6; i++) {
             float faderVal = params[FADER1_PARAM + i].getValue();
             if (activeFaderState == FADER_MIXER) {
                 channelVolumes[i] = faderVal * faderVal; // Exponential taper: finer low-end control
@@ -105,7 +105,7 @@ void Soundscapes::handleFaderMapping() {
         }
     } else {
         // --- CHANNEL FOCUS MODE ---
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 6; i++) {
             if (i != focusedChannel) {
                 continue;
             }
@@ -151,7 +151,7 @@ void Soundscapes::processSequencer(float sampleTime) {
         }
     }
 
-    // 3. CHRD Mode: latching toggle that repurposes the 16 step pads as a radio-select
+    // 3. CHRD Mode: latching toggle that repurposes the 12 step pads as a radio-select
     // option menu, mutually exclusive with normal step editing so users can't edit the
     // pattern and browse CHRD options at the same time.
     bool chordModeWasActive = chordModeActive;
@@ -161,7 +161,7 @@ void Soundscapes::processSequencer(float sampleTime) {
         // Just entered CHRD mode. Preserve the old SHFT+CHRD "clear focused pattern"
         // gesture as a one-shot action on the same edge that opens CHRD mode.
         if (shiftActive && focusedChannel != -1) {
-            for (int i = 0; i < 8; i++) {
+            for (int i = 0; i < 6; i++) {
                 melodyTrack.steps[i].active = false;
                 chordTrack.steps[i].active = false;
             }
@@ -169,7 +169,7 @@ void Soundscapes::processSequencer(float sampleTime) {
         // The step pattern itself lives in melodyTrack/chordTrack .active (already
         // captured above/before this frame), so it's safe to repurpose the raw pads
         // as option-select buttons without losing anything.
-        for (int i = 0; i < 16; i++) {
+        for (int i = 0; i < 12; i++) {
             params[STEP_PARAM_START + i].setValue(0.0f);
         }
         if (chordModeOption >= 0) {
@@ -177,19 +177,19 @@ void Soundscapes::processSequencer(float sampleTime) {
         }
     } else if (!chordModeActive && chordModeWasActive) {
         // Just left CHRD mode: restore the pads to reflect the real (frozen) pattern.
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 6; i++) {
             params[STEP_PARAM_START + i].setValue(melodyTrack.steps[i].active ? 1.0f : 0.0f);
-            params[STEP_PARAM_START + 8 + i].setValue(chordTrack.steps[i].active ? 1.0f : 0.0f);
+            params[STEP_PARAM_START + 6 + i].setValue(chordTrack.steps[i].active ? 1.0f : 0.0f);
         }
     }
 
     if (chordModeActive) {
-        // 16-slot radio-exclusive option selector (only one slot lit at a time).
-        // Slot 0 = Chromatic Pass-Through for the polyphonic V/OCT input; slots 1-15
+        // 12-slot radio-exclusive option selector (only one slot lit at a time).
+        // Slot 0 = Chromatic Pass-Through for the polyphonic V/OCT input; slots 1-11
         // are reserved for future CHRD-mode features.
-        static float prevOptVal[16] = {0.0f};
+        static float prevOptVal[12] = {0.0f};
         int newlyPressed = -1;
-        for (int i = 0; i < 16; i++) {
+        for (int i = 0; i < 12; i++) {
             float cur = params[STEP_PARAM_START + i].getValue();
             if (cur > 0.5f && prevOptVal[i] <= 0.5f) {
                 newlyPressed = i;
@@ -198,7 +198,7 @@ void Soundscapes::processSequencer(float sampleTime) {
         }
 
         if (newlyPressed != -1) {
-            for (int i = 0; i < 16; i++) {
+            for (int i = 0; i < 12; i++) {
                 if (i != newlyPressed) params[STEP_PARAM_START + i].setValue(0.0f);
             }
             chordModeOption = newlyPressed;
@@ -207,7 +207,7 @@ void Soundscapes::processSequencer(float sampleTime) {
             // (SoundscapesButton toggles latching buttons off on a second click) --
             // treat that as "no option selected."
             bool anySelected = false;
-            for (int i = 0; i < 16; i++) {
+            for (int i = 0; i < 12; i++) {
                 if (params[STEP_PARAM_START + i].getValue() > 0.5f) anySelected = true;
             }
             if (!anySelected) chordModeOption = -1;
@@ -215,9 +215,9 @@ void Soundscapes::processSequencer(float sampleTime) {
     } else {
         // Normal STEP mode: map active sequencer steps directly to the parameter
         // values to solve the double-click bug.
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 6; i++) {
             melodyTrack.steps[i].active = (params[STEP_PARAM_START + i].getValue() > 0.5f);
-            chordTrack.steps[i].active = (params[STEP_PARAM_START + 8 + i].getValue() > 0.5f);
+            chordTrack.steps[i].active = (params[STEP_PARAM_START + 6 + i].getValue() > 0.5f);
         }
     }
 
@@ -263,7 +263,7 @@ void Soundscapes::processSequencer(float sampleTime) {
             float densityVal = params[DENSITY_PARAM].getValue();
             globalDensityScale = 0.2f + densityVal * 1.6f;
         }
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 6; i++) {
             int melProb = (int)math::clamp(melodyTrack.steps[i].probability * globalDensityScale, 0.0f, 100.0f);
             int chdProb = (int)math::clamp(chordTrack.steps[i].probability * globalDensityScale, 0.0f, 100.0f);
             voiceTriggerActive[i] = ((rand() % 100) < melProb);
@@ -274,17 +274,17 @@ void Soundscapes::processSequencer(float sampleTime) {
     }
 
     if (nextStep && isPlaying) {
-        melodyTrack.playhead = (melodyTrack.playhead + 1) % 8;
-        chordTrack.playhead = (chordTrack.playhead + 1) % 8;
+        melodyTrack.playhead = (melodyTrack.playhead + 1) % 6;
+        chordTrack.playhead = (chordTrack.playhead + 1) % 6;
     }
 
     // Update LED step lights for visual tracker
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 6; i++) {
         bool isMelPlayhead = (melodyTrack.playhead == i) && isPlaying;
         lights[STEP_LED_START + i].setBrightness(isMelPlayhead ? 1.0f : (melodyTrack.steps[i].active ? 0.3f : 0.0f));
 
         bool isChdPlayhead = (chordTrack.playhead == i) && isPlaying;
-        lights[STEP_LED_START + 8 + i].setBrightness(isChdPlayhead ? 1.0f : (chordTrack.steps[i].active ? 0.3f : 0.0f));
+        lights[STEP_LED_START + 6 + i].setBrightness(isChdPlayhead ? 1.0f : (chordTrack.steps[i].active ? 0.3f : 0.0f));
     }
 
     lights[PLAY_LED].setBrightness(isPlaying ? 1.0f : 0.0f);
@@ -294,11 +294,13 @@ void Soundscapes::processSequencer(float sampleTime) {
     freezeActive = params[FRZ_PARAM].getValue() > 0.5f;
     lights[ARP_LED].setBrightness(arpActive ? 1.0f : 0.0f);
     lights[FRZ_LED].setBrightness(freezeActive ? 1.0f : 0.0f);
+    noteModeActive = params[PROB_PARAM].getValue() > 0.5f;
+    lights[PROB_LED].setBrightness(noteModeActive ? 1.0f : 0.0f);
 
     // SAVE: snapshot the full pattern (both tracks, all step data) into a single
     // scene buffer. RCL: restore it. Both are one-shot momentary presses.
     if (saveClickTrigger.process(params[SAVE_PARAM].getValue())) {
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 6; i++) {
             melodySceneBuffer[i] = melodyTrack.steps[i];
             chordSceneBuffer[i] = chordTrack.steps[i];
         }
@@ -313,7 +315,7 @@ void Soundscapes::processSequencer(float sampleTime) {
 
     if (rclClickTrigger.process(params[RCL_PARAM].getValue())) {
         if (sceneSaved) {
-            for (int i = 0; i < 8; i++) {
+            for (int i = 0; i < 6; i++) {
                 melodyTrack.steps[i] = melodySceneBuffer[i];
                 chordTrack.steps[i] = chordSceneBuffer[i];
                 // .active is normally mirrored FROM params every frame in STEP mode, so
@@ -323,7 +325,7 @@ void Soundscapes::processSequencer(float sampleTime) {
                 // existing CHRD-exit logic already restores pads from step data.
                 if (!chordModeActive) {
                     params[STEP_PARAM_START + i].setValue(melodyTrack.steps[i].active ? 1.0f : 0.0f);
-                    params[STEP_PARAM_START + 8 + i].setValue(chordTrack.steps[i].active ? 1.0f : 0.0f);
+                    params[STEP_PARAM_START + 6 + i].setValue(chordTrack.steps[i].active ? 1.0f : 0.0f);
                 }
             }
             snprintf(macroFunctionText, sizeof(macroFunctionText), "RECALLED");

@@ -16,10 +16,13 @@ Soundscapes::Soundscapes() {
     configInput(EXT_INPUT, "External Audio Carrier Input");
     configInput(DUCK_INPUT, "Sidechain Duck Envelope Follower CV");
 
-    // 3. Configure Row 1 Channel Output Sockets
-    for (int i = 0; i < 8; i++) {
+    // 3. Configure Row 1 Channel Output Sockets (6 synth voices + stereo master sum,
+    // occupying the physical jack positions that used to be channels 7/8)
+    for (int i = 0; i < 6; i++) {
         configOutput(CH1_OUTPUT + i, string::f("Channel %d Audio Output", i + 1));
     }
+    configOutput(MASTER_L_OUTPUT, "Master Mix Left Output");
+    configOutput(MASTER_R_OUTPUT, "Master Mix Right Output");
 
     // 4. Configure Row 2 Core Synth Parameters
     configParam(MODE_PARAM, 0.0f, 2.0f, 0.0f, "Synthesis Mode Select (Voices -> Waves -> Drone & Dust)");
@@ -36,14 +39,14 @@ Soundscapes::Soundscapes() {
     configParam(DYNAMICS_PARAM, 0.0f, 1.0f, 0.5f, "Macro 6: Attack Time / Filter Envelope / Reverb Decay");
 
     // 5. Configure Row 3 Mixer Faders & Center Quantizers
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 6; i++) {
         configParam(FADER1_PARAM + i, 0.0f, 1.0f, 0.8f, string::f("Channel %d Amplitude/Send Fader", i + 1));
     }
     configParam(ROOT_PARAM, 0.0f, 1.0f, 0.0f, "Diatonic Quantizer: Root Scale Transposition Note");
     configParam(SCALE_PARAM, 0.0f, 1.0f, 0.0f, "Diatonic Quantizer: Selected Harmonised Scale Degrees");
 
-    // 6. Configure Row 4 Step Buttons & Performance Block
-    for (int i = 0; i < 16; i++) {
+    // 6. Configure Row 4 Step Buttons & Performance Block (6 melody + 6 chord)
+    for (int i = 0; i < 12; i++) {
         configParam(STEP_PARAM_START + i, 0.0f, 1.0f, 0.0f, string::f("Step Pad %d Toggle Trigger", i + 1));
     }
 
@@ -57,7 +60,7 @@ Soundscapes::Soundscapes() {
     configParam(RCL_PARAM, 0.0f, 1.0f, 0.0f, "Recall Saved Pattern");
 
     // Clear and zero out voice buffers to guarantee clean startup
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 6; i++) {
         voices[i].writeIdx = 0;
         voices[i].phase = 0.0f;
         voices[i].env = 0.0f;

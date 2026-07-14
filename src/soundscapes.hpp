@@ -50,14 +50,18 @@ struct StepData {
     uint8_t velocity = 100;   // 0 - 127
     uint8_t probability = 100; // 0 - 100% trigger chance
     bool active = false;      // True if step is active
-    int8_t targetChannel = -1; // Which channel (0-7) this step triggers; -1 = "own index"
+    int8_t targetChannel = -1; // Which channel (0-5) this step triggers; -1 = "own index"
                                 // (set at construction to match the step's own index by
                                 // default, but reassignable via SHFT+click while a channel
                                 // is focused, decoupling timing position from harmonic role)
+    bool noteOverride = false;   // If true, this step plays its own scale degree instead
+    int8_t noteDegreeOffset = 0;  // of its target channel's fixed harmonic role -- lets a
+                                   // step carry real melodic movement (set via NOTE mode,
+                                   // the PROB button, cycling 0-13 then clearing on wrap)
 };
 
 struct SequencerTrack {
-    StepData steps[8];        // 8 contiguous steps
+    StepData steps[6];        // 6 contiguous steps
     int playhead = 0;         // Active playhead step
 };
 
@@ -91,7 +95,7 @@ struct Soundscapes : Module {
         SPREAD_PARAM,
         DYNAMICS_PARAM,
         FADER1_PARAM, FADER2_PARAM, FADER3_PARAM, FADER4_PARAM,
-        FADER5_PARAM, FADER6_PARAM, FADER7_PARAM, FADER8_PARAM,
+        FADER5_PARAM, FADER6_PARAM,
         ROOT_PARAM,
         SCALE_PARAM,
         PLAY_PARAM, SHFT_PARAM,
@@ -99,7 +103,7 @@ struct Soundscapes : Module {
         CHRD_PARAM, PROB_PARAM,
         SAVE_PARAM, RCL_PARAM,
         STEP_PARAM_START,
-        STEP_PARAM_END = STEP_PARAM_START + 16,
+        STEP_PARAM_END = STEP_PARAM_START + 12, // 6 melody + 6 chord
         NUM_PARAMS
     };
 
@@ -116,15 +120,20 @@ struct Soundscapes : Module {
 
     enum OutputId {
         CH1_OUTPUT, CH2_OUTPUT, CH3_OUTPUT, CH4_OUTPUT,
-        CH5_OUTPUT, CH6_OUTPUT, CH7_OUTPUT, CH8_OUTPUT,
+        CH5_OUTPUT, CH6_OUTPUT,
+        MASTER_L_OUTPUT, MASTER_R_OUTPUT, // Occupy the physical jack positions that used
+                                           // to be channels 7/8 -- 6 synth voices plus a
+                                           // dedicated stereo sum, no external mixer
+                                           // required for the "just give me the mix" case
         NUM_OUTPUTS
     };
 
     enum LightId {
         CLK_LED, RST_LED, VOCT_LED, GATE_LED, VEL_LED, EXT_LED, DUCK_LED,
-        CH1_LED, CH2_LED, CH3_LED, CH4_LED, CH5_LED, CH6_LED, CH7_LED, CH8_LED,
+        CH1_LED, CH2_LED, CH3_LED, CH4_LED, CH5_LED, CH6_LED,
+        MASTER_L_LED, MASTER_R_LED,
         STEP_LED_START,
-        STEP_LED_END = STEP_LED_START + 16,
+        STEP_LED_END = STEP_LED_START + 12, // 6 melody + 6 chord
         PLAY_LED, SHFT_LED, ARP_LED, FRZ_LED, CHRD_LED, PROB_LED, SAVE_LED, RCL_LED,
         NUM_LIGHTS
     };
@@ -135,8 +144,8 @@ struct Soundscapes : Module {
 
     // SAVE/RCL: single-slot pattern scene buffer. SAVE snapshots both tracks' full
     // step data (active/velocity/probability/targetChannel); RCL restores it.
-    StepData melodySceneBuffer[8];
-    StepData chordSceneBuffer[8];
+    StepData melodySceneBuffer[6];
+    StepData chordSceneBuffer[6];
     bool sceneSaved = false;
     
     int focusedChannel = -1;       // Range: -1 (Global Mixer) to 0-7 (Focus 1–8)
@@ -236,8 +245,13 @@ struct Soundscapes : Module {
     // option menu (mutually exclusive with normal step editing -- entering CHRD mode
     // freezes the step pattern rather than letting the two be edited simultaneously).
     bool chordModeActive = false;
-    int chordModeOption = -1;              // -1 = none selected, else 0-15
+    int chordModeOption = -1;              // -1 = none selected, else 0-11
     bool chromaticPassthroughEnabled = false; // CHRD mode slot 0: bypass quantizer on poly V/OCT
+
+    // NOTE mode (PROB button, latching): while active, clicking a step pad cycles
+    // that step's own melodic override (0-13 scale degrees, then clears back to
+    // "use the channel's fixed harmonic role" on wrap) instead of toggling it on/off.
+    bool noteModeActive = false;
 
     // Flashing display clock trackers for UI
     float flashTimer = 0.0f;
@@ -249,13 +263,13 @@ struct Soundscapes : Module {
     int displayType[8] = {};       // 0: Percentage, 1: Root Note, 2: Scale Type
 
     // Sequencer Timing & Probability tracking
-    bool voiceTriggerActive[8] = {};
-    bool chordTriggerActive[8] = {};
+    bool voiceTriggerActive[6] = {};
+    bool chordTriggerActive[6] = {};
     float stepTimeElapsed = 0.0f;  // Keeps track of physical elapsed step duration in seconds
 
     // DSP Processing Variables
-    float channelVolumes[8] = {0.8f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f};
-    float fxSends[4][8]; // [FM, Delay, Reverb, Filter] x [CH1-8]
+    float channelVolumes[6] = {0.8f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f};
+    float fxSends[4][6]; // [FM, Delay, Reverb, Filter] x [CH1-6]
     
     struct VoiceDSP {
         float phase = 0.0f;         // Carrier phase (Voices VA osc) / drone phase (Drone & Dust)
@@ -274,7 +288,7 @@ struct Soundscapes : Module {
         float subPhase = 0.0f;      // Sub-oscillator phase (bass anchor voice only)
         float svfLow = 0.0f;        // Per-voice resonant filter state (lowpass)
         float svfBand = 0.0f;       // Per-voice resonant filter state (bandpass)
-    } voices[8];
+    } voices[6];
 
     struct FXTank {
         float delayBufferL[48000] = {0.0f};
