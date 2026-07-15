@@ -115,13 +115,6 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
         bool useStepNoteOverride = false;
         int stepNoteOffset = 0;
 
-        // --- Determine trigger info FIRST -- pitch depends on which step (if any)
-        // fires this channel, since a step can carry its own melodic override.
-        bool voiceGate = false;
-        float triggerVelocityNorm = 1.0f; // Default: full velocity if nothing says otherwise
-        bool useStepNoteOverride = false;
-        int stepNoteOffset = 0;
-
         if (monoGateActive) {
             // Single mono gate: fire this channel along with every other one, together,
             // as a chord stab -- e.g. a keyboard's GATE OUT into GATE_INPUT plays the
