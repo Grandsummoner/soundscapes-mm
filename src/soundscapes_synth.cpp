@@ -329,10 +329,11 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             channelOutputSignal *= monoVelMod;
         }
 
-        // 3. Write pure audio straight to the output jacks!
-        if (outputs[CH1_OUTPUT + i].isConnected()) {
-            outputs[CH1_OUTPUT + i].setVoltage(channelOutputSignal * 5.0f); // 5V Eurorack peak-to-peak audio output
-        }
+        // 3. Write pure audio straight to the output jacks! Always write, even if
+        // this individual channel jack isn't patched -- the FX/master-bus stage
+        // reads this value back to build the Master L/R sum, which should work
+        // standalone without every individual channel also needing to be patched.
+        outputs[CH1_OUTPUT + i].setVoltage(channelOutputSignal * 5.0f); // 5V Eurorack peak-to-peak audio output
 
         lights[CH1_LED + i].setBrightness(voice.env);
     }

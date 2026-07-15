@@ -153,31 +153,34 @@ void Soundscapes::process(const ProcessArgs& args) {
     float masterSumR = 0.0f;
 
     for (int i = 0; i < 6; i++) {
+        float drySignal = outputs[CH1_OUTPUT + i].getVoltage();
+
+        float panL = 1.0f - ((float)i / 5.0f);
+        float panR = (float)i / 5.0f;
+
+        float finalOutL = drySignal + (wetL * panL * 5.0f);
+        float finalOutR = drySignal + (wetR * panR * 5.0f);
+        if (!std::isfinite(finalOutL)) finalOutL = drySignal;
+        if (!std::isfinite(finalOutR)) finalOutR = drySignal;
+
+        // Left output (CH 1-3) / Right output (CH 4-6) separation -- only writes
+        // back to this channel's own jack if it's actually patched.
         if (outputs[CH1_OUTPUT + i].isConnected()) {
-            float drySignal = outputs[CH1_OUTPUT + i].getVoltage();
-            
-            float panL = 1.0f - ((float)i / 5.0f);
-            float panR = (float)i / 5.0f;
-
-            float finalOutL = drySignal + (wetL * panL * 5.0f);
-            float finalOutR = drySignal + (wetR * panR * 5.0f);
-            if (!std::isfinite(finalOutL)) finalOutL = drySignal;
-            if (!std::isfinite(finalOutR)) finalOutR = drySignal;
-
-            // Left output (CH 1-3) / Right output (CH 4-6) separation
             if (i < 3) {
                 outputs[CH1_OUTPUT + i].setVoltage(finalOutL);
             } else {
                 outputs[CH1_OUTPUT + i].setVoltage(finalOutR);
             }
-
-            // Accumulate into the dedicated master sum -- divided by 3 (not 6) for
-            // headroom: most patches won't have all 6 voices hitting full amplitude
-            // simultaneously, so this keeps typical mixes well clear of 10V while
-            // still sounding reasonably loud rather than overly conservative.
-            masterSumL += finalOutL;
-            masterSumR += finalOutR;
         }
+
+        // Accumulate into the dedicated master sum unconditionally -- Master L/R
+        // should work standalone without every individual channel jack also
+        // needing to be patched. Divided by 3 (not 6) for headroom: most patches
+        // won't have all 6 voices hitting full amplitude simultaneously, so this
+        // keeps typical mixes well clear of 10V while still sounding reasonably
+        // loud rather than overly conservative.
+        masterSumL += finalOutL;
+        masterSumR += finalOutR;
     }
 
     if (outputs[MASTER_L_OUTPUT].isConnected()) {
