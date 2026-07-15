@@ -82,7 +82,6 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
     // Parse macro parameter control dials
     float rateVal = params[RATE_PARAM].getValue();
     float densityVal = params[DENSITY_PARAM].getValue();
-    float timbreVal = params[TIMBRE_PARAM].getValue();
     float textureVal = params[TEXTURE_PARAM].getValue();
     
     // Remapped Envelopes: DYNAMICS controls Attack, SPREAD controls Release/Decay
@@ -91,27 +90,16 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
     float releaseVal = params[SPREAD_PARAM].getValue();
 
     // 2. Synthesize 6 Independent Channels + Master L/R Sum
-    // Each CV input independently decides whether it's externally driven for a given
-    // channel, based on its OWN polyphonic channel count: a poly V/OCT overrides pitch,
-    // a poly GATE independently overrides the step trigger, and a poly VEL independently
-    // overrides velocity. Any combination can be mixed -- e.g. external gate timing with
-    // internally-generated harmony pitch, or an external melody with internal rhythm.
-    int voctChannels = inputs[VOCT_INPUT].getChannels();
-    int gateChannels = inputs[GATE_INPUT].getChannels();
-    int velChannels = inputs[VEL_INPUT].getChannels();
 
     for (int i = 0; i < 6; i++) {
         VoiceDSP& voice = voices[i];
         float channelOutputSignal = 0.0f;
 
-        bool voctOverride = (voctChannels > 1) && (i < voctChannels);
-        bool gateOverride = (gateChannels > 1) && (i < gateChannels);
-        bool velOverride = (velChannels > 1) && (i < velChannels);
-        // A single mono gate (not polyphonic) fires every channel together as one
-        // chord stab, using whatever pitch the mono V/OCT has transposed the internal
-        // harmonizer to -- the straightforward keyboard/sequencer use case, no poly
+        // A single mono gate fires every channel together as one chord stab, using
+        // whatever pitch the mono V/OCT has transposed the internal harmonizer to --
+        // the straightforward keyboard/sequencer use case, standard Eurorack, no poly
         // cable required.
-        bool monoGateActive = (gateChannels <= 1) && inputs[GATE_INPUT].isConnected();
+        bool monoGateActive = inputs[GATE_INPUT].isConnected();
 
         // --- ATTACK-RELEASE (AR) ENVELOPE GENERATOR ---
         float attackTime = 0.001f + attackVal * 2.0f;    // Snappy Attack: 1ms to 2s
@@ -127,13 +115,14 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
         bool useStepNoteOverride = false;
         int stepNoteOffset = 0;
 
-        if (gateOverride) {
-            // External poly GATE independently bypasses the internal step sequencer's
-            // trigger for this channel -- works regardless of whether V/OCT or VEL are
-            // also externally driven, and regardless of transport play/stop state, since
-            // it's a fully separate CV path from the internal sequencer.
-            voiceGate = inputs[GATE_INPUT].getPolyVoltage(i) > 1.0f;
-        } else if (monoGateActive) {
+        // --- Determine trigger info FIRST -- pitch depends on which step (if any)
+        // fires this channel, since a step can carry its own melodic override.
+        bool voiceGate = false;
+        float triggerVelocityNorm = 1.0f; // Default: full velocity if nothing says otherwise
+        bool useStepNoteOverride = false;
+        int stepNoteOffset = 0;
+
+        if (monoGateActive) {
             // Single mono gate: fire this channel along with every other one, together,
             // as a chord stab -- e.g. a keyboard's GATE OUT into GATE_INPUT plays the
             // whole harmonized chord on each keypress.
@@ -146,70 +135,42 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             // Both tracks' playheads always advance in lockstep, so there's really one
             // current step position; each track independently decides whether it fires
             // and which channel it targets (decoupled from the step's own index, so a
-            // step's timing position no longer has to match the harmonic role it plays).
+            // step's timing position no longer has to match the harmonic role it plays --
+            // there are 16 steps but only 6 channels, so this decoupling is essential).
             int currentStep = melodyTrack.playhead;
 
-            if (arpActive) {
-                // ARP override: bypass the programmed pattern entirely and round-robin
-                // through all 6 channels in order (root -> 3rd -> 5th ... -> 11th),
-                // using the same step timing -- a quick "arpeggiate the whole chord"
-                // gesture without needing to program a pattern first.
-                if (currentStep == i && isGateActive) {
-                    voiceGate = true;
-                    triggerVelocityNorm = 1.0f;
-                }
-            } else {
-                bool melStepFires = melodyTrack.steps[currentStep].active && isGateActive && voiceTriggerActive[currentStep];
-                int melTarget = melodyTrack.steps[currentStep].targetChannel;
-                if (melTarget < 0 || melTarget > 5) melTarget = currentStep; // safety fallback
+            bool melStepFires = melodyTrack.steps[currentStep].active && isGateActive && voiceTriggerActive[currentStep];
+            int melTarget = melodyTrack.steps[currentStep].targetChannel;
+            if (melTarget < 0 || melTarget > 5) melTarget = currentStep % 6; // safety fallback
 
-                bool chdStepFires = chordTrack.steps[currentStep].active && isGateActive && chordTriggerActive[currentStep];
-                int chdTarget = chordTrack.steps[currentStep].targetChannel;
-                if (chdTarget < 0 || chdTarget > 5) chdTarget = currentStep; // safety fallback
+            bool chdStepFires = chordTrack.steps[currentStep].active && isGateActive && chordTriggerActive[currentStep];
+            int chdTarget = chordTrack.steps[currentStep].targetChannel;
+            if (chdTarget < 0 || chdTarget > 5) chdTarget = currentStep % 6; // safety fallback
 
-                // Melody Voice check
-                if (melStepFires && melTarget == i) {
-                    voiceGate = true;
-                    triggerVelocityNorm = melodyTrack.steps[currentStep].velocity / 127.0f;
-                    if (melodyTrack.steps[currentStep].noteOverride) {
-                        useStepNoteOverride = true;
-                        stepNoteOffset = melodyTrack.steps[currentStep].noteDegreeOffset;
-                    }
-                }
-                // Chord Voice check (takes priority if both tracks target the same
-                // channel on the same step, matching the existing velocity convention)
-                if (chdStepFires && chdTarget == i) {
-                    voiceGate = true;
-                    triggerVelocityNorm = chordTrack.steps[currentStep].velocity / 127.0f;
-                    if (chordTrack.steps[currentStep].noteOverride) {
-                        useStepNoteOverride = true;
-                        stepNoteOffset = chordTrack.steps[currentStep].noteDegreeOffset;
-                    }
+            // Melody Voice check
+            if (melStepFires && melTarget == i) {
+                voiceGate = true;
+                triggerVelocityNorm = melodyTrack.steps[currentStep].velocity / 127.0f;
+                if (melodyTrack.steps[currentStep].noteOverride) {
+                    useStepNoteOverride = true;
+                    stepNoteOffset = melodyTrack.steps[currentStep].noteDegreeOffset;
                 }
             }
-        }
-
-        // Velocity override is fully independent of gate/pitch override -- a patched
-        // poly VEL always wins for this channel regardless of what triggered it.
-        if (velOverride) {
-            triggerVelocityNorm = math::clamp(inputs[VEL_INPUT].getPolyVoltage(i) / 10.0f, 0.0f, 1.0f);
+            // Chord Voice check (takes priority if both tracks target the same
+            // channel on the same step, matching the existing velocity convention)
+            if (chdStepFires && chdTarget == i) {
+                voiceGate = true;
+                triggerVelocityNorm = chordTrack.steps[currentStep].velocity / 127.0f;
+                if (chordTrack.steps[currentStep].noteOverride) {
+                    useStepNoteOverride = true;
+                    stepNoteOffset = chordTrack.steps[currentStep].noteDegreeOffset;
+                }
+            }
         }
 
         // --- Pitch computation ---
         float voiceMidiNote;
-        if (voctOverride) {
-            float noteCV = inputs[VOCT_INPUT].getPolyVoltage(i);
-            if (chromaticPassthroughEnabled) {
-                // CHRD mode slot 0: bypass the scale quantizer entirely -- useful when
-                // an external sequencer/keyboard is already handling pitch/quantization
-                // and you want Soundscape to just play what it's sent.
-                voiceMidiNote = math::clamp(noteCV, -5.0f, 5.0f) * 12.0f + 60.0f;
-            } else {
-                // Each incoming poly channel is quantized on its own -- the external
-                // source dictates the voicing/chord directly, no internal harmony offset.
-                voiceMidiNote = quantizePitch(noteCV, rootNote, scaleIdx);
-            }
-        } else if (useStepNoteOverride) {
+        if (useStepNoteOverride) {
             // NOTE mode override: this step carries its own scale-degree offset, so it
             // plays its own note instead of the target channel's fixed harmonic role --
             // this is what actually lets a pattern have real melodic movement.
@@ -234,12 +195,9 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
 
         voice.freq = 440.0f * std::pow(2.0f, (voiceMidiNote - 69.0f) / 12.0f);
 
-        if (freezeActive) {
-            // FRZ: hold whatever's currently ringing indefinitely -- envelope frozen in
-            // place, immune to both new gates and the normal release decay.
-        } else if (voiceGate) {
+        if (voiceGate) {
             // Rise phase, scaled by this trigger's velocity so quiet/hard-set steps
-            // (or a patched VEL_INPUT CV, in poly mode) actually play quieter/louder.
+            // actually play quieter/louder.
             voice.env += attackCoeff * (triggerVelocityNorm * 1.05f - voice.env);
         } else {
             // Decay/Release phase
@@ -250,26 +208,9 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
         // --- SYNTHESIS MODEL ROUTER ---
         if (activeSynthMode == MODE_VOICES) {
             // "Voices": a virtual-analog voice per channel (band-limited VA oscillator ->
-            // resonant filter -> AR envelope). FM/ring-modulation only happens when
-            // EXT_INPUT is patched -- with nothing patched, this is a pure, predictable
-            // analog voice with no feedback or self-modulation anywhere in the signal path.
+            // resonant filter -> AR envelope). Pure, predictable analog voice -- no
+            // feedback or self-modulation anywhere in the signal path.
 
-            // Independent operator (brightness) envelope: decays faster than the amplitude
-            // envelope, used only to shape the EXT IN ring-mod wet amount below.
-            float opDecayCoeff = sampleTime / (0.05f + releaseVal * 0.4f);
-            if (voiceGate) {
-                voice.opEnv += attackCoeff * (1.05f - voice.opEnv);
-            } else {
-                voice.opEnv += opDecayCoeff * (0.0f - voice.opEnv);
-            }
-            voice.opEnv = math::clamp(voice.opEnv, 0.0f, 1.0f);
-
-            float rawOscSignal;
-            bool extConnected = inputs[EXT_INPUT].isConnected();
-
-            // --- Internal virtual-analog oscillator (PolyBLEP band-limited) ---
-            // Always computed: it's the whole voice when EXT IN is unpatched, and one
-            // side of the DENSITY domain-blend when it is.
             float dt = voice.freq / sampleRate;
 
             voice.phase += dt;
@@ -288,47 +229,14 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             // TEXTURE morphs the waveshape from sawtooth to pulse -- classic analog
             // waveshape control, giving Voices real tonal range beyond a single timbre.
             float shapeMorph = textureVal;
-            float internalVA = saw * (1.0f - shapeMorph) + pulse * shapeMorph;
+            float rawOscSignal = saw * (1.0f - shapeMorph) + pulse * shapeMorph;
 
             // Bass anchor voice (channel 1): blend in a clean sub-octave sine for
             // low-end weight, since it's the fixed root note.
             if (i == 0) {
                 voice.subPhase += (voice.freq * 0.5f) * sampleTime;
                 if (voice.subPhase >= 1.0f) voice.subPhase -= 1.0f;
-                internalVA = internalVA * 0.7f + std::sin(voice.subPhase * 2.0f * M_PI) * 0.3f;
-            }
-
-            if (extConnected) {
-                // --- External audio domain: FM-flavored ring-modulation harmonizer ---
-                // TIMBRE selects the modulator:carrier ratio from a curated table spanning
-                // harmonic (bell/organ-like, low end) through mildly inharmonic (metallic,
-                // high end) tones. The modulator is a plain sine with NO self-feedback --
-                // predictable and bounded, never harsh or runaway.
-                static const float RATIO_TABLE[8] = {0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 5.0f, 7.0f};
-                int ratioIdx = math::clamp((int)std::round(timbreVal * 7.0f), 0, 7);
-                float modulatorFreq = voice.freq * RATIO_TABLE[ratioIdx];
-
-                voice.modPhase += modulatorFreq * sampleTime;
-                if (voice.modPhase >= 1.0f) voice.modPhase -= 1.0f;
-                float modOut = std::sin(voice.modPhase * 2.0f * M_PI);
-
-                // opEnv shapes how much ring-mod sideband content comes through within
-                // the external domain itself, so it swells in with this channel's gate
-                // rather than sitting static.
-                float extSignal = inputs[EXT_INPUT].getVoltage() / 5.0f;
-                float ringModded = extSignal * modOut;
-                float ringWet = 0.2f + 0.6f * voice.opEnv; // keeps a little dry ext for clarity
-                float externalDomain = extSignal * (1.0f - ringWet) + ringModded * ringWet;
-
-                // DENSITY: blends between the two audio domains -- internal VA voice
-                // (0%) and the processed external signal (100%) -- rather than a hard
-                // switch the moment something's patched into EXT IN.
-                rawOscSignal = internalVA * (1.0f - densityVal) + externalDomain * densityVal;
-            } else {
-                // Nothing patched into EXT IN: pure internal VA voice, no ring-mod at
-                // all. DENSITY does nothing here anymore (it's now a global note-density
-                // control at the sequencer level instead -- see processSequencer).
-                rawOscSignal = internalVA;
+                rawOscSignal = rawOscSignal * 0.7f + std::sin(voice.subPhase * 2.0f * M_PI) * 0.3f;
             }
 
             // Shared resonant lowpass (trapezoidal SVF, envelope-tracked cutoff -- louder
@@ -420,11 +328,10 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             channelOutputSignal *= duckAtten;
         }
 
-        // A single mono VEL (not polyphonic) continuously modulates amplitude every
-        // sample rather than being sampled once at trigger time -- e.g. patch an LFO
-        // in for tremolo, or an envelope for auto-swell, applied uniformly to all 6
-        // channels like a shared VCA.
-        if (velChannels <= 1 && inputs[VEL_INPUT].isConnected()) {
+        // VEL_INPUT continuously modulates amplitude every sample rather than being
+        // sampled once at trigger time -- e.g. patch an LFO in for tremolo, or an
+        // envelope for auto-swell, applied uniformly to all 6 channels like a shared VCA.
+        if (inputs[VEL_INPUT].isConnected()) {
             float monoVelMod = math::clamp(inputs[VEL_INPUT].getVoltage() / 10.0f, 0.0f, 1.0f);
             channelOutputSignal *= monoVelMod;
         }

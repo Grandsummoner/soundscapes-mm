@@ -61,7 +61,7 @@ struct StepData {
 };
 
 struct SequencerTrack {
-    StepData steps[6];        // 6 contiguous steps
+    StepData steps[8];        // 8 contiguous steps
     int playhead = 0;         // Active playhead step
 };
 
@@ -103,7 +103,7 @@ struct Soundscapes : Module {
         CHRD_PARAM, PROB_PARAM,
         SAVE_PARAM, RCL_PARAM,
         STEP_PARAM_START,
-        STEP_PARAM_END = STEP_PARAM_START + 12, // 6 melody + 6 chord
+        STEP_PARAM_END = STEP_PARAM_START + 16, // 8 melody + 8 chord
         NUM_PARAMS
     };
 
@@ -133,7 +133,7 @@ struct Soundscapes : Module {
         CH1_LED, CH2_LED, CH3_LED, CH4_LED, CH5_LED, CH6_LED,
         MASTER_L_LED, MASTER_R_LED,
         STEP_LED_START,
-        STEP_LED_END = STEP_LED_START + 12, // 6 melody + 6 chord
+        STEP_LED_END = STEP_LED_START + 16, // 8 melody + 8 chord
         PLAY_LED, SHFT_LED, ARP_LED, FRZ_LED, CHRD_LED, PROB_LED, SAVE_LED, RCL_LED,
         NUM_LIGHTS
     };
@@ -142,21 +142,9 @@ struct Soundscapes : Module {
     SequencerTrack melodyTrack;
     SequencerTrack chordTrack;
 
-    // SAVE/RCL: single-slot pattern scene buffer. SAVE snapshots both tracks' full
-    // step data (active/velocity/probability/targetChannel); RCL restores it.
-    StepData melodySceneBuffer[6];
-    StepData chordSceneBuffer[6];
-    bool sceneSaved = false;
-    
-    int focusedChannel = -1;       // Range: -1 (Global Mixer) to 0-7 (Focus 1–8)
+    int focusedChannel = -1;       // Range: -1 (Global Mixer) to 0-5 (Focus 1-6)
     bool shiftActive = false;      // SHFT toggle switch state
     bool isPlaying = true;         // Transport state
-    bool arpActive = false;        // ARP: round-robins through all 8 channels, bypassing
-                                    // the programmed pattern -- quick "arpeggiate the
-                                    // whole chord" performance gesture.
-    bool freezeActive = false;     // FRZ: holds all envelopes at their current value
-                                    // indefinitely, ignoring RELEASE and new triggers --
-                                    // a sustain/hold for whatever's currently ringing.
     SynthMode activeSynthMode = MODE_VOICES;
     FaderState activeFaderState = FADER_MIXER;
 
@@ -170,28 +158,24 @@ struct Soundscapes : Module {
     // effect, given the active synth mode, EXT IN connection, and FX send levels --
     // used to visually distinguish "in use" knobs from inert ones on the panel.
     bool isMacroActive(int paramId) {
-        bool extConnected = inputs[EXT_INPUT].isConnected();
         bool reverbSendUp = params[REVERB_PARAM].getValue() > 0.001f;
 
         switch (paramId) {
             case RATE_PARAM:
                 return true; // Always drives sequencer step timing (and delay time)
             case DENSITY_PARAM:
-                // Always does something now: note density (Voices, no EXT), domain
-                // blend (Voices, EXT patched), string unison/chorus (Waves), dust rate
-                // (Drone & Dust). No longer tied to filter resonance (now a fixed value).
+                // Always does something now: note density (Voices), string
+                // unison/chorus (Waves), dust rate (Drone & Dust).
                 return true;
             case TIMBRE_PARAM:
-                // Only does anything in Voices mode when EXT IN is patched (FM ratio),
-                // or when the Reverb FX send is up (shimmer pitch-shift amount).
-                return (activeSynthMode == MODE_VOICES && extConnected)
-                    || reverbSendUp;
+                // No Voices-mode job for now (EXT IN blending is on hold) -- only
+                // active when the Reverb FX send is up (shimmer pitch-shift amount).
+                return reverbSendUp;
             case TEXTURE_PARAM: {
                 bool filterSendUp = params[FILTER_PARAM].getValue() > 0.001f;
-                // Only does anything in Voices mode when EXT IN is NOT patched (VA
-                // waveshape), or when the Filter FX send is up (cutoff).
-                return (activeSynthMode == MODE_VOICES && !extConnected)
-                    || filterSendUp;
+                // Always active in Voices mode (VA waveshape), or when the Filter FX
+                // send is up (cutoff).
+                return (activeSynthMode == MODE_VOICES) || filterSendUp;
             }
             case SPREAD_PARAM:
             case DYNAMICS_PARAM:
@@ -216,22 +200,21 @@ struct Soundscapes : Module {
     // that knob is turned. Kept honest to the actual current implementation -- a knob
     // that's inert right now says so via isMacroActive(), not via a hopeful label.
     const char* macroFunctionName(int paramId) {
-        bool extConnected = inputs[EXT_INPUT].isConnected();
         switch (paramId) {
             case RATE_PARAM:
                 return "RATE";
             case DENSITY_PARAM:
                 if (activeSynthMode == MODE_VOICES) {
-                    return extConnected ? "AUDIOMIX" : "NOTEDENS";
+                    return "NOTEDENS";
                 } else if (activeSynthMode == MODE_WAVES) {
                     return "CHORUS";
                 } else {
                     return "DUSTRATE";
                 }
             case TIMBRE_PARAM:
-                return (activeSynthMode == MODE_VOICES && extConnected) ? "FMRATIO" : "TIMBRE";
+                return "TIMBRE";
             case TEXTURE_PARAM:
-                return (activeSynthMode == MODE_VOICES && !extConnected) ? "OSCSHAPE" : "TEXTURE";
+                return (activeSynthMode == MODE_VOICES) ? "OSCSHAPE" : "TEXTURE";
             case SPREAD_PARAM:
                 return "RELEASE";
             case DYNAMICS_PARAM:
@@ -244,9 +227,9 @@ struct Soundscapes : Module {
     // CHRD mode: latching switch that repurposes the 16 step pads as a radio-select
     // option menu (mutually exclusive with normal step editing -- entering CHRD mode
     // freezes the step pattern rather than letting the two be edited simultaneously).
+    // All 16 slots are currently just reserved framework -- nothing wired to them yet.
     bool chordModeActive = false;
-    int chordModeOption = -1;              // -1 = none selected, else 0-11
-    bool chromaticPassthroughEnabled = false; // CHRD mode slot 0: bypass quantizer on poly V/OCT
+    int chordModeOption = -1;              // -1 = none selected, else 0-15
 
     // NOTE mode (PROB button, latching): while active, clicking a step pad cycles
     // that step's own melodic override (0-13 scale degrees, then clears back to
@@ -263,8 +246,8 @@ struct Soundscapes : Module {
     int displayType[8] = {};       // 0: Percentage, 1: Root Note, 2: Scale Type
 
     // Sequencer Timing & Probability tracking
-    bool voiceTriggerActive[6] = {};
-    bool chordTriggerActive[6] = {};
+    bool voiceTriggerActive[8] = {};
+    bool chordTriggerActive[8] = {};
     float stepTimeElapsed = 0.0f;  // Keeps track of physical elapsed step duration in seconds
 
     // DSP Processing Variables

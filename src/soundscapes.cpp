@@ -45,8 +45,8 @@ Soundscapes::Soundscapes() {
     configParam(ROOT_PARAM, 0.0f, 1.0f, 0.0f, "Diatonic Quantizer: Root Scale Transposition Note");
     configParam(SCALE_PARAM, 0.0f, 1.0f, 0.0f, "Diatonic Quantizer: Selected Harmonised Scale Degrees");
 
-    // 6. Configure Row 4 Step Buttons & Performance Block (6 melody + 6 chord)
-    for (int i = 0; i < 12; i++) {
+    // 6. Configure Row 4 Step Buttons & Performance Block (8 melody + 8 chord)
+    for (int i = 0; i < 16; i++) {
         configParam(STEP_PARAM_START + i, 0.0f, 1.0f, 0.0f, string::f("Step Pad %d Toggle Trigger", i + 1));
     }
 
@@ -77,8 +77,14 @@ Soundscapes::Soundscapes() {
         for (int b = 0; b < 2048; b++) {
             voices[i].delayBuffer[b] = 0.0f;
         }
-        melodyTrack.steps[i].targetChannel = i;
-        chordTrack.steps[i].targetChannel = i;
+    }
+
+    // Default each step's target channel to (step index mod 6), so all 16 steps
+    // (8 per track) have a valid channel to fall back on even though there are
+    // only 6 real synth voices -- steps and channels are independent axes.
+    for (int i = 0; i < 8; i++) {
+        melodyTrack.steps[i].targetChannel = i % 6;
+        chordTrack.steps[i].targetChannel = i % 6;
     }
 
     // Clear FX Unit circular line buffers

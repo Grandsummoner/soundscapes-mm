@@ -219,7 +219,7 @@ struct OpaqueDisplay : Widget {
  * 2. Procedural Step Sequencer Pad Widget
  */
 struct StepPadWidget : app::SvgSwitch {
-    int padId = 0; // Range 0 - 11
+    int padId = 0; // Range 0 - 15
 
     StepPadWidget() {
         momentary = false;
@@ -229,8 +229,8 @@ struct StepPadWidget : app::SvgSwitch {
     void onButton(const event::Button& e) override {
         Soundscapes* mod = dynamic_cast<Soundscapes*>(this->module);
         if (mod && e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT && !mod->chordModeActive) {
-            bool isChord = (padId >= 6);
-            int stepIndex = isChord ? (padId - 6) : padId;
+            bool isChord = (padId >= 8);
+            int stepIndex = isChord ? (padId - 8) : padId;
             SequencerTrack& track = isChord ? mod->chordTrack : mod->melodyTrack;
 
             if (mod->noteModeActive) {
@@ -337,10 +337,10 @@ struct StepPadWidget : app::SvgSwitch {
         // Small dark dot in the top-right corner marks a step whose target channel has
         // been reassigned away from its own index (timing decoupled from harmonic role).
         if (module && !module->chordModeActive) {
-            bool isChord = (padId >= 6);
-            int stepIndex = isChord ? (padId - 6) : padId;
+            bool isChord = (padId >= 8);
+            int stepIndex = isChord ? (padId - 8) : padId;
             const SequencerTrack& track = isChord ? module->chordTrack : module->melodyTrack;
-            if (track.steps[stepIndex].targetChannel != stepIndex) {
+            if (track.steps[stepIndex].targetChannel != stepIndex % 6) {
                 nvgBeginPath(args.vg);
                 nvgCircle(args.vg, box.size.x - 4.0f, 4.0f, 2.0f);
                 nvgFillColor(args.vg, nvgRGBA(0x2b, 0x28, 0x24, 0xff));
@@ -413,9 +413,9 @@ struct PerformanceButtonWidget : SoundscapesButton {
     }
 
     void onButton(const event::Button& e) override {
-        // PLAY(0), SHFT(1), ARP(2), FRZ(3), CHRD(4), and PROB(5) are latching mode
-        // switches; the rest are momentary.
-        momentary = (buttonId != 0 && buttonId != 1 && buttonId != 2 && buttonId != 3 && buttonId != 4 && buttonId != 5);
+        // PLAY(0), SHFT(1), CHRD(4), and PROB(5) are latching mode switches; the
+        // rest (including ARP/FRZ, dropped for the simple v1) are momentary.
+        momentary = (buttonId != 0 && buttonId != 1 && buttonId != 4 && buttonId != 5);
         SoundscapesButton::onButton(e);
     }
 
@@ -426,8 +426,6 @@ struct PerformanceButtonWidget : SoundscapesButton {
         if (module) {
             if (buttonId == 0) litState = module->isPlaying;       // PLAY Button
             if (buttonId == 1) litState = module->shiftActive;     // SHFT Button
-            if (buttonId == 2) litState = module->arpActive;       // ARP Button
-            if (buttonId == 3) litState = module->freezeActive;    // FRZ Button
             if (buttonId == 4) litState = module->chordModeActive; // CHRD Button (STEP <-> CHRD mode)
             if (buttonId == 5) litState = module->noteModeActive;  // PROB Button (PROB <-> NOTE mode)
         }
@@ -834,10 +832,10 @@ struct FaceplateLabels : Widget {
 
             // H. Melody & Chord Labels
             nvgFontSize(args.vg, 6.5f);
-            for (int i = 0; i < 6; i++) {
+            for (int i = 0; i < 8; i++) {
                 float x = SoundscapesCoords::GRID_COLS[i];
                 nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_MELODY_PAD_Y + 18.0f, std::to_string(i + 1).c_str(), NULL);
-                nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_CHORD_PAD_Y + 18.0f, std::to_string(i + 7).c_str(), NULL);
+                nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_CHORD_PAD_Y + 18.0f, std::to_string(i + 9).c_str(), NULL);
             }
 
             // Section Labels
@@ -946,8 +944,10 @@ struct SoundscapesWidget : ModuleWidget {
         addParam(createParamCentered<SoundscapesSmallKnob>(Vec(SoundscapesCoords::GRID_COLS[9], SoundscapesCoords::SCALE_Y), module, Soundscapes::SCALE_PARAM));
 
         // --- V. Row 4: Step Sequencer Pads & Performance Block ---
-        // 12 Step Pad triggers (Columns 1-6): 6 melody + 6 chord
-        for (int i = 0; i < 6; i++) {
+        // 16 Step Pad triggers (Columns 1-8): 8 melody + 8 chord, independent of the
+        // 6 real channels -- steps and channels are decoupled (target-channel
+        // reassignment), so more steps than channels is intentional.
+        for (int i = 0; i < 8; i++) {
             float x = SoundscapesCoords::GRID_COLS[i];
             
             // Melody step button (Row 1)
@@ -956,8 +956,8 @@ struct SoundscapesWidget : ModuleWidget {
             addParam(melPad);
 
             // Chord step button (Row 2)
-            StepPadWidget* chdPad = createParamCentered<StepPadWidget>(Vec(x, SoundscapesCoords::ROW4_CHORD_PAD_Y), module, Soundscapes::STEP_PARAM_START + 6 + i);
-            chdPad->padId = 6 + i;
+            StepPadWidget* chdPad = createParamCentered<StepPadWidget>(Vec(x, SoundscapesCoords::ROW4_CHORD_PAD_Y), module, Soundscapes::STEP_PARAM_START + 8 + i);
+            chdPad->padId = 8 + i;
             addParam(chdPad);
         }
 
