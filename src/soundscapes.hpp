@@ -37,12 +37,17 @@ namespace SoundscapesCoords {
     const float GRID_COLS[10] = {79.0f, 113.0f, 147.0f, 181.0f, 215.0f, 249.0f, 283.0f, 317.0f, 351.0f, 386.0f};
     const float ROW3_FADER_Y = 233.0f;
     const float ROOT_Y = 220.0f;
-    const float SCALE_Y = 246.0f;
+    const float SCALE_Y = 238.0f; // was 246 -- raised 8px so the label (now same
+                                   // size as the 6 big-knob labels) clears the
+                                   // performance button block below it
 
     // Row 4: Step Sequencer Pads & Buttons
     const float ROW4_MELODY_PAD_Y = 288.0f;
     const float ROW4_CHORD_PAD_Y = 336.0f;
-    const float ROW4_BUTTON_ROWS[4] = {273.0f, 295.0f, 317.0f, 339.0f};
+    const float ROW4_BUTTON_ROWS[2] = {285.0f, 313.0f}; // 2 rows x 2 cols = 4
+                                                          // buttons (PITCH, PROB,
+                                                          // SAVE, RCL); was 4 rows
+                                                          // of 8 buttons
 }
 
 struct StepData {
@@ -96,6 +101,8 @@ struct Soundscapes : Module {
         DYNAMICS_PARAM,
         FADER1_PARAM, FADER2_PARAM, FADER3_PARAM, FADER4_PARAM,
         FADER5_PARAM, FADER6_PARAM,
+        FX_RETURN_PARAM,    // Global fader, col 7: FX wet-return depth
+        MASTER_LEVEL_PARAM, // Global fader, col 8: Master L/R output trim
         ROOT_PARAM,
         SCALE_PARAM,
         PLAY_PARAM, SHFT_PARAM,

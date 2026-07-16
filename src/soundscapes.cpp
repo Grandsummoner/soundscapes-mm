@@ -42,6 +42,8 @@ Soundscapes::Soundscapes() {
     for (int i = 0; i < 6; i++) {
         configParam(FADER1_PARAM + i, 0.0f, 1.0f, 0.8f, string::f("Channel %d Amplitude/Send Fader", i + 1));
     }
+    configParam(FX_RETURN_PARAM, 0.0f, 1.0f, 0.5f, "FX Return: Global Wet Depth");
+    configParam(MASTER_LEVEL_PARAM, 0.0f, 1.0f, 0.8f, "Master Level: Output Trim");
     configParam(ROOT_PARAM, 0.0f, 1.0f, 0.0f, "Diatonic Quantizer: Root Scale Transposition Note");
     configParam(SCALE_PARAM, 0.0f, 1.0f, 0.0f, "Diatonic Quantizer: Selected Harmonised Scale Degrees");
 

@@ -362,6 +362,12 @@ struct StepPadWidget : app::SvgSwitch {
  * 3. Procedural Slide Fader Handle
  */
 struct SoundscapesFader : app::SvgSlider {
+    // Overridable so global faders (FX Return, Master Level) can carry a
+    // different cap color than the 6 neutral channel faders, flagging at a
+    // glance that they're not per-channel controls.
+    NVGcolor capFill = nvgRGBA(0xfa, 0xf9, 0xf6, 0xff);   // Silver-cream (default)
+    NVGcolor capStroke = nvgRGBA(0xcc, 0xc4, 0xb5, 0xff);
+
     SoundscapesFader() {
         box.size = Vec(14.0f, 46.0f); // Shorter travel
         speed = 4.0f;                 // Snappier mouse dragging
@@ -383,10 +389,10 @@ struct SoundscapesFader : app::SvgSlider {
         // Draw fader handle body
         nvgBeginPath(args.vg);
         nvgRoundedRect(args.vg, 0.0f, handleY, box.size.x, handleHeight, 2.0f);
-        nvgFillColor(args.vg, nvgRGBA(0xfa, 0xf9, 0xf6, 0xff)); // Silver-cream
+        nvgFillColor(args.vg, capFill);
         nvgFill(args.vg);
 
-        nvgStrokeColor(args.vg, nvgRGBA(0xcc, 0xc4, 0xb5, 0xff));
+        nvgStrokeColor(args.vg, capStroke);
         nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
 
@@ -397,6 +403,27 @@ struct SoundscapesFader : app::SvgSlider {
         nvgStrokeColor(args.vg, nvgRGBA(0x1a, 0x1a, 0x1a, 0xff));
         nvgStrokeWidth(args.vg, 1.5f);
         nvgStroke(args.vg);
+    }
+};
+
+/**
+ * Global fader variants -- same mechanics as SoundscapesFader, distinct caps.
+ * Column 7: FX Return (wet depth of whichever FX buttons are engaged).
+ * Column 8: Master Level (post-mix trim on the Master L/R output).
+ * Colors kept clean/muted (not a gnarly rainbow) -- just enough contrast to
+ * read as "global control", not "channel 7 / channel 8".
+ */
+struct FxReturnFader : SoundscapesFader {
+    FxReturnFader() {
+        capFill = nvgRGBA(0x8a, 0xc9, 0xc3, 0xff);   // Muted teal -- "processing"
+        capStroke = nvgRGBA(0x5c, 0x9a, 0x94, 0xff);
+    }
+};
+
+struct MasterLevelFader : SoundscapesFader {
+    MasterLevelFader() {
+        capFill = nvgRGBA(0xff, 0xff, 0xff, 0xff);   // Bright white -- "final output"
+        capStroke = nvgRGBA(0xb0, 0xa8, 0x98, 0xff);
     }
 };
 
@@ -488,6 +515,18 @@ struct PerformanceButtonWidget : SoundscapesButton {
 /**
  * 5. Procedural Large White Knob Widget (No external SVG dependencies)
  */
+// Small helper: blend a color toward white (amt > 0) or black (amt < 0),
+// used to derive highlight/shadow tones for the metallic bevel from a single
+// base color instead of hand-picking every shade.
+static NVGcolor shadeColor(NVGcolor c, float amt) {
+    if (amt >= 0.0f) {
+        return nvgRGBAf(c.r + (1.0f - c.r) * amt, c.g + (1.0f - c.g) * amt, c.b + (1.0f - c.b) * amt, c.a);
+    } else {
+        float f = 1.0f + amt; // amt is negative here
+        return nvgRGBAf(c.r * f, c.g * f, c.b * f, c.a);
+    }
+}
+
 struct SoundscapesKnob : app::Knob {
     SoundscapesKnob() {
         box.size = Vec(26.0f, 26.0f); // Large diameter: 26px
@@ -517,10 +556,17 @@ struct SoundscapesKnob : app::Knob {
             if (mod) accentGroup = mod->macroAccentGroup(getParamQuantity()->paramId);
         }
 
-        // Drop shadow
+        float cx = box.size.x / 2.0f;
+        float cy = box.size.y / 2.0f;
+
+        // 1. Cast drop shadow -- offset down-right and soft, rather than a flat
+        // halo the same size as the knob (which read as a faint outline, not a
+        // shadow, since it wasn't offset from the body at all).
+        NVGpaint shadowPaint = nvgRadialGradient(args.vg, cx + 1.5f, cy + 2.0f, 6.0f, 15.0f,
+            nvgRGBA(0x00, 0x00, 0x00, 0x50), nvgRGBA(0x00, 0x00, 0x00, 0x00));
         nvgBeginPath(args.vg);
-        nvgCircle(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, 13.0f);
-        nvgFillColor(args.vg, nvgRGBA(0x00, 0x00, 0x00, 0x08));
+        nvgCircle(args.vg, cx + 1.5f, cy + 2.0f, 15.0f);
+        nvgFillPaint(args.vg, shadowPaint);
         nvgFill(args.vg);
 
         // Accent ring: matches the associated FX button's color when that bus is
@@ -533,29 +579,54 @@ struct SoundscapesKnob : app::Knob {
             else accentColor = nvgRGBA(0xe9, 0x1e, 0x63, 0xff);                       // FILTER: Magenta
 
             nvgBeginPath(args.vg);
-            nvgCircle(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, 13.5f);
+            nvgCircle(args.vg, cx, cy, 13.5f);
             nvgStrokeColor(args.vg, accentColor);
             nvgStrokeWidth(args.vg, 2.0f);
             nvgStroke(args.vg);
         }
 
-        // Knob Body
+        // 2. Metallicized trim ring -- a thin brushed-metal band around the body,
+        // shaded with a diagonal gradient (light top-left to dark bottom-right)
+        // rather than a single flat stroke color, so it reads as a beveled metal
+        // lip rather than a painted outline.
+        NVGpaint trimPaint = nvgLinearGradient(args.vg, cx - 9.0f, cy - 9.0f, cx + 9.0f, cy + 9.0f,
+            nvgRGBA(0xe8, 0xe6, 0xe1, 0xff), nvgRGBA(0x6b, 0x66, 0x5e, 0xff));
         nvgBeginPath(args.vg);
-        nvgCircle(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, 12.0f);
-        nvgFillColor(args.vg, bodyFill);
+        nvgCircle(args.vg, cx, cy, 12.5f);
+        nvgStrokePaint(args.vg, trimPaint);
+        nvgStrokeWidth(args.vg, 1.6f);
+        nvgStroke(args.vg);
+
+        // 3. Knob body with a 3D bevel: radial gradient offset toward the
+        // upper-left (simulated light source) so the body itself reads as a
+        // domed cap rather than a flat-filled disc.
+        NVGpaint bodyPaint = nvgRadialGradient(args.vg, cx - 4.0f, cy - 4.5f, 1.0f, 15.0f,
+            shadeColor(bodyFill, 0.22f), shadeColor(bodyFill, -0.25f));
+        nvgBeginPath(args.vg);
+        nvgCircle(args.vg, cx, cy, 11.0f);
+        nvgFillPaint(args.vg, bodyPaint);
         nvgFill(args.vg);
 
         nvgStrokeColor(args.vg, bodyStroke);
         nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
 
-        // Indicator line rotated dynamically by parameter value
+        // 4. Glossy specular highlight -- small soft ellipse near the simulated
+        // light source, the detail that actually sells "polished cap" rather
+        // than "flat sticker".
+        NVGpaint glossPaint = nvgRadialGradient(args.vg, cx - 4.0f, cy - 5.0f, 0.5f, 6.0f,
+            nvgRGBA(0xff, 0xff, 0xff, active ? 0x30 : 0x60), nvgRGBA(0xff, 0xff, 0xff, 0x00));
+        nvgBeginPath(args.vg);
+        nvgCircle(args.vg, cx - 3.0f, cy - 4.0f, 6.0f);
+        nvgFillPaint(args.vg, glossPaint);
+        nvgFill(args.vg);
+
+        // Indicator line rotated dynamically by parameter value, with a small
+        // pointer dot at the tip for a bit of tactile detail.
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.0f;
         float angle = -120.0f + value * 240.0f; // VCV standard knob angle
         float rad = angle * M_PI / 180.0f;
-        float cx = box.size.x / 2.0f;
-        float cy = box.size.y / 2.0f;
-        
+
         float px = cx + std::sin(rad) * 10.0f;
         float py = cy - std::cos(rad) * 10.0f;
 
@@ -565,6 +636,11 @@ struct SoundscapesKnob : app::Knob {
         nvgStrokeColor(args.vg, indicatorColor);
         nvgStrokeWidth(args.vg, 1.6f);
         nvgStroke(args.vg);
+
+        nvgBeginPath(args.vg);
+        nvgCircle(args.vg, px, py, 1.1f);
+        nvgFillColor(args.vg, indicatorColor);
+        nvgFill(args.vg);
     }
 };
 
@@ -577,29 +653,53 @@ struct SoundscapesSmallKnob : SoundscapesKnob {
     }
 
     void draw(const DrawArgs& args) override {
-        // Drop shadow
+        float cx = box.size.x / 2.0f;
+        float cy = box.size.y / 2.0f;
+        NVGcolor bodyFill = nvgRGBA(0xfa, 0xf9, 0xf6, 0xff); // Cream-white
+
+        // 1. Cast drop shadow, offset from the body (same technique as the big
+        // knobs, scaled down).
+        NVGpaint shadowPaint = nvgRadialGradient(args.vg, cx + 1.0f, cy + 1.5f, 4.0f, 11.0f,
+            nvgRGBA(0x00, 0x00, 0x00, 0x38), nvgRGBA(0x00, 0x00, 0x00, 0x00));
         nvgBeginPath(args.vg);
-        nvgCircle(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, 10.0f);
-        nvgFillColor(args.vg, nvgRGBA(0x00, 0x00, 0x00, 0x06));
+        nvgCircle(args.vg, cx + 1.0f, cy + 1.5f, 11.0f);
+        nvgFillPaint(args.vg, shadowPaint);
         nvgFill(args.vg);
 
-        // Knob Body
+        // 2. Metallicized trim ring
+        NVGpaint trimPaint = nvgLinearGradient(args.vg, cx - 7.0f, cy - 7.0f, cx + 7.0f, cy + 7.0f,
+            nvgRGBA(0xe8, 0xe6, 0xe1, 0xff), nvgRGBA(0x8a, 0x84, 0x7a, 0xff));
         nvgBeginPath(args.vg);
-        nvgCircle(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, 9.0f);
-        nvgFillColor(args.vg, nvgRGBA(0xfa, 0xf9, 0xf6, 0xff)); // Cream-white
+        nvgCircle(args.vg, cx, cy, 9.3f);
+        nvgStrokePaint(args.vg, trimPaint);
+        nvgStrokeWidth(args.vg, 1.2f);
+        nvgStroke(args.vg);
+
+        // 3. Beveled body
+        NVGpaint bodyPaint = nvgRadialGradient(args.vg, cx - 3.0f, cy - 3.5f, 0.5f, 11.0f,
+            shadeColor(bodyFill, 0.15f), shadeColor(bodyFill, -0.12f));
+        nvgBeginPath(args.vg);
+        nvgCircle(args.vg, cx, cy, 8.3f);
+        nvgFillPaint(args.vg, bodyPaint);
         nvgFill(args.vg);
 
         nvgStrokeColor(args.vg, nvgRGBA(0xcb, 0xc4, 0xb5, 0xff));
         nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
 
+        // 4. Small specular highlight
+        NVGpaint glossPaint = nvgRadialGradient(args.vg, cx - 3.0f, cy - 3.5f, 0.3f, 4.5f,
+            nvgRGBA(0xff, 0xff, 0xff, 0x80), nvgRGBA(0xff, 0xff, 0xff, 0x00));
+        nvgBeginPath(args.vg);
+        nvgCircle(args.vg, cx - 2.2f, cy - 3.0f, 4.5f);
+        nvgFillPaint(args.vg, glossPaint);
+        nvgFill(args.vg);
+
         // Indicator line rotated dynamically by parameter value
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.0f;
         float angle = -120.0f + value * 240.0f;
         float rad = angle * M_PI / 180.0f;
-        float cx = box.size.x / 2.0f;
-        float cy = box.size.y / 2.0f;
-        
+
         float px = cx + std::sin(rad) * 7.5f;
         float py = cy - std::cos(rad) * 7.5f;
 
@@ -609,6 +709,11 @@ struct SoundscapesSmallKnob : SoundscapesKnob {
         nvgStrokeColor(args.vg, nvgRGBA(0x60, 0x55, 0x48, 0xff));
         nvgStrokeWidth(args.vg, 1.4f);
         nvgStroke(args.vg);
+
+        nvgBeginPath(args.vg);
+        nvgCircle(args.vg, px, py, 0.9f);
+        nvgFillColor(args.vg, nvgRGBA(0x60, 0x55, 0x48, 0xff));
+        nvgFill(args.vg);
     }
 };
 
@@ -825,23 +930,21 @@ struct FaceplateLabels : Widget {
                 nvgTextBold(args.vg, SoundscapesCoords::KNOB_COLS[i], SoundscapesCoords::ROW2_KNOB_Y + 21.0f, knobLabels[i], NULL);
             }
 
-            // G. Root & Scale Labels
-            nvgFontSize(args.vg, 6.5f);
+            // G. Root & Scale Labels -- now sized to match the 6 big-knob labels
+            // (7.5) instead of the old smaller 6.5, for visual consistency, and
+            // positioned below their knobs same as the big knobs are.
+            nvgFontSize(args.vg, 7.5f);
             nvgTextBold(args.vg, SoundscapesCoords::GRID_COLS[8], SoundscapesCoords::ROOT_Y + 21.0f, "ROOT", NULL);
             nvgTextBold(args.vg, SoundscapesCoords::GRID_COLS[9], SoundscapesCoords::SCALE_Y + 21.0f, "SCALE", NULL);
 
-            // H. Melody & Chord Labels
+            // H. Step Numbers (unified single row, melody/chord split removed)
             nvgFontSize(args.vg, 6.5f);
             for (int i = 0; i < 8; i++) {
                 float x = SoundscapesCoords::GRID_COLS[i];
                 nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_MELODY_PAD_Y + 18.0f, std::to_string(i + 1).c_str(), NULL);
-                nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_CHORD_PAD_Y + 18.0f, std::to_string(i + 9).c_str(), NULL);
             }
-
-            // Section Labels
-            nvgFontSize(args.vg, 7.5f);
-            nvgTextBold(args.vg, 198.0f, 315.0f, "MELODY", NULL);
-            nvgTextBold(args.vg, 198.0f, 363.0f, "CHORD", NULL);
+            // NOTE: MELODY/CHORD section labels removed -- steps are now a single
+            // unified row (pitch + probability per step, no melody/chord split).
         }
     }
 };
@@ -933,20 +1036,33 @@ struct SoundscapesWidget : ModuleWidget {
         }
 
         // --- IV. Row 3: Mixer Faders & Diagonal Quantizer Knobs ---
-        // 6 Volume/Send Faders centered over track positions
+        // 6 Volume/Live-Record Faders centered over track positions (neutral cap)
         for (int i = 0; i < 6; i++) {
             float x = SoundscapesCoords::GRID_COLS[i];
             addParam(createParamCentered<SoundscapesFader>(Vec(x, SoundscapesCoords::ROW3_FADER_Y), module, Soundscapes::FADER1_PARAM + i));
         }
+
+        // 2 Global Faders (previously blank strips at columns 7-8): FX Return and
+        // Master Level. Distinct cap colors mark them as global, not per-channel.
+        FxReturnFader* fxReturnFader = createParamCentered<FxReturnFader>(Vec(SoundscapesCoords::GRID_COLS[6], SoundscapesCoords::ROW3_FADER_Y), module, Soundscapes::FX_RETURN_PARAM);
+        addParam(fxReturnFader);
+
+        MasterLevelFader* masterLevelFader = createParamCentered<MasterLevelFader>(Vec(SoundscapesCoords::GRID_COLS[7], SoundscapesCoords::ROW3_FADER_Y), module, Soundscapes::MASTER_LEVEL_PARAM);
+        addParam(masterLevelFader);
 
         // Diagonal Large Quantizers on Columns 9 and 10
         addParam(createParamCentered<SoundscapesSmallKnob>(Vec(SoundscapesCoords::GRID_COLS[8], SoundscapesCoords::ROOT_Y), module, Soundscapes::ROOT_PARAM));
         addParam(createParamCentered<SoundscapesSmallKnob>(Vec(SoundscapesCoords::GRID_COLS[9], SoundscapesCoords::SCALE_Y), module, Soundscapes::SCALE_PARAM));
 
         // --- V. Row 4: Step Sequencer Pads & Performance Block ---
-        // 16 Step Pad triggers (Columns 1-8): 8 melody + 8 chord, independent of the
-        // 6 real channels -- steps and channels are decoupled (target-channel
-        // reassignment), so more steps than channels is intentional.
+        // TODO -- PENDING STEP-MODEL REFACTOR: the melody/chord split is being
+        // retired (steps will hold only pitch + probability, live-recorded via
+        // the channel faders instead of clicked pad-by-pad -- see chat design
+        // notes). Until that refactor lands, this still wires 16 physical pads
+        // as two rows of 8; the MELODY/CHORD text labels above them were already
+        // removed, so right now the second row will look unlabeled/orphaned.
+        // Don't ship this half-state -- either restore the labels temporarily or
+        // finish collapsing this to a single unified 8-pad row.
         for (int i = 0; i < 8; i++) {
             float x = SoundscapesCoords::GRID_COLS[i];
             
@@ -955,14 +1071,18 @@ struct SoundscapesWidget : ModuleWidget {
             melPad->padId = i;
             addParam(melPad);
 
-            // Chord step button (Row 2)
+            // Chord step button (Row 2) -- pending removal, see TODO above
             StepPadWidget* chdPad = createParamCentered<StepPadWidget>(Vec(x, SoundscapesCoords::ROW4_CHORD_PAD_Y), module, Soundscapes::STEP_PARAM_START + 8 + i);
             chdPad->padId = 8 + i;
             addParam(chdPad);
         }
 
-        // 2x4 Utility Button Grid on Columns 9 & 10
-        for (int row = 0; row < 4; row++) {
+        // 2x2 Utility Button Grid on Columns 9 & 10 (PITCH, PROB, SAVE, RCL)
+        // TODO: this still indexes off the old 8-slot PLAY_PARAM..RCL_PARAM block.
+        // Once ParamId is refactored down to just PITCH_PARAM/PROB_PARAM/
+        // SAVE_PARAM/RCL_PARAM (dropping PLAY/SHFT/ARP/FRZ/CHRD), point btnIndex
+        // at the new 4-slot enum directly instead of skipping through the old one.
+        for (int row = 0; row < 2; row++) {
             float y = SoundscapesCoords::ROW4_BUTTON_ROWS[row];
             int btnIndex = row * 2;
 
