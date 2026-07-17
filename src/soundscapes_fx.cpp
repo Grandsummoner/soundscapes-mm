@@ -152,26 +152,31 @@ void Soundscapes::process(const ProcessArgs& args) {
     float masterSumL = 0.0f;
     float masterSumR = 0.0f;
 
+    // FX Return (global fader, col 7): scales how much of the wet FX tank
+    // reaches the master bus. Deliberately NOT applied to the per-channel dry
+    // outs below -- those stay clean regardless of this fader, so patching a
+    // channel elsewhere in the rack always gets a predictable, unprocessed
+    // signal, and only the internal Master L/R mix gets colored by FX Return.
+    float fxReturnAmt = params[FX_RETURN_PARAM].getValue();
+
     for (int i = 0; i < 6; i++) {
+        // Per-channel jack: pure dry, untouched by wet FX or FX Return. This is
+        // what "individual outs are safe to patch out to the rest of the rack"
+        // means in practice -- whatever processDSP() wrote here (already
+        // including that channel's own fader/amplitude) is the final word; we
+        // don't overwrite it with anything wet-mix-dependent below.
         float drySignal = outputs[CH1_OUTPUT + i].getVoltage();
 
         float panL = 1.0f - ((float)i / 5.0f);
         float panR = (float)i / 5.0f;
 
-        float finalOutL = drySignal + (wetL * panL * 5.0f);
-        float finalOutR = drySignal + (wetR * panR * 5.0f);
-        if (!std::isfinite(finalOutL)) finalOutL = drySignal;
-        if (!std::isfinite(finalOutR)) finalOutR = drySignal;
-
-        // Left output (CH 1-3) / Right output (CH 4-6) separation -- only writes
-        // back to this channel's own jack if it's actually patched.
-        if (outputs[CH1_OUTPUT + i].isConnected()) {
-            if (i < 3) {
-                outputs[CH1_OUTPUT + i].setVoltage(finalOutL);
-            } else {
-                outputs[CH1_OUTPUT + i].setVoltage(finalOutR);
-            }
-        }
+        // Master-bus-only blend: dry contribution + wet contribution scaled by
+        // FX Return. This value feeds ONLY masterSumL/R -- it is never written
+        // back to outputs[CH1_OUTPUT + i], unlike the old behavior.
+        float masterContribL = drySignal + (wetL * panL * 5.0f * fxReturnAmt);
+        float masterContribR = drySignal + (wetR * panR * 5.0f * fxReturnAmt);
+        if (!std::isfinite(masterContribL)) masterContribL = drySignal;
+        if (!std::isfinite(masterContribR)) masterContribR = drySignal;
 
         // Accumulate into the dedicated master sum unconditionally -- Master L/R
         // should work standalone without every individual channel jack also
@@ -179,16 +184,21 @@ void Soundscapes::process(const ProcessArgs& args) {
         // won't have all 6 voices hitting full amplitude simultaneously, so this
         // keeps typical mixes well clear of 10V while still sounding reasonably
         // loud rather than overly conservative.
-        masterSumL += finalOutL;
-        masterSumR += finalOutR;
+        masterSumL += masterContribL;
+        masterSumR += masterContribR;
     }
 
+    // Master Level (global fader, col 8): final trim on the master bus output.
+    // Previously unwired -- pulling this fader to zero did nothing, since
+    // nothing downstream ever read its value. Fixed here.
+    float masterLevelAmt = params[MASTER_LEVEL_PARAM].getValue();
+
     if (outputs[MASTER_L_OUTPUT].isConnected()) {
-        float masterOutL = masterSumL / 3.0f;
+        float masterOutL = (masterSumL / 3.0f) * masterLevelAmt;
         outputs[MASTER_L_OUTPUT].setVoltage(std::isfinite(masterOutL) ? masterOutL : 0.0f);
     }
     if (outputs[MASTER_R_OUTPUT].isConnected()) {
-        float masterOutR = masterSumR / 3.0f;
+        float masterOutR = (masterSumR / 3.0f) * masterLevelAmt;
         outputs[MASTER_R_OUTPUT].setVoltage(std::isfinite(masterOutR) ? masterOutR : 0.0f);
     }
     lights[MASTER_L_LED].setBrightness(math::clamp(std::fabs(masterSumL) / 15.0f, 0.0f, 1.0f));
