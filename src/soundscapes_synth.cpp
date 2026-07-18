@@ -108,83 +108,37 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
         float attackCoeff = sampleTime / attackTime;
         float releaseCoeff = sampleTime / releaseTime;
 
-        // --- Determine trigger info FIRST -- pitch depends on which step (if any)
-        // fires this channel, since a step can carry its own melodic override.
+        // --- Determine trigger info FIRST -- this channel's own recorded pitch/
+        // probability at the current step, not a shared melody/chord track lookup.
         bool voiceGate = false;
-        float triggerVelocityNorm = 1.0f; // Default: full velocity if nothing says otherwise
-        bool useStepNoteOverride = false;
-        int stepNoteOffset = 0;
+        float triggerVelocityNorm = 1.0f; // No separate per-step velocity anymore --
+                                           // probability doubles as the on/off flag,
+                                           // amplitude comes from the channel fader.
 
         if (monoGateActive) {
             // Single mono gate: fire this channel along with every other one, together,
             // as a chord stab -- e.g. a keyboard's GATE OUT into GATE_INPUT plays the
             // whole harmonized chord on each keypress.
             voiceGate = inputs[GATE_INPUT].getVoltage() > 1.0f;
-        } else if (isPlaying) {
+        } else {
             float stepPeriod = 1.0f / (1.0f + rateVal * 19.0f);
             float activeGateDuration = stepPeriod * 0.50f; // 50% gate duration
             bool isGateActive = (stepTimeElapsed < activeGateDuration);
 
-            // Both tracks' playheads always advance in lockstep, so there's really one
-            // current step position; each track independently decides whether it fires
-            // and which channel it targets (decoupled from the step's own index, so a
-            // step's timing position no longer has to match the harmonic role it plays --
-            // there are 16 steps but only 6 channels, so this decoupling is essential).
-            int currentStep = melodyTrack.playhead;
-
-            bool melStepFires = melodyTrack.steps[currentStep].active && isGateActive && voiceTriggerActive[currentStep];
-            int melTarget = melodyTrack.steps[currentStep].targetChannel;
-            if (melTarget < 0 || melTarget > 5) melTarget = currentStep % 6; // safety fallback
-
-            bool chdStepFires = chordTrack.steps[currentStep].active && isGateActive && chordTriggerActive[currentStep];
-            int chdTarget = chordTrack.steps[currentStep].targetChannel;
-            if (chdTarget < 0 || chdTarget > 5) chdTarget = currentStep % 6; // safety fallback
-
-            // Melody Voice check
-            if (melStepFires && melTarget == i) {
-                voiceGate = true;
-                triggerVelocityNorm = melodyTrack.steps[currentStep].velocity / 127.0f;
-                if (melodyTrack.steps[currentStep].noteOverride) {
-                    useStepNoteOverride = true;
-                    stepNoteOffset = melodyTrack.steps[currentStep].noteDegreeOffset;
-                }
-            }
-            // Chord Voice check (takes priority if both tracks target the same
-            // channel on the same step, matching the existing velocity convention)
-            if (chdStepFires && chdTarget == i) {
-                voiceGate = true;
-                triggerVelocityNorm = chordTrack.steps[currentStep].velocity / 127.0f;
-                if (chordTrack.steps[currentStep].noteOverride) {
-                    useStepNoteOverride = true;
-                    stepNoteOffset = chordTrack.steps[currentStep].noteDegreeOffset;
-                }
-            }
+            // All 6 channels share one playhead (currentStep), but each has its own
+            // probability roll at that step (channelTriggerActive[i], re-rolled every
+            // time the playhead advances -- see processSequencer).
+            voiceGate = isGateActive && channelTriggerActive[i];
         }
 
-        // --- Pitch computation ---
-        float voiceMidiNote;
-        if (useStepNoteOverride) {
-            // NOTE mode override: this step carries its own scale-degree offset, so it
-            // plays its own note instead of the target channel's fixed harmonic role --
-            // this is what actually lets a pattern have real melodic movement.
-            int octaveOffset = stepNoteOffset / 7;
-            int scaleDegreeIndex = stepNoteOffset % 7;
-            int relativeNoteOffset = SCALES[scaleIdx][scaleDegreeIndex] + (octaveOffset * 12);
-            voiceMidiNote = baseMidiNote + relativeNoteOffset;
-        } else {
-            // --- DIATONIC CONSTELLATION MAPPING (internal generative harmony) ---
-            int chordOffsetDegree = i * 2; // Harmonizes in thirds
-            int chordOctaveOffset = chordOffsetDegree / 7;
-            int scaleDegreeIndex = chordOffsetDegree % 7;
-
-            int relativeNoteOffset = SCALES[scaleIdx][scaleDegreeIndex] + (chordOctaveOffset * 12);
-
-            // Channel 1 acts as the dedicated bass anchor note (transposed down 1 octave)
-            if (i == 0) {
-                relativeNoteOffset = -12;
-            }
-            voiceMidiNote = baseMidiNote + relativeNoteOffset;
-        }
+        // --- Pitch computation: this channel's own recorded value at the current
+        // step, quantized. Raw 0-1 fader value maps across a 2-octave (14-degree)
+        // range so live-recording a pitch has real melodic reach.
+        int degreeOffset = (int)std::round(stepPitch[i][currentStep] * 13.0f);
+        int octaveOffset = degreeOffset / 7;
+        int scaleDegreeIndex = degreeOffset % 7;
+        int relativeNoteOffset = SCALES[scaleIdx][scaleDegreeIndex] + (octaveOffset * 12);
+        float voiceMidiNote = baseMidiNote + relativeNoteOffset;
 
         voice.freq = 440.0f * std::pow(2.0f, (voiceMidiNote - 69.0f) / 12.0f);
 

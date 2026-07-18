@@ -47,19 +47,21 @@ Soundscapes::Soundscapes() {
     configParam(ROOT_PARAM, 0.0f, 1.0f, 0.0f, "Diatonic Quantizer: Root Scale Transposition Note");
     configParam(SCALE_PARAM, 0.0f, 1.0f, 0.0f, "Diatonic Quantizer: Selected Harmonised Scale Degrees");
 
-    // 6. Configure Row 4 Step Buttons & Performance Block (8 melody + 8 chord)
+    // 6. Configure Row 4 Step Buttons (unified 16-step row, was 8 melody + 8 chord).
+    // In normal operation these are passive playhead/occupied-slot indicators, not
+    // click-to-toggle -- they only become interactive (as a slot picker) while SAVE
+    // or RCL is armed. See StepPadWidget::onButton.
     for (int i = 0; i < 16; i++) {
-        configParam(STEP_PARAM_START + i, 0.0f, 1.0f, 0.0f, string::f("Step Pad %d Toggle Trigger", i + 1));
+        configParam(STEP_PARAM_START + i, 0.0f, 1.0f, 0.0f, string::f("Step Pad %d / Memory Slot %d", i + 1, i + 1));
     }
 
-    configParam(PLAY_PARAM, 0.0f, 1.0f, 0.0f, "Transport: Sequencer Play / Stop Toggle");
-    configParam(SHFT_PARAM, 0.0f, 1.0f, 0.0f, "Shift Toggle: Edits Step Probability & Resets Patterns");
-    configParam(ARP_PARAM, 0.0f, 1.0f, 0.0f, "Arpeggiator Enable");
-    configParam(FRZ_PARAM, 0.0f, 1.0f, 0.0f, "Freeze Capture State");
-    configParam(CHRD_PARAM, 0.0f, 1.0f, 0.0f, "Chord / Sequence Initialize");
-    configParam(PROB_PARAM, 0.0f, 1.0f, 0.0f, "Probability / Variation Lock");
-    configParam(SAVE_PARAM, 0.0f, 1.0f, 0.0f, "Save Active Sequencer Pattern");
-    configParam(RCL_PARAM, 0.0f, 1.0f, 0.0f, "Recall Saved Pattern");
+    // Performance section: 4 buttons (was 8 -- PLAY/SHFT/ARP/FRZ retired: PLAY
+    // because the module free-runs by default and RATE-down-to-zero already
+    // serves as "stop"; SHFT/ARP/FRZ were never wired to anything audible).
+    configParam(PITCH_PARAM, 0.0f, 1.0f, 0.0f, "Arm Faders: Live-Record Step Pitch");
+    configParam(PROB_PARAM, 0.0f, 1.0f, 0.0f, "Arm Faders: Live-Record Step Probability");
+    configParam(SAVE_PARAM, 0.0f, 1.0f, 0.0f, "Save Pattern to Memory Slot (pick a step pad)");
+    configParam(RCL_PARAM, 0.0f, 1.0f, 0.0f, "Recall Pattern from Memory Slot (browse step pads)");
 
     // Clear and zero out voice buffers to guarantee clean startup
     for (int i = 0; i < 6; i++) {
@@ -81,12 +83,14 @@ Soundscapes::Soundscapes() {
         }
     }
 
-    // Default each step's target channel to (step index mod 6), so all 16 steps
-    // (8 per track) have a valid channel to fall back on even though there are
-    // only 6 real synth voices -- steps and channels are independent axes.
-    for (int i = 0; i < 8; i++) {
-        melodyTrack.steps[i].targetChannel = i % 6;
-        chordTrack.steps[i].targetChannel = i % 6;
+    // Seed a modest default pattern so the module isn't silent on first load, before
+    // the player has recorded anything via PITCH/PROB fader-riding: alternating
+    // steps at a comfortable mid-probability, pitch centered (quantizer default).
+    for (int ch = 0; ch < 6; ch++) {
+        for (int s = 0; s < 16; s++) {
+            stepPitch[ch][s] = 0.5f;
+            stepProb[ch][s] = (s % 2 == 0) ? 0.7f : 0.0f;
+        }
     }
 
     // Clear FX Unit circular line buffers
@@ -97,6 +101,4 @@ Soundscapes::Soundscapes() {
         fxUnit.delayBufferR[b] = 0.0f;
     }
 
-    // Initialize Default Sequencer Trigger States
-    initializeSequence();
 }

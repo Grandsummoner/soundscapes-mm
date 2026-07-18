@@ -1,26 +1,8 @@
 #include "soundscapes.hpp"
 
 // Static trigger helpers for sequencer and interface controls
-static dsp::SchmittTrigger playClickTrigger;
 static dsp::SchmittTrigger clockTrigger;
 static dsp::SchmittTrigger resetTrigger;
-
-/**
- * Initialise default sequencer sequences
- */
-void Soundscapes::initializeSequence() {
-    for (int i = 0; i < 8; i++) {
-        melodyTrack.steps[i].note = i; // Diatonic step offsets
-        melodyTrack.steps[i].velocity = 100;
-        melodyTrack.steps[i].probability = 100;
-        melodyTrack.steps[i].active = (i % 2 == 0); // Default alternating pattern
-
-        chordTrack.steps[i].note = i + 2;
-        chordTrack.steps[i].velocity = 90;
-        chordTrack.steps[i].probability = 80;
-        chordTrack.steps[i].active = (i % 4 == 0);
-    }
-}
 
 /**
  * Handle Display Clicks to toggle Channel Focus Locks
@@ -34,20 +16,59 @@ void Soundscapes::handleFocusToggle(int channel) {
 }
 
 /**
- * Handle complex fader mappings based on Global Mixer vs. Focus Mode
+ * Handle complex fader mappings based on Global Mixer vs. Focus Mode, and the
+ * PITCH/PROB/SAVE/RCL exclusivity rules for the performance section.
  */
 void Soundscapes::handleFaderMapping() {
-    shiftActive = params[SHFT_PARAM].getValue() > 0.5f;
-    isPlaying = params[PLAY_PARAM].getValue() > 0.5f;
+    // --- PITCH/PROB/SAVE/RCL exclusivity ---
+    // SAVE is fully exclusive: engaging it forces PITCH, PROB, and RCL off.
+    // RCL is exclusive with SAVE only: engaging it forces SAVE off, but PITCH/PROB
+    // can still be armed alongside it (so a loaded pattern can be tweaked live
+    // without leaving RCL). PITCH/PROB force SAVE off but can combine with RCL and
+    // with each other.
+    static float prevPitch = 0.0f, prevProb = 0.0f, prevSave = 0.0f, prevRcl = 0.0f;
+    float currPitch = params[PITCH_PARAM].getValue();
+    float currProb = params[PROB_PARAM].getValue();
+    float currSave = params[SAVE_PARAM].getValue();
+    float currRcl = params[RCL_PARAM].getValue();
 
-    // Mutually Exclusive Radio Button logic for FM, DELAY, REVERB, and FILTER
+    bool pitchPressed = (currPitch > 0.5f && prevPitch <= 0.5f);
+    bool probPressed = (currProb > 0.5f && prevProb <= 0.5f);
+    bool savePressed = (currSave > 0.5f && prevSave <= 0.5f);
+    bool rclPressed = (currRcl > 0.5f && prevRcl <= 0.5f);
+
+    if (savePressed) {
+        params[PITCH_PARAM].setValue(0.0f);
+        params[PROB_PARAM].setValue(0.0f);
+        params[RCL_PARAM].setValue(0.0f);
+        currPitch = currProb = currRcl = 0.0f;
+    }
+    if (rclPressed) {
+        params[SAVE_PARAM].setValue(0.0f);
+        currSave = 0.0f;
+    }
+    if ((pitchPressed || probPressed) && currSave > 0.5f) {
+        params[SAVE_PARAM].setValue(0.0f);
+        currSave = 0.0f;
+    }
+
+    prevPitch = currPitch;
+    prevProb = currProb;
+    prevSave = currSave;
+    prevRcl = currRcl;
+
+    pitchArmed = currPitch > 0.5f;
+    probArmed = currProb > 0.5f;
+    saveArmed = currSave > 0.5f;
+    rclArmed = currRcl > 0.5f;
+
+    // --- Mutually Exclusive Radio Button logic for FM, DELAY, REVERB, and FILTER ---
     static float prevFm = 0.0f, prevDelay = 0.0f, prevReverb = 0.0f, prevFilter = 0.0f;
     float currFm = params[FM_PARAM].getValue();
     float currDelay = params[DELAY_PARAM].getValue();
     float currReverb = params[REVERB_PARAM].getValue();
     float currFilter = params[FILTER_PARAM].getValue();
 
-    // Check which FX button was newly clicked ON, disabling all other three options
     if (currFm > 0.5f && prevFm <= 0.5f) {
         params[DELAY_PARAM].setValue(0.0f);
         params[REVERB_PARAM].setValue(0.0f);
@@ -75,10 +96,7 @@ void Soundscapes::handleFaderMapping() {
     prevReverb = currReverb;
     prevFilter = currFilter;
 
-    // Determine active fader routing mode based on the cleared selection
-    if (shiftActive) {
-        activeFaderState = FADER_MIXER; 
-    } else if (currFm > 0.5f) {
+    if (currFm > 0.5f) {
         activeFaderState = FADER_FM_SEND;
     } else if (currDelay > 0.5f) {
         activeFaderState = FADER_DELAY_SEND;
@@ -90,15 +108,17 @@ void Soundscapes::handleFaderMapping() {
         activeFaderState = FADER_MIXER;
     }
 
-    // NOTE: focused-channel per-step velocity/probability editing via the faders is
-    // on hold for now -- steps (16) and channels (6) are decoupled (a step's target
-    // channel isn't 1:1 anymore), so "this channel's own step" no longer cleanly
-    // exists. Faders always control channel volume for now, focused or not; a
-    // proper per-step velocity/probability editing gesture is a separate decision
-    // for later.
+    // --- Channel faders: amplitude by default, live-record when PITCH/PROB armed ---
+    // Live-looper style: every sample the fader is actively being moved while
+    // armed, it overwrites that channel's stepPitch/stepProb at the CURRENT step
+    // again -- so riding it across multiple loop passes keeps refining the pattern.
     for (int i = 0; i < 6; i++) {
         float faderVal = params[FADER1_PARAM + i].getValue();
-        if (activeFaderState == FADER_MIXER) {
+
+        if (pitchArmed || probArmed) {
+            if (pitchArmed) stepPitch[i][currentStep] = faderVal;
+            if (probArmed) stepProb[i][currentStep] = faderVal;
+        } else if (activeFaderState == FADER_MIXER) {
             channelVolumes[i] = faderVal * faderVal; // Exponential taper: finer low-end control
         } else {
             int fxIndex = (int)activeFaderState - 1;
@@ -118,92 +138,21 @@ void Soundscapes::processSequencer(float sampleTime) {
         displayFlashState = !displayFlashState;
     }
 
-    // 2. Play/Stop Transport / Rewind
-    bool playClicked = playClickTrigger.process(params[PLAY_PARAM].getValue());
-    if (playClicked) {
-        if (shiftActive) {
-            melodyTrack.playhead = 0;
-            chordTrack.playhead = 0;
-            // Retain actual play state on latching toggle
-            params[PLAY_PARAM].setValue(isPlaying ? 1.0f : 0.0f);
-        } else {
-            isPlaying = !isPlaying;
-        }
-    }
-
-    // 3. CHRD Mode: latching toggle that repurposes the 16 step pads as a radio-select
-    // option menu, mutually exclusive with normal step editing so users can't edit the
-    // pattern and browse CHRD options at the same time. All 16 slots are currently
-    // just reserved framework -- nothing wired to them yet.
-    bool chordModeWasActive = chordModeActive;
-    chordModeActive = params[CHRD_PARAM].getValue() > 0.5f;
-
-    if (chordModeActive && !chordModeWasActive) {
-        // Just entered CHRD mode. Preserve the old SHFT+CHRD "clear focused pattern"
-        // gesture as a one-shot action on the same edge that opens CHRD mode.
-        if (shiftActive && focusedChannel != -1) {
-            for (int i = 0; i < 8; i++) {
-                melodyTrack.steps[i].active = false;
-                chordTrack.steps[i].active = false;
-            }
-        }
-        // The step pattern itself lives in melodyTrack/chordTrack .active (already
-        // captured above/before this frame), so it's safe to repurpose the raw pads
-        // as option-select buttons without losing anything.
-        for (int i = 0; i < 16; i++) {
-            params[STEP_PARAM_START + i].setValue(0.0f);
-        }
-        if (chordModeOption >= 0) {
-            params[STEP_PARAM_START + chordModeOption].setValue(1.0f);
-        }
-    } else if (!chordModeActive && chordModeWasActive) {
-        // Just left CHRD mode: restore the pads to reflect the real (frozen) pattern.
-        for (int i = 0; i < 8; i++) {
-            params[STEP_PARAM_START + i].setValue(melodyTrack.steps[i].active ? 1.0f : 0.0f);
-            params[STEP_PARAM_START + 8 + i].setValue(chordTrack.steps[i].active ? 1.0f : 0.0f);
-        }
-    }
-
-    if (chordModeActive) {
-        // 16-slot radio-exclusive option selector (only one slot lit at a time).
-        // Nothing is wired to any slot yet -- reserved for future CHRD-mode features.
-        static float prevOptVal[16] = {0.0f};
-        int newlyPressed = -1;
-        for (int i = 0; i < 16; i++) {
-            float cur = params[STEP_PARAM_START + i].getValue();
-            if (cur > 0.5f && prevOptVal[i] <= 0.5f) {
-                newlyPressed = i;
-            }
-            prevOptVal[i] = cur;
-        }
-
-        if (newlyPressed != -1) {
-            for (int i = 0; i < 16; i++) {
-                if (i != newlyPressed) params[STEP_PARAM_START + i].setValue(0.0f);
-            }
-            chordModeOption = newlyPressed;
-        } else {
-            bool anySelected = false;
-            for (int i = 0; i < 16; i++) {
-                if (params[STEP_PARAM_START + i].getValue() > 0.5f) anySelected = true;
-            }
-            if (!anySelected) chordModeOption = -1;
-        }
-    } else {
-        for (int i = 0; i < 8; i++) {
-            melodyTrack.steps[i].active = (params[STEP_PARAM_START + i].getValue() > 0.5f);
-            chordTrack.steps[i].active = (params[STEP_PARAM_START + 8 + i].getValue() > 0.5f);
-        }
-    }
-
-    // 5. Standalone Internal Clock Fallback (advances playhead automatically when CLK input is unpatched)
+    // 2. SAVE/RCL slot-picker: while either is armed, the 16 step pads stop being
+    // passive playhead indicators and become a memory slot picker instead (see
+    // StepPadWidget::onButton for the actual save/load action on press). This
+    // block just drives the pads' lit state to show which slots are occupied.
+    //
+    // 3. Standalone Internal Clock Fallback (advances playhead automatically when
+    // CLK input is unpatched). No PLAY button: the module free-runs by default:
+    // an external CLK connection takes over advancement, and turning RATE all the
+    // way down functions as "stop" (period approaches infinity).
     bool nextStep = false;
     bool externalClockConnected = inputs[CLK_INPUT].isConnected();
     bool externalReset = resetTrigger.process(inputs[RST_INPUT].getVoltage());
 
     if (externalReset) {
-        melodyTrack.playhead = 0;
-        chordTrack.playhead = 0;
+        currentStep = 0;
     }
 
     if (externalClockConnected) {
@@ -222,37 +171,38 @@ void Soundscapes::processSequencer(float sampleTime) {
 
     if (nextStep) {
         stepTimeElapsed = 0.0f;
+        currentStep = (currentStep + 1) % 16;
+
+        // Roll each channel's probability for the step it's now on. Probability
+        // doubles as the on/off flag -- a step at/near 0% is effectively silent,
+        // no separate "active" flag needed.
         float globalDensityScale = 1.0f;
         if (activeSynthMode == MODE_VOICES) {
             float densityVal = params[DENSITY_PARAM].getValue();
             globalDensityScale = 0.2f + densityVal * 1.6f;
         }
-        for (int i = 0; i < 8; i++) {
-            int melProb = (int)math::clamp(melodyTrack.steps[i].probability * globalDensityScale, 0.0f, 100.0f);
-            int chdProb = (int)math::clamp(chordTrack.steps[i].probability * globalDensityScale, 0.0f, 100.0f);
-            voiceTriggerActive[i] = ((rand() % 100) < melProb);
-            chordTriggerActive[i] = ((rand() % 100) < chdProb);
+        for (int ch = 0; ch < 6; ch++) {
+            float prob = math::clamp(stepProb[ch][currentStep] * globalDensityScale, 0.0f, 1.0f);
+            channelTriggerActive[ch] = ((float)rand() / RAND_MAX) < prob;
         }
     } else {
         stepTimeElapsed += sampleTime;
     }
 
-    if (nextStep && isPlaying) {
-        melodyTrack.playhead = (melodyTrack.playhead + 1) % 8;
-        chordTrack.playhead = (chordTrack.playhead + 1) % 8;
+    // 4. Step pad lights: SAVE/RCL armed -> show which of the 16 memory slots are
+    // occupied (dim = empty, bright = occupied). Otherwise -> passive playhead
+    // indicator, one step lit brightly as it plays, the rest dark.
+    for (int i = 0; i < 16; i++) {
+        if (saveArmed || rclArmed) {
+            lights[STEP_LED_START + i].setBrightness(slots[i].occupied ? 0.6f : 0.05f);
+        } else {
+            bool isPlayhead = (currentStep == i);
+            lights[STEP_LED_START + i].setBrightness(isPlayhead ? 1.0f : 0.0f);
+        }
     }
 
-    for (int i = 0; i < 8; i++) {
-        bool isMelPlayhead = (melodyTrack.playhead == i) && isPlaying;
-        lights[STEP_LED_START + i].setBrightness(isMelPlayhead ? 1.0f : (melodyTrack.steps[i].active ? 0.3f : 0.0f));
-
-        bool isChdPlayhead = (chordTrack.playhead == i) && isPlaying;
-        lights[STEP_LED_START + 8 + i].setBrightness(isChdPlayhead ? 1.0f : (chordTrack.steps[i].active ? 0.3f : 0.0f));
-    }
-
-    lights[PLAY_LED].setBrightness(isPlaying ? 1.0f : 0.0f);
-    lights[SHFT_LED].setBrightness(shiftActive ? 1.0f : 0.0f);
-    lights[CHRD_LED].setBrightness(chordModeActive ? 1.0f : 0.0f);
-    noteModeActive = params[PROB_PARAM].getValue() > 0.5f;
-    lights[PROB_LED].setBrightness(noteModeActive ? 1.0f : 0.0f);
+    lights[PITCH_LED].setBrightness(pitchArmed ? 1.0f : 0.0f);
+    lights[PROB_LED].setBrightness(probArmed ? 1.0f : 0.0f);
+    lights[SAVE_LED].setBrightness(saveArmed ? 1.0f : 0.0f);
+    lights[RCL_LED].setBrightness(rclArmed ? 1.0f : 0.0f);
 }

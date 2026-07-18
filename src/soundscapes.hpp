@@ -37,37 +37,31 @@ namespace SoundscapesCoords {
     const float GRID_COLS[10] = {79.0f, 113.0f, 147.0f, 181.0f, 215.0f, 249.0f, 283.0f, 317.0f, 351.0f, 386.0f};
     const float ROW3_FADER_Y = 233.0f;
     const float ROOT_Y = 220.0f;
-    const float SCALE_Y = 238.0f; // was 246 -- raised 8px so the label (now same
-                                   // size as the 6 big-knob labels) clears the
-                                   // performance button block below it
+    const float SCALE_Y = 220.0f; // was 238 (diagonal from ROOT) -- now same row as
+                                   // ROOT, freeing the space below for the
+                                   // performance button block to stretch into
 
     // Row 4: Step Sequencer Pads & Buttons
     const float ROW4_MELODY_PAD_Y = 288.0f;
     const float ROW4_CHORD_PAD_Y = 336.0f;
-    const float ROW4_BUTTON_ROWS[2] = {285.0f, 313.0f}; // 2 rows x 2 cols = 4
-                                                          // buttons (PITCH, PROB,
-                                                          // SAVE, RCL); was 4 rows
-                                                          // of 8 buttons
+    const float ROW4_BUTTON_ROWS[2] = {306.0f, 336.0f}; // 2x2 shape preserved (PITCH,
+                                                          // PROB, SAVE, RCL); stretched
+                                                          // down to use the space freed
+                                                          // by ROOT/SCALE now sharing a
+                                                          // row -- bottom row (336, +10
+                                                          // half-height = 346) sits flush
+                                                          // with the step grid's own
+                                                          // bottom edge
 }
 
-struct StepData {
-    uint8_t note = 0;         // Midi pitch offset
-    uint8_t velocity = 100;   // 0 - 127
-    uint8_t probability = 100; // 0 - 100% trigger chance
-    bool active = false;      // True if step is active
-    int8_t targetChannel = -1; // Which channel (0-5) this step triggers; -1 = "own index"
-                                // (set at construction to match the step's own index by
-                                // default, but reassignable via SHFT+click while a channel
-                                // is focused, decoupling timing position from harmonic role)
-    bool noteOverride = false;   // If true, this step plays its own scale degree instead
-    int8_t noteDegreeOffset = 0;  // of its target channel's fixed harmonic role -- lets a
-                                   // step carry real melodic movement (set via NOTE mode,
-                                   // the PROB button, cycling 0-13 then clearing on wrap)
-};
-
-struct SequencerTrack {
-    StepData steps[8];        // 8 contiguous steps
-    int playhead = 0;         // Active playhead step
+// A single saved pattern: all 6 channels' pitch + probability across all 16 steps,
+// captured together as one snapshot (a "slot" isn't meaningful per-channel, since
+// all 6 channels share one playhead position -- see Soundscapes::stepPitch/stepProb
+// below for why).
+struct PatternSlot {
+    bool occupied = false;
+    float pitch[6][16] = {};
+    float prob[6][16] = {};
 };
 
 enum SynthMode {
@@ -105,12 +99,14 @@ struct Soundscapes : Module {
         MASTER_LEVEL_PARAM, // Global fader, col 8: Master L/R output trim
         ROOT_PARAM,
         SCALE_PARAM,
-        PLAY_PARAM, SHFT_PARAM,
-        ARP_PARAM, FRZ_PARAM,
-        CHRD_PARAM, PROB_PARAM,
+        // Performance section: 4 buttons (was 8). PITCH/PROB arm the channel faders
+        // for live-record; SAVE/RCL repurpose the 16 step pads as a slot picker.
+        // Exclusivity: SAVE forces PITCH/PROB/RCL off; RCL forces SAVE off (but
+        // allows PITCH/PROB to combine with it); PITCH/PROB force SAVE off.
+        PITCH_PARAM, PROB_PARAM,
         SAVE_PARAM, RCL_PARAM,
         STEP_PARAM_START,
-        STEP_PARAM_END = STEP_PARAM_START + 16, // 8 melody + 8 chord
+        STEP_PARAM_END = STEP_PARAM_START + 16, // Unified 16-step row (was 8 melody + 8 chord)
         NUM_PARAMS
     };
 
@@ -140,18 +136,44 @@ struct Soundscapes : Module {
         CH1_LED, CH2_LED, CH3_LED, CH4_LED, CH5_LED, CH6_LED,
         MASTER_L_LED, MASTER_R_LED,
         STEP_LED_START,
-        STEP_LED_END = STEP_LED_START + 16, // 8 melody + 8 chord
-        PLAY_LED, SHFT_LED, ARP_LED, FRZ_LED, CHRD_LED, PROB_LED, SAVE_LED, RCL_LED,
+        STEP_LED_END = STEP_LED_START + 16, // Unified 16-step row (was 8 melody + 8 chord)
+        PITCH_LED, PROB_LED, SAVE_LED, RCL_LED,
         NUM_LIGHTS
     };
 
     // Sequencer & Latching State
-    SequencerTrack melodyTrack;
-    SequencerTrack chordTrack;
+    //
+    // Shared timeline, independent per-channel content: all 6 channels advance
+    // through the same 16-step playhead together, but each channel stores its own
+    // pitch + probability at every step -- 6 parallel automation lanes over one
+    // clock, not 6 separate sequencers. See stepPitch/stepProb below.
+    int currentStep = 0;             // 0-15, shared playhead for all 6 channels
+    float stepPitch[6][16] = {};     // Per-channel, per-step raw pitch (0-1, quantized downstream)
+    float stepProb[6][16] = {};      // Per-channel, per-step trigger probability (0-1); doubles as the on/off flag -- 0 = effectively silent
+    bool channelTriggerActive[6] = {}; // This pass's probability roll result, per channel, latched at each step advance
+
+    PatternSlot slots[16];           // SAVE/RCL memory -- one slot = all 6 channels' full pattern
+
+    // PITCH/PROB: latching, multi-armable together. While armed, the channel
+    // faders stop controlling amplitude and become live-record inputs instead --
+    // riding a fader writes into that channel's own stepPitch/stepProb at
+    // whatever step the shared clock is currently on (live-looper style: every
+    // pass the fader is touched, it overwrites that step again).
+    bool pitchArmed = false;
+    bool probArmed = false;
+
+    // SAVE: latching, but self-clears the instant a slot is picked (see
+    // processSequencer). Exclusive with PITCH/PROB/RCL -- engaging SAVE forces
+    // all three off.
+    bool saveArmed = false;
+
+    // RCL: latching, stays latched until pressed again (a "browse memory slots
+    // while performing" mode) -- unlike SAVE, doesn't auto-clear on a pad press,
+    // and can combine with PITCH/PROB so a loaded pattern can be tweaked live
+    // without leaving RCL. Exclusive with SAVE only.
+    bool rclArmed = false;
 
     int focusedChannel = -1;       // Range: -1 (Global Mixer) to 0-5 (Focus 1-6)
-    bool shiftActive = false;      // SHFT toggle switch state
-    bool isPlaying = true;         // Transport state
     SynthMode activeSynthMode = MODE_VOICES;
     FaderState activeFaderState = FADER_MIXER;
 
@@ -231,18 +253,6 @@ struct Soundscapes : Module {
         }
     }
 
-    // CHRD mode: latching switch that repurposes the 16 step pads as a radio-select
-    // option menu (mutually exclusive with normal step editing -- entering CHRD mode
-    // freezes the step pattern rather than letting the two be edited simultaneously).
-    // All 16 slots are currently just reserved framework -- nothing wired to them yet.
-    bool chordModeActive = false;
-    int chordModeOption = -1;              // -1 = none selected, else 0-15
-
-    // NOTE mode (PROB button, latching): while active, clicking a step pad cycles
-    // that step's own melodic override (0-13 scale degrees, then clears back to
-    // "use the channel's fixed harmonic role" on wrap) instead of toggling it on/off.
-    bool noteModeActive = false;
-
     // Flashing display clock trackers for UI
     float flashTimer = 0.0f;
     bool displayFlashState = false;
@@ -252,9 +262,6 @@ struct Soundscapes : Module {
     float displayValueTimer[8] = {};
     int displayType[8] = {};       // 0: Percentage, 1: Root Note, 2: Scale Type
 
-    // Sequencer Timing & Probability tracking
-    bool voiceTriggerActive[8] = {};
-    bool chordTriggerActive[8] = {};
     float stepTimeElapsed = 0.0f;  // Keeps track of physical elapsed step duration in seconds
 
     // DSP Processing Variables
@@ -376,5 +383,4 @@ struct Soundscapes : Module {
     void processDSP(const ProcessArgs& args);
     void handleFocusToggle(int channel);
     void handleFaderMapping();
-    void initializeSequence();
 };

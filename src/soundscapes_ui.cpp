@@ -202,13 +202,11 @@ struct OpaqueDisplay : Widget {
                     snprintf(text, sizeof(text), "%02d", pct);
                 }
             } else {
-                if (channelId == 6) {
-                    snprintf(text, sizeof(text), "L");
-                } else if (channelId == 7) {
-                    snprintf(text, sizeof(text), "R");
-                } else {
-                    snprintf(text, sizeof(text), "%d", channelId + 1);
-                }
+                // Idle: leave dark. Channel/L/R identity is already printed once,
+                // above the display -- repeating it here was redundant, and a
+                // display that's only ever lit when something needs to show is a
+                // clearer signal than one that's always showing something.
+                return;
             }
             nvgTextBold(args.vg, box.size.x / 2.0f, box.size.y / 2.0f + 1.5f, text, NULL);
         }
@@ -228,52 +226,24 @@ struct StepPadWidget : app::SvgSwitch {
 
     void onButton(const event::Button& e) override {
         Soundscapes* mod = dynamic_cast<Soundscapes*>(this->module);
-        if (mod && e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT && !mod->chordModeActive) {
-            bool isChord = (padId >= 8);
-            int stepIndex = isChord ? (padId - 8) : padId;
-            SequencerTrack& track = isChord ? mod->chordTrack : mod->melodyTrack;
-
-            if (mod->noteModeActive) {
-                // NOTE mode: cycle this step's own melodic override up one scale degree
-                // each click (0-13, two octaves), then clear back to "use the channel's
-                // fixed harmonic role" on wrap -- lets a step carry real melodic movement
-                // independent of whatever channel it happens to target.
-                StepData& step = track.steps[stepIndex];
-                if (!step.noteOverride) {
-                    step.noteOverride = true;
-                    step.noteDegreeOffset = 0;
-                } else if (step.noteDegreeOffset < 13) {
-                    step.noteDegreeOffset++;
-                } else {
-                    step.noteOverride = false;
-                    step.noteDegreeOffset = 0;
+        if (mod && e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
+            if (mod->saveArmed) {
+                // SAVE: pressing a pad writes the current live pattern (all 6
+                // channels' pitch+probability across all 16 steps) into this slot,
+                // then SAVE auto-unlatches immediately.
+                PatternSlot& slot = mod->slots[padId];
+                for (int ch = 0; ch < 6; ch++) {
+                    for (int s = 0; s < 16; s++) {
+                        slot.pitch[ch][s] = mod->stepPitch[ch][s];
+                        slot.prob[ch][s] = mod->stepProb[ch][s];
+                    }
                 }
+                slot.occupied = true;
+                mod->params[Soundscapes::SAVE_PARAM].setValue(0.0f);
+                mod->saveArmed = false;
 
                 char buf[9];
-                if (step.noteOverride) {
-                    snprintf(buf, sizeof(buf), "%c%d:DG%d", isChord ? 'C' : 'M', stepIndex + 1, step.noteDegreeOffset);
-                } else {
-                    snprintf(buf, sizeof(buf), "%c%dCLEAR", isChord ? 'C' : 'M', stepIndex + 1);
-                }
-                snprintf(mod->macroFunctionText, sizeof(mod->macroFunctionText), "%s", buf);
-                mod->macroFunctionActive = step.noteOverride;
-                for (int c = 0; c < 8; c++) {
-                    mod->displayValueTimer[c] = 1.5f;
-                    mod->displayType[c] = 4;
-                }
-                e.consume(this);
-                return;
-            }
-
-            if (mod->shiftActive && mod->focusedChannel != -1) {
-                // SHFT+click while a channel is focused reassigns this step's target
-                // channel instead of toggling it -- decouples timing position from which
-                // harmonic role it plays. A normal click still just toggles active/inactive.
-                track.steps[stepIndex].targetChannel = (int8_t)mod->focusedChannel;
-
-                // Flash a confirmation across the 7-segment displays, e.g. "M3->C5"
-                char buf[9];
-                snprintf(buf, sizeof(buf), "%c%d-C%d", isChord ? 'C' : 'M', stepIndex + 1, mod->focusedChannel + 1);
+                snprintf(buf, sizeof(buf), "SAVE%02d", padId + 1);
                 snprintf(mod->macroFunctionText, sizeof(mod->macroFunctionText), "%s", buf);
                 mod->macroFunctionActive = true;
                 for (int c = 0; c < 8; c++) {
@@ -283,23 +253,54 @@ struct StepPadWidget : app::SvgSwitch {
                 e.consume(this);
                 return;
             }
+
+            if (mod->rclArmed) {
+                // RCL: pressing a pad loads that slot into the live pattern (if
+                // occupied) and stays latched -- lets you keep punching through
+                // slots to audition/perform across memory without leaving RCL.
+                PatternSlot& slot = mod->slots[padId];
+                if (slot.occupied) {
+                    for (int ch = 0; ch < 6; ch++) {
+                        for (int s = 0; s < 16; s++) {
+                            mod->stepPitch[ch][s] = slot.pitch[ch][s];
+                            mod->stepProb[ch][s] = slot.prob[ch][s];
+                        }
+                    }
+                }
+
+                char buf[9];
+                snprintf(buf, sizeof(buf), slot.occupied ? "RCL%02d" : "EMPTY%02d", padId + 1);
+                snprintf(mod->macroFunctionText, sizeof(mod->macroFunctionText), "%s", buf);
+                mod->macroFunctionActive = slot.occupied;
+                for (int c = 0; c < 8; c++) {
+                    mod->displayValueTimer[c] = 1.5f;
+                    mod->displayType[c] = 4;
+                }
+                e.consume(this);
+                return;
+            }
+
+            // Normal state: pads are a passive playhead indicator only, not
+            // click-to-edit -- step content is set by riding the channel faders
+            // with PITCH/PROB armed (see handleFaderMapping), not by clicking pads.
+            e.consume(this);
+            return;
         }
         SvgSwitch::onButton(e);
     }
 
     void draw(const DrawArgs& args) override {
         Soundscapes* module = dynamic_cast<Soundscapes*>(this->module);
-        bool stepActive = false;
         bool isPlayhead = false;
+        bool slotOccupied = false;
+        bool pickerMode = false;
 
         if (module) {
-            if (padId < 6) {
-                stepActive = module->params[Soundscapes::STEP_PARAM_START + padId].getValue() > 0.5f;
-                isPlayhead = (module->melodyTrack.playhead == padId) && module->isPlaying;
+            pickerMode = module->saveArmed || module->rclArmed;
+            if (pickerMode) {
+                slotOccupied = module->slots[padId].occupied;
             } else {
-                int chordStep = padId - 6;
-                stepActive = module->params[Soundscapes::STEP_PARAM_START + padId].getValue() > 0.5f;
-                isPlayhead = (module->chordTrack.playhead == chordStep) && module->isPlaying;
+                isPlayhead = (module->currentStep == padId);
             }
         }
 
@@ -313,48 +314,22 @@ struct StepPadWidget : app::SvgSwitch {
         nvgBeginPath(args.vg);
         nvgRoundedRect(args.vg, 0.0f, 0.0f, box.size.x, box.size.y, 3.5f);
 
-        if (module && module->chordModeActive) {
-            // In CHRD mode the pads are a 16-slot option selector, not step toggles --
-            // tint purple (matching the CHRD button) so it reads as a different mode.
-            if (stepActive) {
-                nvgFillColor(args.vg, nvgRGBA(155, 89, 182, 255)); // Vivid Royal Purple
-            } else {
-                nvgFillColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff));
-            }
+        if (pickerMode) {
+            // SAVE/RCL slot picker: tint by whether a saved pattern lives here.
+            // SAVE tints amber (matches the SAVE button), RCL tints purple.
+            bool isSave = module && module->saveArmed;
+            NVGcolor occupiedColor = isSave ? nvgRGBA(0xff, 0x9d, 0x00, 0xff) : nvgRGBA(155, 89, 182, 255);
+            nvgFillColor(args.vg, slotOccupied ? occupiedColor : nvgRGBA(0xff, 0xff, 0xff, 0xff));
         } else if (isPlayhead) {
             nvgFillColor(args.vg, nvgRGBA(0x2e, 0xcc, 0x71, 0xff)); // Active green playhead
-        } else if (stepActive) {
-            nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // Active step amber
         } else {
-            nvgFillColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff)); // Clean white unlit pad
+            nvgFillColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff)); // Clean white, passive
         }
         nvgFill(args.vg);
 
         nvgStrokeColor(args.vg, nvgRGBA(0xd5, 0xcf, 0xc5, 0xff));
         nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
-
-        // Small dark dot in the top-right corner marks a step whose target channel has
-        // been reassigned away from its own index (timing decoupled from harmonic role).
-        if (module && !module->chordModeActive) {
-            bool isChord = (padId >= 8);
-            int stepIndex = isChord ? (padId - 8) : padId;
-            const SequencerTrack& track = isChord ? module->chordTrack : module->melodyTrack;
-            if (track.steps[stepIndex].targetChannel != stepIndex % 6) {
-                nvgBeginPath(args.vg);
-                nvgCircle(args.vg, box.size.x - 4.0f, 4.0f, 2.0f);
-                nvgFillColor(args.vg, nvgRGBA(0x2b, 0x28, 0x24, 0xff));
-                nvgFill(args.vg);
-            }
-            // Small colored dot in the bottom-left corner marks a step carrying its own
-            // melodic override (plays its own note instead of the target channel's role).
-            if (track.steps[stepIndex].noteOverride) {
-                nvgBeginPath(args.vg);
-                nvgCircle(args.vg, 4.0f, box.size.y - 4.0f, 2.0f);
-                nvgFillColor(args.vg, nvgRGBA(0x34, 0x98, 0xdb, 0xff)); // Blue
-                nvgFill(args.vg);
-            }
-        }
     }
 };
 
@@ -431,18 +406,19 @@ struct MasterLevelFader : SoundscapesFader {
  * 4. Procedural Utility/Performance Buttons (Enhanced high-contrast vivid colors)
  */
 struct PerformanceButtonWidget : SoundscapesButton {
-    int buttonId = 0; // 0 to 7
+    int buttonId = 0; // 0 = PITCH, 1 = PROB, 2 = SAVE, 3 = RCL
     std::shared_ptr<Font> font;
 
     PerformanceButtonWidget() {
-        box.size = Vec(22.0f, 18.0f);
+        box.size = Vec(24.0f, 20.0f); // was 22x18 -- now matches FXButtonWidget size
         font = loadRobustFont();
     }
 
     void onButton(const event::Button& e) override {
-        // PLAY(0), SHFT(1), CHRD(4), and PROB(5) are latching mode switches; the
-        // rest (including ARP/FRZ, dropped for the simple v1) are momentary.
-        momentary = (buttonId != 0 && buttonId != 1 && buttonId != 4 && buttonId != 5);
+        // All four are latching -- SAVE's "auto-unlatch on pad press" behavior
+        // happens in module logic (StepPadWidget::onButton / handleFaderMapping),
+        // not by making this widget itself momentary.
+        momentary = false;
         SoundscapesButton::onButton(e);
     }
 
@@ -451,10 +427,10 @@ struct PerformanceButtonWidget : SoundscapesButton {
         bool litState = false;
 
         if (module) {
-            if (buttonId == 0) litState = module->isPlaying;       // PLAY Button
-            if (buttonId == 1) litState = module->shiftActive;     // SHFT Button
-            if (buttonId == 4) litState = module->chordModeActive; // CHRD Button (STEP <-> CHRD mode)
-            if (buttonId == 5) litState = module->noteModeActive;  // PROB Button (PROB <-> NOTE mode)
+            if (buttonId == 0) litState = module->pitchArmed;
+            if (buttonId == 1) litState = module->probArmed;
+            if (buttonId == 2) litState = module->saveArmed;
+            if (buttonId == 3) litState = module->rclArmed;
         }
 
         // Soft shadow
@@ -467,16 +443,14 @@ struct PerformanceButtonWidget : SoundscapesButton {
         nvgBeginPath(args.vg);
         nvgRoundedRect(args.vg, 0.0f, 0.0f, box.size.x, box.size.y, 2.5f);
 
-        float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.0f;
-        if (litState || value > 0.5f) {
-            // Two colors only: green for persistent mode/state toggles (PLAY, SHFT,
-            // ARP, FRZ, CHRD, PROB), amber for momentary one-shot actions (SAVE, RCL).
-            // Color variety is reserved for the FX section instead.
-            bool isStateToggle = (buttonId <= 5);
-            if (isStateToggle) {
-                nvgFillColor(args.vg, nvgRGBA(0x2e, 0xcc, 0x71, 0xff)); // Green
-            } else {
+        if (litState) {
+            // PITCH/PROB (live-record, fader-focused): blue. SAVE: amber. RCL: purple.
+            if (buttonId <= 1) {
+                nvgFillColor(args.vg, nvgRGBA(0x34, 0x98, 0xdb, 0xff)); // Blue
+            } else if (buttonId == 2) {
                 nvgFillColor(args.vg, nvgRGBA(0xf1, 0xc4, 0x0f, 0xff)); // Amber
+            } else {
+                nvgFillColor(args.vg, nvgRGBA(155, 89, 182, 255)); // Purple
             }
         } else {
             nvgFillColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff)); // White unlit
@@ -484,7 +458,7 @@ struct PerformanceButtonWidget : SoundscapesButton {
         nvgFill(args.vg);
 
         // Bold white stroke to highlight active state
-        if (litState || value > 0.5f) {
+        if (litState) {
             nvgStrokeColor(args.vg, nvgRGBA(255, 255, 255, 255));
             nvgStrokeWidth(args.vg, 1.5f);
         } else {
@@ -498,16 +472,10 @@ struct PerformanceButtonWidget : SoundscapesButton {
             nvgFontFaceId(args.vg, font->handle);
             nvgFontSize(args.vg, 7.0f);
             nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-            nvgFillColor(args.vg, (litState || value > 0.5f) ? nvgRGBA(0xff, 0xff, 0xff, 0xff) : nvgRGBA(0x3a, 0x35, 0x2e, 0xff));
+            nvgFillColor(args.vg, litState ? nvgRGBA(0xff, 0xff, 0xff, 0xff) : nvgRGBA(0x3a, 0x35, 0x2e, 0xff));
 
-            const char* labels[8] = {"PLAY", "SHFT", "ARP", "FRZ", "CHRD", "PROB", "SAVE", "RCL"};
-            const char* labelText = labels[buttonId];
-            if (buttonId == 4) {
-                labelText = (litState || value > 0.5f) ? "CHRD" : "STEP";
-            } else if (buttonId == 5) {
-                labelText = (litState || value > 0.5f) ? "NOTE" : "PROB";
-            }
-            nvgTextBold(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, labelText, NULL);
+            const char* labels[4] = {"PITCH", "PROB", "SAVE", "RCL"};
+            nvgTextBold(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, labels[buttonId], NULL);
         }
     }
 };
@@ -792,12 +760,6 @@ struct FXButtonWidget : SoundscapesButton {
     }
 
     void onButton(const event::Button& e) override {
-        // Corrected: If shift is active, disable button clicks completely (fixes hidden latching)
-        Soundscapes* module = dynamic_cast<Soundscapes*>(this->module);
-        if (module && module->shiftActive) {
-            e.consume(this);
-            return;
-        }
         SoundscapesButton::onButton(e);
     }
 
@@ -881,15 +843,15 @@ struct FaceplateLabels : Widget {
             nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
             
             // A. Draw Module Main Header
-            nvgFontSize(args.vg, 13.0f);
+            nvgFontSize(args.vg, 16.0f); // was 13
             nvgFontFaceId(args.vg, font->handle);
             nvgFillColor(args.vg, nvgRGBA(0x11, 0x11, 0x11, 0xff)); // Dark bold
-            nvgTextBold(args.vg, 232.5f, 25.0f, "SOUNDSCAPES", NULL);
+            nvgTextBold(args.vg, 232.5f, 23.0f, "SOUNDSCAPES", NULL);
 
             // B. Draw Module Slogan
-            nvgFontSize(args.vg, 7.0f);
+            nvgFontSize(args.vg, 8.5f); // was 7
             nvgFillColor(args.vg, nvgRGBA(0x6d, 0x65, 0x58, 0xff)); // Cream-charcoal
-            nvgTextBold(args.vg, 232.5f, 36.0f, "6-Channel Poly-Engine", NULL);
+            nvgTextBold(args.vg, 232.5f, 38.0f, "6-Channel Poly-Engine", NULL);
 
             // C. Sidebar Labels (CLK, RST, etc.)
             const char* sidebarLabels[7] = {"CLK", "RST", "V/OCT", "GATE", "VEL", "EXT IN", "DUCK"};
@@ -903,18 +865,18 @@ struct FaceplateLabels : Widget {
             }
             nvgFillColor(args.vg, nvgRGBA(0x5c, 0x53, 0x46, 0xff)); // Reset to standard charcoal
 
-            // D. Output Jack Column Numbers (1 to 6), then L/R for the master outs
+            // D. Output Jack Column Numbers (1 to 6), then L/R for the master outs.
+            // Printed once, above the 7-seg display (between it and the jack) --
+            // the display itself no longer repeats this when idle (see
+            // OpaqueDisplay::draw), so there's no more duplicate second row below.
             for (int i = 0; i < 6; i++) {
                 float x = SoundscapesCoords::CH_COLS[i];
                 nvgFontSize(args.vg, 7.0f);
                 nvgTextBold(args.vg, x, SoundscapesCoords::ROW1_JACK_Y + 16.0f, std::to_string(i + 1).c_str(), NULL);
-                nvgTextBold(args.vg, x, SoundscapesCoords::ROW1_DISPLAY_Y + 28.0f, std::to_string(i + 1).c_str(), NULL);
             }
             nvgFontSize(args.vg, 7.0f);
             nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[6], SoundscapesCoords::ROW1_JACK_Y + 16.0f, "L", NULL);
-            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[6], SoundscapesCoords::ROW1_DISPLAY_Y + 28.0f, "L", NULL);
             nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[7], SoundscapesCoords::ROW1_JACK_Y + 16.0f, "R", NULL);
-            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[7], SoundscapesCoords::ROW1_DISPLAY_Y + 28.0f, "R", NULL);
 
             // E. Fader Numbers (1 to 6)
             for (int i = 0; i < 6; i++) {
@@ -937,14 +899,14 @@ struct FaceplateLabels : Widget {
             nvgTextBold(args.vg, SoundscapesCoords::GRID_COLS[8], SoundscapesCoords::ROOT_Y + 21.0f, "ROOT", NULL);
             nvgTextBold(args.vg, SoundscapesCoords::GRID_COLS[9], SoundscapesCoords::SCALE_Y + 21.0f, "SCALE", NULL);
 
-            // H. Step Numbers (unified single row, melody/chord split removed)
+            // H. Step Numbers (unified 16-step row, physically laid out as two
+            // rows of 8: row 1 = steps 1-8, row 2 = steps 9-16)
             nvgFontSize(args.vg, 6.5f);
             for (int i = 0; i < 8; i++) {
                 float x = SoundscapesCoords::GRID_COLS[i];
                 nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_MELODY_PAD_Y + 18.0f, std::to_string(i + 1).c_str(), NULL);
+                nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_CHORD_PAD_Y + 18.0f, std::to_string(i + 9).c_str(), NULL);
             }
-            // NOTE: MELODY/CHORD section labels removed -- steps are now a single
-            // unified row (pitch + probability per step, no melody/chord split).
         }
     }
 };
@@ -1055,44 +1017,34 @@ struct SoundscapesWidget : ModuleWidget {
         addParam(createParamCentered<SoundscapesSmallKnob>(Vec(SoundscapesCoords::GRID_COLS[9], SoundscapesCoords::SCALE_Y), module, Soundscapes::SCALE_PARAM));
 
         // --- V. Row 4: Step Sequencer Pads & Performance Block ---
-        // TODO -- PENDING STEP-MODEL REFACTOR: the melody/chord split is being
-        // retired (steps will hold only pitch + probability, live-recorded via
-        // the channel faders instead of clicked pad-by-pad -- see chat design
-        // notes). Until that refactor lands, this still wires 16 physical pads
-        // as two rows of 8; the MELODY/CHORD text labels above them were already
-        // removed, so right now the second row will look unlabeled/orphaned.
-        // Don't ship this half-state -- either restore the labels temporarily or
-        // finish collapsing this to a single unified 8-pad row.
+        // Unified 16-step row, physically laid out as two rows of 8 (steps 1-8,
+        // then 9-16). No more melody/chord split -- each pad is just step N of one
+        // shared 16-step timeline; every channel has its own pitch/probability at
+        // that step (see Soundscapes::stepPitch/stepProb).
         for (int i = 0; i < 8; i++) {
             float x = SoundscapesCoords::GRID_COLS[i];
-            
-            // Melody step button (Row 1)
-            StepPadWidget* melPad = createParamCentered<StepPadWidget>(Vec(x, SoundscapesCoords::ROW4_MELODY_PAD_Y), module, Soundscapes::STEP_PARAM_START + i);
-            melPad->padId = i;
-            addParam(melPad);
 
-            // Chord step button (Row 2) -- pending removal, see TODO above
-            StepPadWidget* chdPad = createParamCentered<StepPadWidget>(Vec(x, SoundscapesCoords::ROW4_CHORD_PAD_Y), module, Soundscapes::STEP_PARAM_START + 8 + i);
-            chdPad->padId = 8 + i;
-            addParam(chdPad);
+            StepPadWidget* padRow1 = createParamCentered<StepPadWidget>(Vec(x, SoundscapesCoords::ROW4_MELODY_PAD_Y), module, Soundscapes::STEP_PARAM_START + i);
+            padRow1->padId = i;
+            addParam(padRow1);
+
+            StepPadWidget* padRow2 = createParamCentered<StepPadWidget>(Vec(x, SoundscapesCoords::ROW4_CHORD_PAD_Y), module, Soundscapes::STEP_PARAM_START + 8 + i);
+            padRow2->padId = 8 + i;
+            addParam(padRow2);
         }
 
         // 2x2 Utility Button Grid on Columns 9 & 10 (PITCH, PROB, SAVE, RCL)
-        // TODO: this still indexes off the old 8-slot PLAY_PARAM..RCL_PARAM block.
-        // Once ParamId is refactored down to just PITCH_PARAM/PROB_PARAM/
-        // SAVE_PARAM/RCL_PARAM (dropping PLAY/SHFT/ARP/FRZ/CHRD), point btnIndex
-        // at the new 4-slot enum directly instead of skipping through the old one.
         for (int row = 0; row < 2; row++) {
             float y = SoundscapesCoords::ROW4_BUTTON_ROWS[row];
             int btnIndex = row * 2;
 
             // Column 1 Button
-            PerformanceButtonWidget* btn1 = createParamCentered<PerformanceButtonWidget>(Vec(SoundscapesCoords::GRID_COLS[8], y), module, Soundscapes::PLAY_PARAM + btnIndex);
+            PerformanceButtonWidget* btn1 = createParamCentered<PerformanceButtonWidget>(Vec(SoundscapesCoords::GRID_COLS[8], y), module, Soundscapes::PITCH_PARAM + btnIndex);
             btn1->buttonId = btnIndex;
             addParam(btn1);
 
             // Column 2 Button
-            PerformanceButtonWidget* btn2 = createParamCentered<PerformanceButtonWidget>(Vec(SoundscapesCoords::GRID_COLS[9], y), module, Soundscapes::PLAY_PARAM + btnIndex + 1);
+            PerformanceButtonWidget* btn2 = createParamCentered<PerformanceButtonWidget>(Vec(SoundscapesCoords::GRID_COLS[9], y), module, Soundscapes::PITCH_PARAM + btnIndex + 1);
             btn2->buttonId = btnIndex + 1;
             addParam(btn2);
         }
