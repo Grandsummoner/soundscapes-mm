@@ -156,9 +156,15 @@ void Soundscapes::processSequencer(float sampleTime) {
         currentStep = 0;
     }
 
+    // RATE turned all the way down = stop. The previous formula (1/(1+rateVal*19))
+    // only ever reached a 1-second period at rateVal=0 -- never actually stopped,
+    // despite the comment above claiming it approached infinity. Below this
+    // threshold, freeze the playhead outright instead of just running very slowly.
+    bool clockStopped = !externalClockConnected && (params[RATE_PARAM].getValue() < 0.02f);
+
     if (externalClockConnected) {
         nextStep = clockTrigger.process(inputs[CLK_INPUT].getVoltage());
-    } else {
+    } else if (!clockStopped) {
         float rateVal = params[RATE_PARAM].getValue();
         float period = 1.0f / (1.0f + rateVal * 19.0f);
 

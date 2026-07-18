@@ -868,29 +868,41 @@ struct XYPadWidget : OpaqueWidget {
     }
 
     void onButton(const event::Button& e) override {
-        if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
-            double now = system::getTime();
-            if (lastClickTime > 0.0 && (now - lastClickTime) < 0.3) {
-                // Double-click: recenter both axes (= off)
-                if (module) {
-                    module->params[Soundscapes::WILDCARD_X_PARAM].setValue(0.5f);
-                    module->params[Soundscapes::WILDCARD_Y_PARAM].setValue(0.5f);
-                }
-                lastClickTime = -1.0;
-            } else {
-                lastClickTime = now;
-                dragPos = e.pos;
-                setFromLocalPos(e.pos);
+        if (e.action != GLFW_PRESS) return;
+
+        if (e.button == GLFW_MOUSE_BUTTON_RIGHT) {
+            // Right-click: guaranteed, timing-independent recenter. Added as a
+            // backup to double-click, which depends on manually-tracked timing
+            // that's harder to verify works identically across platforms.
+            if (module) {
+                module->params[Soundscapes::WILDCARD_X_PARAM].setValue(0.5f);
+                module->params[Soundscapes::WILDCARD_Y_PARAM].setValue(0.5f);
             }
             e.consume(this);
+            return;
         }
-        OpaqueWidget::onButton(e);
+
+        if (e.button != GLFW_MOUSE_BUTTON_LEFT) return;
+
+        double now = system::getTime();
+        if (lastClickTime > 0.0 && (now - lastClickTime) < 0.4) {
+            // Double-click: recenter both axes (= off)
+            if (module) {
+                module->params[Soundscapes::WILDCARD_X_PARAM].setValue(0.5f);
+                module->params[Soundscapes::WILDCARD_Y_PARAM].setValue(0.5f);
+            }
+            lastClickTime = -1.0;
+        } else {
+            lastClickTime = now;
+            dragPos = e.pos;
+            setFromLocalPos(e.pos);
+        }
+        e.consume(this);
     }
 
     void onDragMove(const event::DragMove& e) override {
         dragPos = dragPos.plus(e.mouseDelta);
         setFromLocalPos(dragPos);
-        OpaqueWidget::onDragMove(e);
     }
 
     void draw(const DrawArgs& args) override {

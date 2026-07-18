@@ -122,6 +122,11 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             // as a chord stab -- e.g. a keyboard's GATE OUT into GATE_INPUT plays the
             // whole harmonized chord on each keypress.
             voiceGate = inputs[GATE_INPUT].getVoltage() > 1.0f;
+        } else if (!inputs[CLK_INPUT].isConnected() && rateVal < 0.02f) {
+            // RATE turned all the way down = stop: gate off unconditionally, so
+            // voices release naturally instead of staying stuck sounding on
+            // whatever step the playhead was frozen on (see processSequencer).
+            voiceGate = false;
         } else {
             float stepPeriod = 1.0f / (1.0f + rateVal * 19.0f);
             float activeGateDuration = stepPeriod * 0.50f; // 50% gate duration
