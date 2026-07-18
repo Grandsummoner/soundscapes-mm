@@ -21,12 +21,15 @@ void Soundscapes::handleFocusToggle(int channel) {
  */
 void Soundscapes::handleFaderMapping() {
     // --- PITCH/PROB/SAVE/RCL exclusivity ---
-    // SAVE is fully exclusive: engaging it forces PITCH, PROB, and RCL off.
-    // RCL is exclusive with SAVE only: engaging it forces SAVE off, but PITCH/PROB
-    // can still be armed alongside it (so a loaded pattern can be tweaked live
-    // without leaving RCL). PITCH/PROB force SAVE off but can combine with RCL and
-    // with each other.
-    static float prevPitch = 0.0f, prevProb = 0.0f, prevSave = 0.0f, prevRcl = 0.0f;
+    // PITCH defaults to armed and stays that way as the resting state -- editing
+    // pitch is the immediate, most common action, so it shouldn't require a
+    // button press first. Pressing PROB temporarily takes over (forces PITCH
+    // off); when PROB is unlatched again (by the user, not by SAVE stealing it),
+    // PITCH automatically resumes. SAVE is fully exclusive: engaging it forces
+    // PITCH, PROB, and RCL off. RCL is exclusive with SAVE only: engaging it
+    // forces SAVE off, but PITCH/PROB can still be armed alongside it (so a
+    // loaded pattern can be tweaked live without leaving RCL).
+    static float prevPitch = 1.0f, prevProb = 0.0f, prevSave = 0.0f, prevRcl = 0.0f;
     float currPitch = params[PITCH_PARAM].getValue();
     float currProb = params[PROB_PARAM].getValue();
     float currSave = params[SAVE_PARAM].getValue();
@@ -34,8 +37,27 @@ void Soundscapes::handleFaderMapping() {
 
     bool pitchPressed = (currPitch > 0.5f && prevPitch <= 0.5f);
     bool probPressed = (currProb > 0.5f && prevProb <= 0.5f);
+    bool probReleased = (currProb <= 0.5f && prevProb > 0.5f); // User-driven unlatch, read
+                                                                // before SAVE/RCL can force
+                                                                // PROB off below, so a SAVE
+                                                                // press doesn't also look like
+                                                                // a genuine PROB release here
     bool savePressed = (currSave > 0.5f && prevSave <= 0.5f);
     bool rclPressed = (currRcl > 0.5f && prevRcl <= 0.5f);
+
+    // PITCH <-> PROB: mutually exclusive with each other, with PROB-unlatch
+    // auto-restoring PITCH.
+    if (pitchPressed) {
+        params[PROB_PARAM].setValue(0.0f);
+        currProb = 0.0f;
+    }
+    if (probPressed) {
+        params[PITCH_PARAM].setValue(0.0f);
+        currPitch = 0.0f;
+    } else if (probReleased) {
+        params[PITCH_PARAM].setValue(1.0f);
+        currPitch = 1.0f;
+    }
 
     if (savePressed) {
         params[PITCH_PARAM].setValue(0.0f);

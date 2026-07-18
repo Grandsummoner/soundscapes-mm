@@ -57,6 +57,18 @@ struct SoundscapesButton : app::ParamWidget {
 /**
  * 1. Custom Smoked Bronze Channel Display Widget (with 60Hz UI parameter HUD change-checking)
  */
+// Small helper: blend a color toward white (amt > 0) or black (amt < 0), used
+// both to derive highlight/shadow tones for knob bevels and to shade the VU
+// meter's 4 depth bands from a single base color.
+static NVGcolor shadeColor(NVGcolor c, float amt) {
+    if (amt >= 0.0f) {
+        return nvgRGBAf(c.r + (1.0f - c.r) * amt, c.g + (1.0f - c.g) * amt, c.b + (1.0f - c.b) * amt, c.a);
+    } else {
+        float f = 1.0f + amt; // amt is negative here
+        return nvgRGBAf(c.r * f, c.g * f, c.b * f, c.a);
+    }
+}
+
 struct OpaqueDisplay : Widget {
     Soundscapes* module = nullptr;
     int channelId = 0; // Range 0 - 7
@@ -195,26 +207,62 @@ struct OpaqueDisplay : Widget {
                     char c = (channelId < len) ? module->macroFunctionText[channelId] : ' ';
                     snprintf(text, sizeof(text), "%c", c);
                 } else if (module->displayType[channelId] == 5) {
-                    // VU-meter bargraph: knob-turn HUD. Colorful zones (green/yellow/red)
-                    // instead of a flat monotone fill, so it reads at a glance like a real
-                    // level meter rather than just a generic progress bar.
-                    int litCount = (int)std::round(module->displayValue[channelId] * 8.0f);
-                    litCount = clamp(litCount, 0, 8);
-                    if (channelId < litCount) {
-                        NVGcolor segColor;
-                        if (channelId < 5) segColor = nvgRGBA(0x2e, 0xcc, 0x71, 0xff);      // Green (segments 1-5)
-                        else if (channelId < 7) segColor = nvgRGBA(0xf1, 0xc4, 0x0f, 0xff); // Yellow (6-7)
-                        else segColor = nvgRGBA(0xe7, 0x4c, 0x3c, 0xff);                     // Red (8)
+                    // VU-meter bargraph: knob-turn HUD. 3 sub-columns per display (24
+                    // segments total across all 8) for finer resolution than a single
+                    // block per cell. Colored to match whichever FX bus is currently
+                    // active (so a Reverb-focused knob turn reads in amber, a Filter one
+                    // in magenta, etc.), in 4 shade depths of that one hue -- easy to
+                    // read and remember at a glance, rather than an unrelated flat color.
+                    NVGcolor baseColor;
+                    int accentGroup = 0;
+                    if (module->activeFaderState == FADER_DELAY_SEND) accentGroup = 2;
+                    else if (module->activeFaderState == FADER_REVERB_SEND) accentGroup = 3;
+                    else if (module->activeFaderState == FADER_FILTER_SEND) accentGroup = 4;
+                    else if (module->activeFaderState == FADER_FM_SEND) accentGroup = 5; // Compressor
+
+                    if (accentGroup == 2) baseColor = nvgRGBA(0x1a, 0xbc, 0x9c, 0xff);      // Delay: Teal
+                    else if (accentGroup == 3) baseColor = nvgRGBA(0xff, 0x9d, 0x00, 0xff); // Reverb: Amber
+                    else if (accentGroup == 4) baseColor = nvgRGBA(0xe9, 0x1e, 0x63, 0xff); // Filter: Magenta
+                    else if (accentGroup == 5) baseColor = nvgRGBA(0x9b, 0x59, 0xb6, 0xff); // Compressor: Purple
+                    else baseColor = nvgRGBA(0x2e, 0xcc, 0x71, 0xff);                       // No FX bus active: Green
+
+                    int totalLit = (int)std::round(module->displayValue[channelId] * 24.0f);
+                    totalLit = clamp(totalLit, 0, 24);
+                    int myLit = clamp(totalLit - channelId * 3, 0, 3);
+
+                    float colW = (box.size.x - 6.0f) / 3.0f;
+                    for (int col = 0; col < myLit; col++) {
+                        int segIdx = channelId * 3 + col;
+                        int shadeBand = clamp(segIdx / 6, 0, 3); // 4 shade bands across 24 segments
+                        // Band 0 (quietest) lightest tint -> band 3 (loudest) darkest/most saturated
+                        float shadeAmt = 0.45f - (float)shadeBand * 0.3f; // 0.45, 0.15, -0.15, -0.45
+                        NVGcolor segColor = shadeColor(baseColor, shadeAmt);
+
                         nvgBeginPath(args.vg);
-                        nvgRoundedRect(args.vg, 4.0f, 4.0f, box.size.x - 8.0f, box.size.y - 8.0f, 2.0f);
+                        nvgRoundedRect(args.vg, 3.0f + col * colW, 4.0f, colW - 1.5f, box.size.y - 8.0f, 1.5f);
                         nvgFillColor(args.vg, segColor);
                         nvgFill(args.vg);
                     }
-                    return; // Filled block, not text -- skip the nvgTextBold call below
+                    return; // Filled blocks, not text -- skip the nvgTextBold call below
                 } else {
-                    int pct = (int)std::round(module->displayValue[channelId] * 99.0f);
-                    pct = clamp(pct, 0, 99);
-                    snprintf(text, sizeof(text), "%02d", pct);
+                    // Item 3: channel fader edits also get a VU bar instead of a plain
+                    // 00-99 number -- 3 segments, classic green/yellow/red zones, drawn
+                    // within this single cell (this display isn't shared across all 8
+                    // like the knob-turn HUD above, so a simpler 3-step meter fits here).
+                    int litCount = (int)std::round(module->displayValue[channelId] * 3.0f);
+                    litCount = clamp(litCount, 0, 3);
+                    float colW = (box.size.x - 6.0f) / 3.0f;
+                    for (int col = 0; col < litCount; col++) {
+                        NVGcolor segColor;
+                        if (col == 0) segColor = nvgRGBA(0x2e, 0xcc, 0x71, 0xff);      // Green
+                        else if (col == 1) segColor = nvgRGBA(0xf1, 0xc4, 0x0f, 0xff); // Yellow
+                        else segColor = nvgRGBA(0xe7, 0x4c, 0x3c, 0xff);                // Red
+                        nvgBeginPath(args.vg);
+                        nvgRoundedRect(args.vg, 3.0f + col * colW, 4.0f, colW - 1.5f, box.size.y - 8.0f, 1.5f);
+                        nvgFillColor(args.vg, segColor);
+                        nvgFill(args.vg);
+                    }
+                    return; // Filled blocks, not text -- skip the nvgTextBold call below
                 }
             } else {
                 // Idle: leave dark. Channel/L/R identity is already printed once,
@@ -420,6 +468,66 @@ struct MasterLevelFader : SoundscapesFader {
 };
 
 /**
+ * Octatrack-style horizontal crossfader. Distinct from the vertical channel
+ * faders in both orientation and cap shape (a diamond, not a rectangle) so it
+ * reads immediately as "not a channel control."
+ */
+struct CrossfaderWidget : app::ParamWidget {
+    Vec dragPos;
+
+    CrossfaderWidget() {
+        box.size = Vec(70.0f, 16.0f);
+    }
+
+    void onButton(const event::Button& e) override {
+        if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
+            dragPos = e.pos;
+            setFromLocalPos(e.pos);
+            e.consume(this);
+        }
+    }
+
+    void onDragMove(const event::DragMove& e) override {
+        dragPos = dragPos.plus(e.mouseDelta);
+        setFromLocalPos(dragPos);
+    }
+
+    void setFromLocalPos(Vec pos) {
+        if (!getParamQuantity()) return;
+        float x = math::clamp(pos.x / box.size.x, 0.0f, 1.0f);
+        getParamQuantity()->setValue(x);
+    }
+
+    void draw(const DrawArgs& args) override {
+        // Track groove
+        nvgBeginPath(args.vg);
+        nvgRect(args.vg, 0.0f, box.size.y / 2.0f - 2.0f, box.size.x, 4.0f);
+        nvgFillColor(args.vg, nvgRGBA(13, 12, 11, 255));
+        nvgFill(args.vg);
+
+        float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.5f;
+        float handleWidth = 14.0f;
+        float handleX = value * (box.size.x - handleWidth);
+        float cx = handleX + handleWidth / 2.0f;
+        float cy = box.size.y / 2.0f;
+
+        // Diamond-shaped cap -- deliberately distinct from every other control
+        // on the panel, matching an Octatrack-style crossfader's look.
+        nvgBeginPath(args.vg);
+        nvgMoveTo(args.vg, cx, cy - 9.0f);
+        nvgLineTo(args.vg, cx + 9.0f, cy);
+        nvgLineTo(args.vg, cx, cy + 9.0f);
+        nvgLineTo(args.vg, cx - 9.0f, cy);
+        nvgClosePath(args.vg);
+        nvgFillColor(args.vg, nvgRGBA(0xe7, 0x4c, 0x3c, 0xff)); // Vivid red-orange
+        nvgFill(args.vg);
+        nvgStrokeColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff));
+        nvgStrokeWidth(args.vg, 1.3f);
+        nvgStroke(args.vg);
+    }
+};
+
+/**
  * 4. Procedural Utility/Performance Buttons (Enhanced high-contrast vivid colors)
  */
 struct PerformanceButtonWidget : SoundscapesButton {
@@ -500,17 +608,6 @@ struct PerformanceButtonWidget : SoundscapesButton {
 /**
  * 5. Procedural Large White Knob Widget (No external SVG dependencies)
  */
-// Small helper: blend a color toward white (amt > 0) or black (amt < 0),
-// used to derive highlight/shadow tones for the metallic bevel from a single
-// base color instead of hand-picking every shade.
-static NVGcolor shadeColor(NVGcolor c, float amt) {
-    if (amt >= 0.0f) {
-        return nvgRGBAf(c.r + (1.0f - c.r) * amt, c.g + (1.0f - c.g) * amt, c.b + (1.0f - c.b) * amt, c.a);
-    } else {
-        float f = 1.0f + amt; // amt is negative here
-        return nvgRGBAf(c.r * f, c.g * f, c.b * f, c.a);
-    }
-}
 
 struct SoundscapesKnob : app::Knob {
     SoundscapesKnob() {
@@ -853,7 +950,6 @@ struct FXButtonWidget : SoundscapesButton {
 struct XYPadWidget : OpaqueWidget {
     Soundscapes* module = nullptr;
     Vec dragPos;
-    double lastClickTime = -1.0;
 
     XYPadWidget() {
         box.size = Vec(50.0f, 50.0f);
@@ -867,36 +963,34 @@ struct XYPadWidget : OpaqueWidget {
         module->params[Soundscapes::WILDCARD_Y_PARAM].setValue(y);
     }
 
+    void recenter() {
+        if (!module) return;
+        module->params[Soundscapes::WILDCARD_X_PARAM].setValue(0.5f);
+        module->params[Soundscapes::WILDCARD_Y_PARAM].setValue(0.5f);
+    }
+
+    void onDoubleClick(const event::DoubleClick& e) override {
+        // Primary recenter gesture -- uses Rack's own double-click detection
+        // rather than a hand-rolled timer, which is more likely to actually work
+        // reliably (a previous manual system::getTime()-based version didn't).
+        recenter();
+    }
+
     void onButton(const event::Button& e) override {
         if (e.action != GLFW_PRESS) return;
 
         if (e.button == GLFW_MOUSE_BUTTON_RIGHT) {
-            // Right-click: guaranteed, timing-independent recenter. Added as a
-            // backup to double-click, which depends on manually-tracked timing
-            // that's harder to verify works identically across platforms.
-            if (module) {
-                module->params[Soundscapes::WILDCARD_X_PARAM].setValue(0.5f);
-                module->params[Soundscapes::WILDCARD_Y_PARAM].setValue(0.5f);
-            }
+            // Right-click: guaranteed, timing-independent recenter -- a backup
+            // in case double-click still doesn't register on some platforms.
+            recenter();
             e.consume(this);
             return;
         }
 
         if (e.button != GLFW_MOUSE_BUTTON_LEFT) return;
 
-        double now = system::getTime();
-        if (lastClickTime > 0.0 && (now - lastClickTime) < 0.4) {
-            // Double-click: recenter both axes (= off)
-            if (module) {
-                module->params[Soundscapes::WILDCARD_X_PARAM].setValue(0.5f);
-                module->params[Soundscapes::WILDCARD_Y_PARAM].setValue(0.5f);
-            }
-            lastClickTime = -1.0;
-        } else {
-            lastClickTime = now;
-            dragPos = e.pos;
-            setFromLocalPos(e.pos);
-        }
+        dragPos = e.pos;
+        setFromLocalPos(e.pos);
         e.consume(this);
     }
 
@@ -1059,8 +1153,9 @@ struct SoundscapesWidget : ModuleWidget {
 
             // Custom Display overlays
             OpaqueDisplay* display = new OpaqueDisplay();
-            display->box.pos = Vec(x - 14.0f, SoundscapesCoords::ROW1_DISPLAY_Y - 20.0f);
-            display->box.size = Vec(28.0f, 40.0f);
+            display->box.pos = Vec(x - 14.0f, SoundscapesCoords::ROW1_DISPLAY_Y - 15.0f);
+            display->box.size = Vec(28.0f, 30.0f); // Height reduced to 75% (was 40) -- frees
+                                                    // vertical room, kept centered on the same Y
             display->module = module;
             display->channelId = i;
             addChild(display);
@@ -1076,15 +1171,15 @@ struct SoundscapesWidget : ModuleWidget {
 
         {
             OpaqueDisplay* masterLDisplay = new OpaqueDisplay();
-            masterLDisplay->box.pos = Vec(SoundscapesCoords::CH_COLS[6] - 14.0f, SoundscapesCoords::ROW1_DISPLAY_Y - 20.0f);
-            masterLDisplay->box.size = Vec(28.0f, 40.0f);
+            masterLDisplay->box.pos = Vec(SoundscapesCoords::CH_COLS[6] - 14.0f, SoundscapesCoords::ROW1_DISPLAY_Y - 15.0f);
+            masterLDisplay->box.size = Vec(28.0f, 30.0f); // 75% height, see above
             masterLDisplay->module = module;
             masterLDisplay->channelId = 6; // 6/7 are the master L/R display slots
             addChild(masterLDisplay);
 
             OpaqueDisplay* masterRDisplay = new OpaqueDisplay();
-            masterRDisplay->box.pos = Vec(SoundscapesCoords::CH_COLS[7] - 14.0f, SoundscapesCoords::ROW1_DISPLAY_Y - 20.0f);
-            masterRDisplay->box.size = Vec(28.0f, 40.0f);
+            masterRDisplay->box.pos = Vec(SoundscapesCoords::CH_COLS[7] - 14.0f, SoundscapesCoords::ROW1_DISPLAY_Y - 15.0f);
+            masterRDisplay->box.size = Vec(28.0f, 30.0f); // 75% height, see above
             masterRDisplay->module = module;
             masterRDisplay->channelId = 7;
             addChild(masterRDisplay);
@@ -1149,8 +1244,16 @@ struct SoundscapesWidget : ModuleWidget {
             XYPadWidget* xyPad = new XYPadWidget();
             xyPad->module = module;
             float xyCenterX = (SoundscapesCoords::GRID_COLS[8] + SoundscapesCoords::GRID_COLS[9]) / 2.0f;
-            xyPad->box.pos = Vec(xyCenterX - xyPad->box.size.x / 2.0f, 268.0f - xyPad->box.size.y / 2.0f);
+            xyPad->box.pos = Vec(xyCenterX - xyPad->box.size.x / 2.0f, 272.0f - xyPad->box.size.y / 2.0f); // was 268 -- a few px lower for breathing room below the ROOT/SCALE label
             addChild(xyPad);
+        }
+
+        // Octatrack-style crossfader -- sits in the existing gap between the fader
+        // row (bottom edge ~256) and the step pad row (top edge ~278), spanning
+        // across the step/channel columns.
+        {
+            CrossfaderWidget* crossfader = createParamCentered<CrossfaderWidget>(Vec((SoundscapesCoords::GRID_COLS[0] + SoundscapesCoords::GRID_COLS[7]) / 2.0f, 267.0f), module, Soundscapes::CROSSFADER_PARAM);
+            addParam(crossfader);
         }
 
         // --- V. Row 4: Step Sequencer Pads & Performance Block ---

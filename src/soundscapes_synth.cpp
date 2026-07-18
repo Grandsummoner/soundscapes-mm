@@ -214,10 +214,20 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             int delayLength = (int)(sampleRate / voice.freq);
             delayLength = math::clamp(delayLength, 4, 2047);
 
-            // Snappy trigger excitation pluck on gate onset
-            if (voiceGate && voice.env < 0.05f) {
-                voice.delayBuffer[voice.writeIdx] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f;
+            // One-shot pluck excitation on the gate's rising edge: fill the entire
+            // delay line with noise in a single pass, rather than trickle-writing
+            // one sample per call while env stays below a threshold (that approach
+            // depended on attack being slow enough, and delayLength short enough,
+            // for the whole line to get seeded before the envelope rose past the
+            // threshold -- low notes with a fast attack often only got partially
+            // seeded, giving a weak, thin pluck instead of a full string excitation).
+            bool gateRisingEdge = voiceGate && !voice.prevGate;
+            if (gateRisingEdge) {
+                for (int b = 0; b < 2048; b++) {
+                    voice.delayBuffer[b] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f;
+                }
             }
+            voice.prevGate = voiceGate;
 
             int readIdx = (voice.writeIdx - delayLength + 2048) & 2047;
             float currentSample = voice.delayBuffer[readIdx];
@@ -240,8 +250,10 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             float detuneRatio = std::pow(2.0f, (densityVal * 8.0f) / 1200.0f);
             int unisonDelayLength = math::clamp((int)(sampleRate / (voice.freq * detuneRatio)), 4, 2047);
 
-            if (voiceGate && voice.env < 0.05f) {
-                voice.unisonDelayBuffer[voice.unisonWriteIdx] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f;
+            if (gateRisingEdge) {
+                for (int b = 0; b < 2048; b++) {
+                    voice.unisonDelayBuffer[b] = ((float)rand() / RAND_MAX - 0.5f) * 2.0f;
+                }
             }
 
             int unisonReadIdx = (voice.unisonWriteIdx - unisonDelayLength + 2048) & 2047;
@@ -270,8 +282,19 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
                 dustImpulse = ((float)rand() / RAND_MAX - 0.5f) * 1.5f;
             }
 
-            channelOutputSignal = (droneCarrier * 0.4f * voice.env + dustImpulse * 0.6f * voice.env) * channelVolumes[i];
+            channelOutputSignal = (droneCarrier * 0.75f * voice.env + dustImpulse * 0.55f * voice.env) * channelVolumes[i];
+            // Was 0.4/0.6 -- measurably quieter than Voices/Waves (which run near full
+            // amplitude), since the drone alone only reached 0.4 peak and dust impulses
+            // are sparse. Boosted for comparable loudness across all three modes.
         }
+
+        // Octatrack-style crossfader: equal-power morph between channels 1-3 and
+        // 4-6, so sliding from one end to the other doesn't cause an overall
+        // level dip at center.
+        float crossfaderPos = params[CROSSFADER_PARAM].getValue();
+        float groupAWeight = std::cos(crossfaderPos * (float)M_PI / 2.0f); // Channels 1-3
+        float groupBWeight = std::sin(crossfaderPos * (float)M_PI / 2.0f); // Channels 4-6
+        channelOutputSignal *= (i < 3) ? groupAWeight : groupBWeight;
 
         // Apply dynamic CV DUCKING
         if (inputs[DUCK_INPUT].isConnected()) {

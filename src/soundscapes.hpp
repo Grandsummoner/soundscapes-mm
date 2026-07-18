@@ -116,6 +116,11 @@ struct Soundscapes : Module {
         // one direction = bass deepens while others hold, other direction =
         // reverse). Center (0.5, 0.5) = fully off.
         WILDCARD_X_PARAM, WILDCARD_Y_PARAM,
+        // Octatrack-style crossfader: morphs channels 1-3 against channels 4-6 as
+        // you slide from one end to the other (equal-power curve, so the overall
+        // level doesn't dip at center). First-pass interpretation of "morph" --
+        // easy to redefine what the two sides mean once you've tried it.
+        CROSSFADER_PARAM,
         // Performance section: 4 buttons (was 8). PITCH/PROB arm the channel faders
         // for live-record; SAVE/RCL repurpose the 16 step pads as a slot picker.
         // Exclusivity: SAVE forces PITCH/PROB/RCL off; RCL forces SAVE off (but
@@ -299,6 +304,7 @@ struct Soundscapes : Module {
         float delayBuffer[2048] = {0.0f};
         int writeIdx = 0;
         float noiseState = 0.0f;    // LPG smoothing filter state (Waves/Drone-Dust use)
+        bool prevGate = false;      // Rising-edge detection for Waves mode's pluck excitation
         void trigger() { env = 1.0f; }
 
         // --- Voices mode (VA osc + FM/ring-mod) specific state ---
@@ -323,6 +329,16 @@ struct Soundscapes : Module {
         float compEnvelope = 0.0f;  // Compressor's RMS envelope follower
         float tiltLowL = 0.0f;      // Tilt EQ's one-pole low/high crossover split
         float tiltLowR = 0.0f;
+
+        // Smoothed copies of each FX bus's send level, used only for the audio
+        // math below (the raw params stay instant for the exclusivity/UI logic).
+        // Fixes the volume jump when switching buses (e.g. Delay -> Filter): the
+        // wet content used to snap from one bus's character to another's in a
+        // single sample; now it crossfades over ~40ms instead.
+        float smoothedDelaySend = 0.0f;
+        float smoothedReverbSend = 0.0f;
+        float smoothedFilterSend = 0.0f;
+        float smoothedCompressorSend = 0.0f;
     } fxUnit;
 
     /**

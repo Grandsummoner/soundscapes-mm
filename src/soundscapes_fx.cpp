@@ -88,6 +88,11 @@ void Soundscapes::process(const ProcessArgs& args) {
 
     // --- PROCESSOR 1: FEEDBACK DELAY ---
     float delaySendVal = params[DELAY_PARAM].getValue();
+    {
+        float smoothCoeff = 1.0f - std::exp(-1.0f / (0.04f * sampleRate)); // ~40ms
+        fxUnit.smoothedDelaySend += (delaySendVal - fxUnit.smoothedDelaySend) * smoothCoeff;
+        delaySendVal = fxUnit.smoothedDelaySend;
+    }
     float fbackVal = params[SPREAD_PARAM].getValue() * 0.95f; // Max feedback clamp: 95%
     float delayTimeVal = params[RATE_PARAM].getValue();
 
@@ -133,6 +138,11 @@ void Soundscapes::process(const ProcessArgs& args) {
 
     // --- PROCESSOR 2: SHIMMER REVERB TANK ---
     float reverbSendVal = params[REVERB_PARAM].getValue();
+    {
+        float smoothCoeff = 1.0f - std::exp(-1.0f / (0.04f * sampleRate));
+        fxUnit.smoothedReverbSend += (reverbSendVal - fxUnit.smoothedReverbSend) * smoothCoeff;
+        reverbSendVal = fxUnit.smoothedReverbSend;
+    }
     float timbrePitchShiftVal = params[TIMBRE_PARAM].getValue();
 
     // Mode-dependent reverb character (unannounced): Voices keeps the original
@@ -172,6 +182,11 @@ void Soundscapes::process(const ProcessArgs& args) {
 
     // --- PROCESSOR 3: STATE-VARIABLE FILTER (SVF) ---
     float filterSendVal = params[FILTER_PARAM].getValue();
+    {
+        float smoothCoeff = 1.0f - std::exp(-1.0f / (0.04f * sampleRate));
+        fxUnit.smoothedFilterSend += (filterSendVal - fxUnit.smoothedFilterSend) * smoothCoeff;
+        filterSendVal = fxUnit.smoothedFilterSend;
+    }
     float cutoffVal = expMap(params[TEXTURE_PARAM].getValue(), 80.0f, 12000.0f); // Exponential: was linear 100Hz-12.1kHz
     // Resonance: was a fixed 0.35 constant -- now a real second knob (TIMBRE),
     // safe to share with Reverb's shimmer control since Reverb/Filter/Compressor
@@ -190,6 +205,11 @@ void Soundscapes::process(const ProcessArgs& args) {
     // Fixed, moderate attack/release times so turning the strength knob reshapes
     // depth, not speed -- deliberately no wild swings in level.
     float compressorSendVal = params[COMPRESSOR_PARAM].getValue();
+    {
+        float smoothCoeff = 1.0f - std::exp(-1.0f / (0.04f * sampleRate));
+        fxUnit.smoothedCompressorSend += (compressorSendVal - fxUnit.smoothedCompressorSend) * smoothCoeff;
+        compressorSendVal = fxUnit.smoothedCompressorSend;
+    }
     float strengthVal = params[TIMBRE_PARAM].getValue();
     float widthVal = params[TEXTURE_PARAM].getValue();
 
