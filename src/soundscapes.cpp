@@ -26,7 +26,7 @@ Soundscapes::Soundscapes() {
 
     // 4. Configure Row 2 Core Synth Parameters
     configParam(MODE_PARAM, 0.0f, 2.0f, 0.0f, "Synthesis Mode Select (Voices -> Waves -> Drone & Dust)");
-    configParam(FM_PARAM, 0.0f, 1.0f, 0.0f, "FM Modulation Send Edit Select");
+    configParam(COMPRESSOR_PARAM, 0.0f, 1.0f, 0.0f, "Compressor+Tilt EQ+Mid-Side Send");
     configParam(DELAY_PARAM, 0.0f, 1.0f, 0.0f, "Delay Send Edit Select");
     configParam(REVERB_PARAM, 0.0f, 1.0f, 0.0f, "Reverb Send Edit Select");
     configParam(FILTER_PARAM, 0.0f, 1.0f, 0.0f, "Filter Send Edit Select");
@@ -46,6 +46,8 @@ Soundscapes::Soundscapes() {
     configParam(MASTER_LEVEL_PARAM, 0.0f, 1.0f, 0.8f, "Master Level: Output Trim");
     configParam(ROOT_PARAM, 0.0f, 1.0f, 0.0f, "Diatonic Quantizer: Root Scale Transposition Note");
     configParam(SCALE_PARAM, 0.0f, 1.0f, 0.0f, "Diatonic Quantizer: Selected Harmonised Scale Degrees");
+    configParam(WILDCARD_X_PARAM, 0.0f, 1.0f, 0.5f, "Wildcard Transpose: Reach/Wildness");
+    configParam(WILDCARD_Y_PARAM, 0.0f, 1.0f, 0.5f, "Wildcard Transpose: Voice Balance (Bass vs Others)");
 
     // 6. Configure Row 4 Step Buttons (unified 16-step row, was 8 melody + 8 chord).
     // In normal operation these are passive playhead/occupied-slot indicators, not

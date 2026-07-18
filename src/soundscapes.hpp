@@ -3,6 +3,16 @@
 #include "rack.hpp"
 #include <cmath>
 
+// Exponential interpolation for time/frequency-style knobs: at raw=0 gives
+// minVal, at raw=1 gives maxVal, with equal perceptual (octave-like) steps per
+// unit of rotation -- most of the knob's travel covers short/musical values,
+// only the extreme end reaches the slow/pad-like tail. Contrast with a plain
+// linear knob, which spends most of its rotation on values nobody wants.
+static inline float expMap(float raw, float minVal, float maxVal) {
+    raw = rack::math::clamp(raw, 0.0f, 1.0f);
+    return minVal * std::pow(maxVal / minVal, raw);
+}
+
 using namespace rack;
 
 // Forward declare the plugin instance
@@ -83,7 +93,8 @@ enum FaderState {
 struct Soundscapes : Module {
     enum ParamId {
         MODE_PARAM,
-        FM_PARAM,
+        COMPRESSOR_PARAM, // Was FM_PARAM -- FM never did anything audible (confirmed
+                          // dead), repurposed for Compressor+Tilt EQ+Mid-Side
         DELAY_PARAM,
         REVERB_PARAM,
         FILTER_PARAM,
@@ -99,6 +110,12 @@ struct Soundscapes : Module {
         MASTER_LEVEL_PARAM, // Global fader, col 8: Master L/R output trim
         ROOT_PARAM,
         SCALE_PARAM,
+        // X-Y wildcard transpose pad (live performance, continuous -- no measure
+        // count/timer): X = reach/wildness (center = tame, edges = bigger leaps
+        // like 4ths/octaves more likely), Y = voice balance (center = balanced,
+        // one direction = bass deepens while others hold, other direction =
+        // reverse). Center (0.5, 0.5) = fully off.
+        WILDCARD_X_PARAM, WILDCARD_Y_PARAM,
         // Performance section: 4 buttons (was 8). PITCH/PROB arm the channel faders
         // for live-record; SAVE/RCL repurpose the 16 step pads as a slot picker.
         // Exclusivity: SAVE forces PITCH/PROB/RCL off; RCL forces SAVE off (but
@@ -154,6 +171,11 @@ struct Soundscapes : Module {
 
     PatternSlot slots[16];           // SAVE/RCL memory -- one slot = all 6 channels' full pattern
 
+    float channelWildcardOffset[6] = {}; // Semitone offset from the X-Y wildcard pad,
+                                          // recomputed live each step advance -- a
+                                          // transient performance layer on top of
+                                          // the recorded stepPitch, not baked into it
+
     // PITCH/PROB: latching, multi-armable together. While armed, the channel
     // faders stop controlling amplitude and become live-record inputs instead --
     // riding a fader writes into that channel's own stepPitch/stepProb at
@@ -188,6 +210,8 @@ struct Soundscapes : Module {
     // used to visually distinguish "in use" knobs from inert ones on the panel.
     bool isMacroActive(int paramId) {
         bool reverbSendUp = params[REVERB_PARAM].getValue() > 0.001f;
+        bool filterSendUp = params[FILTER_PARAM].getValue() > 0.001f;
+        bool compressorSendUp = params[COMPRESSOR_PARAM].getValue() > 0.001f;
 
         switch (paramId) {
             case RATE_PARAM:
@@ -197,15 +221,14 @@ struct Soundscapes : Module {
                 // unison/chorus (Waves), dust rate (Drone & Dust).
                 return true;
             case TIMBRE_PARAM:
-                // No Voices-mode job for now (EXT IN blending is on hold) -- only
-                // active when the Reverb FX send is up (shimmer pitch-shift amount).
-                return reverbSendUp;
-            case TEXTURE_PARAM: {
-                bool filterSendUp = params[FILTER_PARAM].getValue() > 0.001f;
-                // Always active in Voices mode (VA waveshape), or when the Filter FX
-                // send is up (cutoff).
-                return (activeSynthMode == MODE_VOICES) || filterSendUp;
-            }
+                // Shared across three exclusive FX buses (only one can ever be
+                // active at once): Reverb (shimmer amount), Filter (resonance),
+                // Compressor (comp+tilt strength).
+                return reverbSendUp || filterSendUp || compressorSendUp;
+            case TEXTURE_PARAM:
+                // Always active in Voices mode (VA waveshape), or when Filter
+                // (cutoff) or Compressor (mid-side width) is the active bus.
+                return (activeSynthMode == MODE_VOICES) || filterSendUp || compressorSendUp;
             case SPREAD_PARAM:
             case DYNAMICS_PARAM:
                 return true; // Always drive the shared Release/Attack envelope
@@ -215,12 +238,13 @@ struct Soundscapes : Module {
     }
 
     // Returns which FX-bus accent color (if any) currently applies to a macro knob,
-    // matching that FX button's color for easy visual pairing. 0 = none, 1 = FM,
-    // 2 = DELAY, 3 = REVERB, 4 = FILTER.
+    // matching that FX button's color for easy visual pairing. 0 = none, 2 = DELAY,
+    // 3 = REVERB, 4 = FILTER, 5 = COMPRESSOR.
     int macroAccentGroup(int paramId) {
         if (activeFaderState == FADER_DELAY_SEND && (paramId == RATE_PARAM || paramId == SPREAD_PARAM)) return 2;
         if (activeFaderState == FADER_REVERB_SEND && (paramId == TIMBRE_PARAM || paramId == DYNAMICS_PARAM)) return 3;
-        if (activeFaderState == FADER_FILTER_SEND && paramId == TEXTURE_PARAM) return 4;
+        if (activeFaderState == FADER_FILTER_SEND && (paramId == TEXTURE_PARAM || paramId == TIMBRE_PARAM)) return 4;
+        if (activeFaderState == FADER_FM_SEND && (paramId == TIMBRE_PARAM || paramId == TEXTURE_PARAM)) return 5; // Compressor
         return 0;
     }
 
@@ -293,6 +317,12 @@ struct Soundscapes : Module {
         int delayPtr = 0;
         float reverbState = 0.0f;
         float sidechainEnv = 0.0f;
+        float delayDampL = 0.0f;    // One-pole HF damping on the feedback tap --
+        float delayDampR = 0.0f;    // repeats darken over time like a tape echo,
+                                    // instead of staying full-bandwidth forever
+        float compEnvelope = 0.0f;  // Compressor's RMS envelope follower
+        float tiltLowL = 0.0f;      // Tilt EQ's one-pole low/high crossover split
+        float tiltLowR = 0.0f;
     } fxUnit;
 
     /**

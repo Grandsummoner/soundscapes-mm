@@ -121,20 +121,18 @@ struct OpaqueDisplay : Widget {
                 lastFader[channelId] = currFader;
             }
 
-            // 2. Detect global knob edits (RATE to DYNAMICS) -- spell the knob's current
-            // function name across all 8 displays (one character each) so its role is
-            // unambiguous no matter which mode/patch state it's operating under.
+            // 2. Detect global knob edits (RATE to DYNAMICS) -- show a colorful VU-meter
+            // bargraph fill across the 8 displays instead of spelling out the knob's
+            // function name. The player already knows which knob they're turning;
+            // announcing it every time was distracting and served no real purpose.
             for (int k = 0; k < 6; k++) {
                 float currKnob = module->params[Soundscapes::RATE_PARAM + k].getValue();
                 static float lastKnob[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
                 if (lastKnob[k] >= 0.0f && fabs(currKnob - lastKnob[k]) > 0.001f) {
-                    int paramId = Soundscapes::RATE_PARAM + k;
-                    const char* fn = module->macroFunctionName(paramId);
-                    snprintf(module->macroFunctionText, sizeof(module->macroFunctionText), "%s", fn);
-                    module->macroFunctionActive = module->isMacroActive(paramId);
                     for (int c = 0; c < 8; c++) {
                         module->displayValueTimer[c] = 1.5f;
-                        module->displayType[c] = 4;
+                        module->displayValue[c] = currKnob;
+                        module->displayType[c] = 5;
                     }
                 }
                 lastKnob[k] = currKnob;
@@ -196,6 +194,23 @@ struct OpaqueDisplay : Widget {
                     int len = (int)strlen(module->macroFunctionText);
                     char c = (channelId < len) ? module->macroFunctionText[channelId] : ' ';
                     snprintf(text, sizeof(text), "%c", c);
+                } else if (module->displayType[channelId] == 5) {
+                    // VU-meter bargraph: knob-turn HUD. Colorful zones (green/yellow/red)
+                    // instead of a flat monotone fill, so it reads at a glance like a real
+                    // level meter rather than just a generic progress bar.
+                    int litCount = (int)std::round(module->displayValue[channelId] * 8.0f);
+                    litCount = clamp(litCount, 0, 8);
+                    if (channelId < litCount) {
+                        NVGcolor segColor;
+                        if (channelId < 5) segColor = nvgRGBA(0x2e, 0xcc, 0x71, 0xff);      // Green (segments 1-5)
+                        else if (channelId < 7) segColor = nvgRGBA(0xf1, 0xc4, 0x0f, 0xff); // Yellow (6-7)
+                        else segColor = nvgRGBA(0xe7, 0x4c, 0x3c, 0xff);                     // Red (8)
+                        nvgBeginPath(args.vg);
+                        nvgRoundedRect(args.vg, 4.0f, 4.0f, box.size.x - 8.0f, box.size.y - 8.0f, 2.0f);
+                        nvgFillColor(args.vg, segColor);
+                        nvgFill(args.vg);
+                    }
+                    return; // Filled block, not text -- skip the nvgTextBold call below
                 } else {
                     int pct = (int)std::round(module->displayValue[channelId] * 99.0f);
                     pct = clamp(pct, 0, 99);
@@ -397,8 +412,10 @@ struct FxReturnFader : SoundscapesFader {
 
 struct MasterLevelFader : SoundscapesFader {
     MasterLevelFader() {
-        capFill = nvgRGBA(0xff, 0xff, 0xff, 0xff);   // Bright white -- "final output"
-        capStroke = nvgRGBA(0xb0, 0xa8, 0x98, 0xff);
+        capFill = nvgRGBA(0xe6, 0xb8, 0x1e, 0xff);   // Gold/amber -- "final output"; was
+                                                       // bright white, nearly identical to
+                                                       // the neutral channel cap color
+        capStroke = nvgRGBA(0xa8, 0x84, 0x0e, 0xff);
     }
 };
 
@@ -541,10 +558,10 @@ struct SoundscapesKnob : app::Knob {
         // currently selected, for easy visual pairing of "this knob shapes that FX".
         if (accentGroup != 0) {
             NVGcolor accentColor;
-            if (accentGroup == 1) accentColor = nvgRGBA(0x34, 0x98, 0xdb, 0xff);      // FM: Blue
-            else if (accentGroup == 2) accentColor = nvgRGBA(0x1a, 0xbc, 0x9c, 0xff); // DELAY: Teal
+            if (accentGroup == 2) accentColor = nvgRGBA(0x1a, 0xbc, 0x9c, 0xff);      // DELAY: Teal
             else if (accentGroup == 3) accentColor = nvgRGBA(0xff, 0x9d, 0x00, 0xff); // REVERB: Amber
-            else accentColor = nvgRGBA(0xe9, 0x1e, 0x63, 0xff);                       // FILTER: Magenta
+            else if (accentGroup == 4) accentColor = nvgRGBA(0xe9, 0x1e, 0x63, 0xff); // FILTER: Magenta
+            else accentColor = nvgRGBA(0x9b, 0x59, 0xb6, 0xff);                       // COMPRESSOR: Purple
 
             nvgBeginPath(args.vg);
             nvgCircle(args.vg, cx, cy, 13.5f);
@@ -732,16 +749,16 @@ struct ModeThreeWaySwitch : app::ParamWidget {
         nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
 
-        // Draw selection markers V, W, D next to the switch positions inside the bronze screen
+        // Draw selection labels Voice/Wave/Dust next to the switch positions
         if (font) {
             nvgFontFaceId(args.vg, font->handle);
-            nvgFontSize(args.vg, 7.5f);
+            nvgFontSize(args.vg, 6.2f);
             nvgTextAlign(args.vg, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
-            nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xdf));
+            nvgFillColor(args.vg, nvgRGBA(0x00, 0x00, 0x00, 0xff)); // Black -- was low-contrast amber
 
-            nvgTextBold(args.vg, -6.0f, 5.0f, "V", NULL);
-            nvgTextBold(args.vg, -6.0f, box.size.y / 2.0f, "W", NULL);
-            nvgTextBold(args.vg, -6.0f, box.size.y - 5.0f, "D", NULL);
+            nvgTextBold(args.vg, -9.0f, 5.0f, "Voice", NULL);            // was "V" at -6
+            nvgTextBold(args.vg, -9.0f, box.size.y / 2.0f, "Wave", NULL); // was "W" at -6
+            nvgTextBold(args.vg, -9.0f, box.size.y - 5.0f, "Dust", NULL); // was "D" at -6
         }
     }
 };
@@ -768,7 +785,7 @@ struct FXButtonWidget : SoundscapesButton {
         bool isActive = false;
 
         if (module) {
-            if (label == "FM" && module->activeFaderState == FADER_FM_SEND) isActive = true;
+            if (label == "COMP" && module->activeFaderState == FADER_FM_SEND) isActive = true; // Enum name kept, represents Compressor bus
             if (label == "DELAY" && module->activeFaderState == FADER_DELAY_SEND) isActive = true;
             if (label == "REVERB" && module->activeFaderState == FADER_REVERB_SEND) isActive = true;
             if (label == "FILTER" && module->activeFaderState == FADER_FILTER_SEND) isActive = true;
@@ -788,14 +805,14 @@ struct FXButtonWidget : SoundscapesButton {
         if (isActive) {
             // Each FX bus gets its own distinct color, shared with its associated
             // macro knob's accent ring for easy visual identification.
-            if (label == "FM") {
-                nvgFillColor(args.vg, nvgRGBA(0x34, 0x98, 0xdb, 0xff)); // Blue
-            } else if (label == "DELAY") {
+            if (label == "DELAY") {
                 nvgFillColor(args.vg, nvgRGBA(0x1a, 0xbc, 0x9c, 0xff)); // Teal
             } else if (label == "REVERB") {
                 nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // Amber
+            } else if (label == "FILTER") {
+                nvgFillColor(args.vg, nvgRGBA(0xe9, 0x1e, 0x63, 0xff)); // Magenta
             } else {
-                nvgFillColor(args.vg, nvgRGBA(0xe9, 0x1e, 0x63, 0xff)); // Magenta (FILTER)
+                nvgFillColor(args.vg, nvgRGBA(0x9b, 0x59, 0xb6, 0xff)); // Purple (COMP)
             }
         } else if (value > 0.5f) {
             nvgFillColor(args.vg, nvgRGBA(0xee, 0xee, 0xee, 0xff)); // Pressed grey
@@ -822,6 +839,95 @@ struct FXButtonWidget : SoundscapesButton {
             nvgFillColor(args.vg, isActive ? nvgRGBA(0xff, 0xff, 0xff, 0xff) : nvgRGBA(0x5c, 0x53, 0x46, 0xff));
             nvgTextBold(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, label.c_str(), NULL);
         }
+    }
+};
+
+/**
+ * X-Y Wildcard Transpose Pad -- drives two params at once (WILDCARD_X_PARAM/
+ * WILDCARD_Y_PARAM) rather than the usual single-param ParamWidget pattern.
+ * Center = both params at 0.5 = fully off. Double-click recenters both --
+ * mouse-only, since there's no equivalent gesture on hardware; on MetaModule,
+ * X and Y are just two separately-mappable knobs, so a patch reload/manually
+ * turning both back to noon is the hardware equivalent.
+ */
+struct XYPadWidget : OpaqueWidget {
+    Soundscapes* module = nullptr;
+    Vec dragPos;
+    double lastClickTime = -1.0;
+
+    XYPadWidget() {
+        box.size = Vec(50.0f, 50.0f);
+    }
+
+    void setFromLocalPos(Vec pos) {
+        if (!module) return;
+        float x = math::clamp(pos.x / box.size.x, 0.0f, 1.0f);
+        float y = math::clamp(1.0f - (pos.y / box.size.y), 0.0f, 1.0f); // up = higher Y
+        module->params[Soundscapes::WILDCARD_X_PARAM].setValue(x);
+        module->params[Soundscapes::WILDCARD_Y_PARAM].setValue(y);
+    }
+
+    void onButton(const event::Button& e) override {
+        if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
+            double now = system::getTime();
+            if (lastClickTime > 0.0 && (now - lastClickTime) < 0.3) {
+                // Double-click: recenter both axes (= off)
+                if (module) {
+                    module->params[Soundscapes::WILDCARD_X_PARAM].setValue(0.5f);
+                    module->params[Soundscapes::WILDCARD_Y_PARAM].setValue(0.5f);
+                }
+                lastClickTime = -1.0;
+            } else {
+                lastClickTime = now;
+                dragPos = e.pos;
+                setFromLocalPos(e.pos);
+            }
+            e.consume(this);
+        }
+        OpaqueWidget::onButton(e);
+    }
+
+    void onDragMove(const event::DragMove& e) override {
+        dragPos = dragPos.plus(e.mouseDelta);
+        setFromLocalPos(dragPos);
+        OpaqueWidget::onDragMove(e);
+    }
+
+    void draw(const DrawArgs& args) override {
+        // Background
+        nvgBeginPath(args.vg);
+        nvgRoundedRect(args.vg, 0.0f, 0.0f, box.size.x, box.size.y, 4.0f);
+        nvgFillColor(args.vg, nvgRGBA(0x2b, 0x28, 0x24, 0xff));
+        nvgFill(args.vg);
+        nvgStrokeColor(args.vg, nvgRGBA(0xcb, 0xc4, 0xb5, 0xff));
+        nvgStrokeWidth(args.vg, 1.0f);
+        nvgStroke(args.vg);
+
+        // Center crosshair marks the "off" position
+        nvgBeginPath(args.vg);
+        nvgMoveTo(args.vg, box.size.x / 2.0f, 4.0f);
+        nvgLineTo(args.vg, box.size.x / 2.0f, box.size.y - 4.0f);
+        nvgMoveTo(args.vg, 4.0f, box.size.y / 2.0f);
+        nvgLineTo(args.vg, box.size.x - 4.0f, box.size.y / 2.0f);
+        nvgStrokeColor(args.vg, nvgRGBA(0x5c, 0x53, 0x46, 0x70));
+        nvgStrokeWidth(args.vg, 1.0f);
+        nvgStroke(args.vg);
+
+        float x = 0.5f, y = 0.5f;
+        if (module) {
+            x = module->params[Soundscapes::WILDCARD_X_PARAM].getValue();
+            y = module->params[Soundscapes::WILDCARD_Y_PARAM].getValue();
+        }
+        float px = x * box.size.x;
+        float py = (1.0f - y) * box.size.y;
+
+        nvgBeginPath(args.vg);
+        nvgCircle(args.vg, px, py, 4.0f);
+        nvgFillColor(args.vg, nvgRGBA(0x9b, 0x59, 0xb6, 0xff)); // Purple, matches Compressor accent
+        nvgFill(args.vg);
+        nvgStrokeColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff));
+        nvgStrokeWidth(args.vg, 1.2f);
+        nvgStroke(args.vg);
     }
 };
 
@@ -886,7 +992,7 @@ struct FaceplateLabels : Widget {
             }
 
             // F. Macro Knob Labels
-            const char* knobLabels[6] = {"RATE", "DENSITY", "TIMBRE", "TEXTURE", "SPREAD", "DYNAMICS"};
+            const char* knobLabels[6] = {"RATE", "DYNAMICS", "SPREAD", "TIMBRE", "TEXTURE", "DENSITY"};
             for (int i = 0; i < 6; i++) {
                 nvgFontSize(args.vg, 7.5f);
                 nvgTextBold(args.vg, SoundscapesCoords::KNOB_COLS[i], SoundscapesCoords::ROW2_KNOB_Y + 21.0f, knobLabels[i], NULL);
@@ -975,26 +1081,33 @@ struct SoundscapesWidget : ModuleWidget {
         // --- III. Row 2: Centralized Synth Deck (Using discrete 3-way switch) ---
         addParam(createParamCentered<ModeThreeWaySwitch>(Vec(SoundscapesCoords::MODE_X, SoundscapesCoords::MODE_Y), module, Soundscapes::MODE_PARAM));
 
-        // 2x2 FX Button Group
-        FXButtonWidget* fmBtn = createParamCentered<FXButtonWidget>(Vec(SoundscapesCoords::FX_COLS[0], SoundscapesCoords::FX_ROWS[0]), module, Soundscapes::FM_PARAM);
-        fmBtn->label = "FM";
-        addParam(fmBtn);
-
-        FXButtonWidget* dlyBtn = createParamCentered<FXButtonWidget>(Vec(SoundscapesCoords::FX_COLS[1], SoundscapesCoords::FX_ROWS[0]), module, Soundscapes::DELAY_PARAM);
+        // 2x2 FX Button Group -- top-left to bottom-right: Delay, Reverb, Filter, Compressor
+        FXButtonWidget* dlyBtn = createParamCentered<FXButtonWidget>(Vec(SoundscapesCoords::FX_COLS[0], SoundscapesCoords::FX_ROWS[0]), module, Soundscapes::DELAY_PARAM);
         dlyBtn->label = "DELAY";
         addParam(dlyBtn);
 
-        FXButtonWidget* revBtn = createParamCentered<FXButtonWidget>(Vec(SoundscapesCoords::FX_COLS[0], SoundscapesCoords::FX_ROWS[1]), module, Soundscapes::REVERB_PARAM);
+        FXButtonWidget* revBtn = createParamCentered<FXButtonWidget>(Vec(SoundscapesCoords::FX_COLS[1], SoundscapesCoords::FX_ROWS[0]), module, Soundscapes::REVERB_PARAM);
         revBtn->label = "REVERB";
         addParam(revBtn);
 
-        FXButtonWidget* fltBtn = createParamCentered<FXButtonWidget>(Vec(SoundscapesCoords::FX_COLS[1], SoundscapesCoords::FX_ROWS[1]), module, Soundscapes::FILTER_PARAM);
+        FXButtonWidget* fltBtn = createParamCentered<FXButtonWidget>(Vec(SoundscapesCoords::FX_COLS[0], SoundscapesCoords::FX_ROWS[1]), module, Soundscapes::FILTER_PARAM);
         fltBtn->label = "FILTER";
         addParam(fltBtn);
 
+        FXButtonWidget* compBtn = createParamCentered<FXButtonWidget>(Vec(SoundscapesCoords::FX_COLS[1], SoundscapesCoords::FX_ROWS[1]), module, Soundscapes::COMPRESSOR_PARAM);
+        compBtn->label = "COMP";
+        addParam(compBtn);
+
         // 6 Large Parameter Knobs
         for (int i = 0; i < 6; i++) {
-            addParam(createParamCentered<SoundscapesKnob>(Vec(SoundscapesCoords::KNOB_COLS[i], SoundscapesCoords::ROW2_KNOB_Y), module, Soundscapes::RATE_PARAM + i));
+            // Physical left-to-right order: Rate, Dynamics, Spread, Timbre, Texture,
+            // Density -- was Rate, Density, Timbre, Texture, Spread, Dynamics.
+            // Param identities unchanged, just which column each sits in.
+            static const int knobOrder[6] = {
+                Soundscapes::RATE_PARAM, Soundscapes::DYNAMICS_PARAM, Soundscapes::SPREAD_PARAM,
+                Soundscapes::TIMBRE_PARAM, Soundscapes::TEXTURE_PARAM, Soundscapes::DENSITY_PARAM
+            };
+            addParam(createParamCentered<SoundscapesKnob>(Vec(SoundscapesCoords::KNOB_COLS[i], SoundscapesCoords::ROW2_KNOB_Y), module, knobOrder[i]));
         }
 
         // --- IV. Row 3: Mixer Faders & Diagonal Quantizer Knobs ---
@@ -1015,6 +1128,18 @@ struct SoundscapesWidget : ModuleWidget {
         // Diagonal Large Quantizers on Columns 9 and 10
         addParam(createParamCentered<SoundscapesSmallKnob>(Vec(SoundscapesCoords::GRID_COLS[8], SoundscapesCoords::ROOT_Y), module, Soundscapes::ROOT_PARAM));
         addParam(createParamCentered<SoundscapesSmallKnob>(Vec(SoundscapesCoords::GRID_COLS[9], SoundscapesCoords::SCALE_Y), module, Soundscapes::SCALE_PARAM));
+
+        // X-Y Wildcard Transpose pad -- lives in the space freed by ROOT/SCALE now
+        // sharing one row instead of sitting diagonally. Centered between the two
+        // quantizer columns, between the ROOT/SCALE label and the performance
+        // button block below.
+        {
+            XYPadWidget* xyPad = new XYPadWidget();
+            xyPad->module = module;
+            float xyCenterX = (SoundscapesCoords::GRID_COLS[8] + SoundscapesCoords::GRID_COLS[9]) / 2.0f;
+            xyPad->box.pos = Vec(xyCenterX - xyPad->box.size.x / 2.0f, 268.0f - xyPad->box.size.y / 2.0f);
+            addChild(xyPad);
+        }
 
         // --- V. Row 4: Step Sequencer Pads & Performance Block ---
         // Unified 16-step row, physically laid out as two rows of 8 (steps 1-8,

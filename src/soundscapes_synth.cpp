@@ -102,8 +102,10 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
         bool monoGateActive = inputs[GATE_INPUT].isConnected();
 
         // --- ATTACK-RELEASE (AR) ENVELOPE GENERATOR ---
-        float attackTime = 0.001f + attackVal * 2.0f;    // Snappy Attack: 1ms to 2s
-        float releaseTime = 0.010f + releaseVal * 4.0f;  // Snappy Release: 10ms to 4s
+        float attackTime = expMap(attackVal, 0.001f, 2.0f);    // 1ms to 2s, exponential (was linear --
+        float releaseTime = expMap(releaseVal, 0.010f, 4.0f); // center used to default to ~1s/~2s, causing
+                                                                // envelopes to overlap and drone; now center
+                                                                // lands on a much snappier, musical time)
 
         float attackCoeff = sampleTime / attackTime;
         float releaseCoeff = sampleTime / releaseTime;
@@ -138,7 +140,7 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
         int octaveOffset = degreeOffset / 7;
         int scaleDegreeIndex = degreeOffset % 7;
         int relativeNoteOffset = SCALES[scaleIdx][scaleDegreeIndex] + (octaveOffset * 12);
-        float voiceMidiNote = baseMidiNote + relativeNoteOffset;
+        float voiceMidiNote = baseMidiNote + relativeNoteOffset + channelWildcardOffset[i];
 
         voice.freq = 440.0f * std::pow(2.0f, (voiceMidiNote - 69.0f) / 12.0f);
 

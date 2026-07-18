@@ -62,42 +62,42 @@ void Soundscapes::handleFaderMapping() {
     saveArmed = currSave > 0.5f;
     rclArmed = currRcl > 0.5f;
 
-    // --- Mutually Exclusive Radio Button logic for FM, DELAY, REVERB, and FILTER ---
-    static float prevFm = 0.0f, prevDelay = 0.0f, prevReverb = 0.0f, prevFilter = 0.0f;
-    float currFm = params[FM_PARAM].getValue();
+    // --- Mutually Exclusive Radio Button logic for COMPRESSOR, DELAY, REVERB, and FILTER ---
+    static float prevComp = 0.0f, prevDelay = 0.0f, prevReverb = 0.0f, prevFilter = 0.0f;
+    float currComp = params[COMPRESSOR_PARAM].getValue();
     float currDelay = params[DELAY_PARAM].getValue();
     float currReverb = params[REVERB_PARAM].getValue();
     float currFilter = params[FILTER_PARAM].getValue();
 
-    if (currFm > 0.5f && prevFm <= 0.5f) {
+    if (currComp > 0.5f && prevComp <= 0.5f) {
         params[DELAY_PARAM].setValue(0.0f);
         params[REVERB_PARAM].setValue(0.0f);
         params[FILTER_PARAM].setValue(0.0f);
         currDelay = currReverb = currFilter = 0.0f;
     } else if (currDelay > 0.5f && prevDelay <= 0.5f) {
-        params[FM_PARAM].setValue(0.0f);
+        params[COMPRESSOR_PARAM].setValue(0.0f);
         params[REVERB_PARAM].setValue(0.0f);
         params[FILTER_PARAM].setValue(0.0f);
-        currFm = currReverb = currFilter = 0.0f;
+        currComp = currReverb = currFilter = 0.0f;
     } else if (currReverb > 0.5f && prevReverb <= 0.5f) {
-        params[FM_PARAM].setValue(0.0f);
+        params[COMPRESSOR_PARAM].setValue(0.0f);
         params[DELAY_PARAM].setValue(0.0f);
         params[FILTER_PARAM].setValue(0.0f);
-        currFm = currDelay = currFilter = 0.0f;
+        currComp = currDelay = currFilter = 0.0f;
     } else if (currFilter > 0.5f && prevFilter <= 0.5f) {
-        params[FM_PARAM].setValue(0.0f);
+        params[COMPRESSOR_PARAM].setValue(0.0f);
         params[DELAY_PARAM].setValue(0.0f);
         params[REVERB_PARAM].setValue(0.0f);
-        currFm = currDelay = currReverb = 0.0f;
+        currComp = currDelay = currReverb = 0.0f;
     }
 
-    prevFm = currFm;
+    prevComp = currComp;
     prevDelay = currDelay;
     prevReverb = currReverb;
     prevFilter = currFilter;
 
-    if (currFm > 0.5f) {
-        activeFaderState = FADER_FM_SEND;
+    if (currComp > 0.5f) {
+        activeFaderState = FADER_FM_SEND; // Enum name kept for now (see hpp) -- represents Compressor bus
     } else if (currDelay > 0.5f) {
         activeFaderState = FADER_DELAY_SEND;
     } else if (currReverb > 0.5f) {
@@ -116,8 +116,9 @@ void Soundscapes::handleFaderMapping() {
         float faderVal = params[FADER1_PARAM + i].getValue();
 
         if (pitchArmed || probArmed) {
-            if (pitchArmed) stepPitch[i][currentStep] = faderVal;
-            if (probArmed) stepProb[i][currentStep] = faderVal;
+            float shapedVal = faderVal * faderVal; // Exponential taper, same as the amplitude case below
+            if (pitchArmed) stepPitch[i][currentStep] = shapedVal;
+            if (probArmed) stepProb[i][currentStep] = shapedVal;
         } else if (activeFaderState == FADER_MIXER) {
             channelVolumes[i] = faderVal * faderVal; // Exponential taper: finer low-end control
         } else {
@@ -184,6 +185,37 @@ void Soundscapes::processSequencer(float sampleTime) {
         for (int ch = 0; ch < 6; ch++) {
             float prob = math::clamp(stepProb[ch][currentStep] * globalDensityScale, 0.0f, 1.0f);
             channelTriggerActive[ch] = ((float)rand() / RAND_MAX) < prob;
+        }
+
+        // --- X-Y Wildcard Transpose (live performance pad) ---
+        // reachAmt: 0 at pad center, 1 at either edge -- how likely and how big a
+        // leap is. yBias: -1..1, which voice group gets more of the movement.
+        float xVal = params[WILDCARD_X_PARAM].getValue();
+        float yVal = params[WILDCARD_Y_PARAM].getValue();
+        float reachAmt = std::fabs(xVal - 0.5f) * 2.0f;
+
+        for (int ch = 0; ch < 6; ch++) {
+            // Channel 0 is treated as the nominal "bass" voice for this feature --
+            // a simplification, since channels no longer have fixed harmonic roles;
+            // if you record your lowest part elsewhere, this balance won't track it.
+            bool isBass = (ch == 0);
+            float weight = isBass ? yVal : (1.0f - yVal);
+            float rollProb = reachAmt * weight;
+
+            if (((float)rand() / RAND_MAX) < rollProb) {
+                bool bigLeap = ((float)rand() / RAND_MAX) < reachAmt;
+                if (bigLeap) {
+                    static const int bigIntervals[6] = {-12, -7, -5, 5, 7, 12};
+                    channelWildcardOffset[ch] = (float)bigIntervals[rand() % 6];
+                } else {
+                    static const int smallIntervals[5] = {-2, -1, 0, 1, 2};
+                    channelWildcardOffset[ch] = (float)smallIntervals[rand() % 5];
+                }
+            }
+            // If the roll fails, this channel simply keeps whatever offset (if
+            // any) it already had -- offsets persist across steps rather than
+            // resetting to 0 every time, so a wildcard move sticks until the next
+            // one overwrites it, similar to how a recorded pitch stays put.
         }
     } else {
         stepTimeElapsed += sampleTime;
