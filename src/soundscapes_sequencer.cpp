@@ -19,6 +19,57 @@ void Soundscapes::handleFocusToggle(int channel) {
  * Handle complex fader mappings based on Global Mixer vs. Focus Mode, and the
  * PITCH/PROB/SAVE/RCL exclusivity rules for the performance section.
  */
+/**
+ * Crossfader Scene A/B: capture-on-press, then continuous interpolation of every
+ * captured param once both scenes exist. Writing directly into params[...] here
+ * is what makes the fader/knob widgets visibly move as the crossfader slides --
+ * they all just read getValue() to draw themselves, same as a manual drag would.
+ */
+void Soundscapes::handleSceneMorph() {
+    static float prevSceneA = 0.0f, prevSceneB = 0.0f;
+    float currSceneA = params[SCENE_A_PARAM].getValue();
+    float currSceneB = params[SCENE_B_PARAM].getValue();
+
+    bool sceneAPressed = (currSceneA > 0.5f && prevSceneA <= 0.5f);
+    bool sceneBPressed = (currSceneB > 0.5f && prevSceneB <= 0.5f);
+
+    if (sceneAPressed) {
+        for (int i = 0; i < 6; i++) sceneA.fader[i] = params[FADER1_PARAM + i].getValue();
+        sceneA.fxReturn = params[FX_RETURN_PARAM].getValue();
+        sceneA.masterLevel = params[MASTER_LEVEL_PARAM].getValue();
+        for (int i = 0; i < 6; i++) sceneA.macro[i] = params[RATE_PARAM + i].getValue();
+        sceneA.root = params[ROOT_PARAM].getValue();
+        sceneA.scaleParam = params[SCALE_PARAM].getValue();
+        sceneA.captured = true;
+    }
+    if (sceneBPressed) {
+        for (int i = 0; i < 6; i++) sceneB.fader[i] = params[FADER1_PARAM + i].getValue();
+        sceneB.fxReturn = params[FX_RETURN_PARAM].getValue();
+        sceneB.masterLevel = params[MASTER_LEVEL_PARAM].getValue();
+        for (int i = 0; i < 6; i++) sceneB.macro[i] = params[RATE_PARAM + i].getValue();
+        sceneB.root = params[ROOT_PARAM].getValue();
+        sceneB.scaleParam = params[SCALE_PARAM].getValue();
+        sceneB.captured = true;
+    }
+
+    prevSceneA = currSceneA;
+    prevSceneB = currSceneB;
+
+    if (sceneA.captured && sceneB.captured) {
+        float pos = params[CROSSFADER_PARAM].getValue();
+        for (int i = 0; i < 6; i++) {
+            params[FADER1_PARAM + i].setValue(sceneA.fader[i] + (sceneB.fader[i] - sceneA.fader[i]) * pos);
+        }
+        params[FX_RETURN_PARAM].setValue(sceneA.fxReturn + (sceneB.fxReturn - sceneA.fxReturn) * pos);
+        params[MASTER_LEVEL_PARAM].setValue(sceneA.masterLevel + (sceneB.masterLevel - sceneA.masterLevel) * pos);
+        for (int i = 0; i < 6; i++) {
+            params[RATE_PARAM + i].setValue(sceneA.macro[i] + (sceneB.macro[i] - sceneA.macro[i]) * pos);
+        }
+        params[ROOT_PARAM].setValue(sceneA.root + (sceneB.root - sceneA.root) * pos);
+        params[SCALE_PARAM].setValue(sceneA.scaleParam + (sceneB.scaleParam - sceneA.scaleParam) * pos);
+    }
+}
+
 void Soundscapes::handleFaderMapping() {
     // --- PITCH/PROB/SAVE/RCL exclusivity ---
     // PITCH defaults to armed and stays that way as the resting state -- editing

@@ -288,14 +288,6 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             // are sparse. Boosted for comparable loudness across all three modes.
         }
 
-        // Octatrack-style crossfader: equal-power morph between channels 1-3 and
-        // 4-6, so sliding from one end to the other doesn't cause an overall
-        // level dip at center.
-        float crossfaderPos = params[CROSSFADER_PARAM].getValue();
-        float groupAWeight = std::cos(crossfaderPos * (float)M_PI / 2.0f); // Channels 1-3
-        float groupBWeight = std::sin(crossfaderPos * (float)M_PI / 2.0f); // Channels 4-6
-        channelOutputSignal *= (i < 3) ? groupAWeight : groupBWeight;
-
         // Apply dynamic CV DUCKING
         if (inputs[DUCK_INPUT].isConnected()) {
             float duckVolts = inputs[DUCK_INPUT].getVoltage();

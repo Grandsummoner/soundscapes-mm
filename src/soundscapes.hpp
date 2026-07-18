@@ -74,6 +74,21 @@ struct PatternSlot {
     float prob[6][16] = {};
 };
 
+// Crossfader Scene A/B: a snapshot of every "global" continuous control -- the 6
+// channel faders, FX Return, Master Level, the 6 macro knobs, and Root/Scale.
+// Deliberately does NOT include step pitch/probability data (per-step content
+// morphing is a different thing from morphing continuous controls) or any
+// button/latch state (on-off states don't have a meaningful "halfway").
+struct SceneSnapshot {
+    bool captured = false;
+    float fader[6] = {};
+    float fxReturn = 0.0f;
+    float masterLevel = 0.0f;
+    float macro[6] = {};
+    float root = 0.0f;
+    float scaleParam = 0.0f;
+};
+
 enum SynthMode {
     MODE_VOICES,       // "V" - Dual-Operator FM with virtual LPGs
     MODE_WAVES,        // "W" - Karplus-Strong string waveguide resonators
@@ -116,11 +131,12 @@ struct Soundscapes : Module {
         // one direction = bass deepens while others hold, other direction =
         // reverse). Center (0.5, 0.5) = fully off.
         WILDCARD_X_PARAM, WILDCARD_Y_PARAM,
-        // Octatrack-style crossfader: morphs channels 1-3 against channels 4-6 as
-        // you slide from one end to the other (equal-power curve, so the overall
-        // level doesn't dip at center). First-pass interpretation of "morph" --
-        // easy to redefine what the two sides mean once you've tried it.
+        // Octatrack-style crossfader: morphs between two captured global-state
+        // snapshots (see SceneSnapshot below) -- press SCENE_A or SCENE_B to
+        // capture the current fader/knob state into that end, then sliding
+        // between them interpolates every captured param live.
         CROSSFADER_PARAM,
+        SCENE_A_PARAM, SCENE_B_PARAM, // Momentary: press to capture current state
         // Performance section: 4 buttons (was 8). PITCH/PROB arm the channel faders
         // for live-record; SAVE/RCL repurpose the 16 step pads as a slot picker.
         // Exclusivity: SAVE forces PITCH/PROB/RCL off; RCL forces SAVE off (but
@@ -175,6 +191,8 @@ struct Soundscapes : Module {
     bool channelTriggerActive[6] = {}; // This pass's probability roll result, per channel, latched at each step advance
 
     PatternSlot slots[16];           // SAVE/RCL memory -- one slot = all 6 channels' full pattern
+
+    SceneSnapshot sceneA, sceneB;     // Crossfader morph targets
 
     float channelWildcardOffset[6] = {}; // Semitone offset from the X-Y wildcard pad,
                                           // recomputed live each step advance -- a
@@ -429,4 +447,5 @@ struct Soundscapes : Module {
     void processDSP(const ProcessArgs& args);
     void handleFocusToggle(int channel);
     void handleFaderMapping();
+    void handleSceneMorph();
 };

@@ -476,7 +476,7 @@ struct CrossfaderWidget : app::ParamWidget {
     Vec dragPos;
 
     CrossfaderWidget() {
-        box.size = Vec(70.0f, 16.0f);
+        box.size = Vec(200.0f, 16.0f); // Was 70 -- now actually spans the gap, reads as a proper wide crossfader
     }
 
     void onButton(const event::Button& e) override {
@@ -524,6 +524,46 @@ struct CrossfaderWidget : app::ParamWidget {
         nvgStrokeColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff));
         nvgStrokeWidth(args.vg, 1.3f);
         nvgStroke(args.vg);
+    }
+};
+
+/**
+ * Compact Scene A/B capture button -- sits at one end of the crossfader.
+ * Momentary: press to capture the current global state into that scene.
+ */
+struct SceneButtonWidget : SoundscapesButton {
+    char label = 'A';
+    std::shared_ptr<Font> font;
+
+    SceneButtonWidget() {
+        momentary = true;
+        box.size = Vec(16.0f, 16.0f);
+        font = loadRobustFont();
+    }
+
+    void draw(const DrawArgs& args) override {
+        Soundscapes* module = dynamic_cast<Soundscapes*>(this->module);
+        bool captured = false;
+        if (module) {
+            captured = (label == 'A') ? module->sceneA.captured : module->sceneB.captured;
+        }
+
+        nvgBeginPath(args.vg);
+        nvgRoundedRect(args.vg, 0.0f, 0.0f, box.size.x, box.size.y, 2.5f);
+        nvgFillColor(args.vg, captured ? nvgRGBA(0xe7, 0x4c, 0x3c, 0xff) : nvgRGBA(0xff, 0xff, 0xff, 0xff));
+        nvgFill(args.vg);
+        nvgStrokeColor(args.vg, captured ? nvgRGBA(0xff, 0xff, 0xff, 0xff) : nvgRGBA(0xcc, 0xc4, 0xb6, 0xff));
+        nvgStrokeWidth(args.vg, 1.0f);
+        nvgStroke(args.vg);
+
+        if (font) {
+            nvgFontFaceId(args.vg, font->handle);
+            nvgFontSize(args.vg, 8.0f);
+            nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+            nvgFillColor(args.vg, captured ? nvgRGBA(0xff, 0xff, 0xff, 0xff) : nvgRGBA(0x3a, 0x35, 0x2e, 0xff));
+            char buf[2] = {label, '\0'};
+            nvgTextBold(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, buf, NULL);
+        }
     }
 };
 
@@ -1250,10 +1290,20 @@ struct SoundscapesWidget : ModuleWidget {
 
         // Octatrack-style crossfader -- sits in the existing gap between the fader
         // row (bottom edge ~256) and the step pad row (top edge ~278), spanning
-        // across the step/channel columns.
+        // across the step/channel columns. Scene A/B capture buttons sit at its
+        // two ends.
         {
-            CrossfaderWidget* crossfader = createParamCentered<CrossfaderWidget>(Vec((SoundscapesCoords::GRID_COLS[0] + SoundscapesCoords::GRID_COLS[7]) / 2.0f, 267.0f), module, Soundscapes::CROSSFADER_PARAM);
+            float crossfaderCenterX = (SoundscapesCoords::GRID_COLS[0] + SoundscapesCoords::GRID_COLS[7]) / 2.0f;
+            CrossfaderWidget* crossfader = createParamCentered<CrossfaderWidget>(Vec(crossfaderCenterX, 267.0f), module, Soundscapes::CROSSFADER_PARAM);
             addParam(crossfader);
+
+            SceneButtonWidget* sceneAButton = createParamCentered<SceneButtonWidget>(Vec(crossfaderCenterX - 112.0f, 267.0f), module, Soundscapes::SCENE_A_PARAM);
+            sceneAButton->label = 'A';
+            addParam(sceneAButton);
+
+            SceneButtonWidget* sceneBButton = createParamCentered<SceneButtonWidget>(Vec(crossfaderCenterX + 112.0f, 267.0f), module, Soundscapes::SCENE_B_PARAM);
+            sceneBButton->label = 'B';
+            addParam(sceneBButton);
         }
 
         // --- V. Row 4: Step Sequencer Pads & Performance Block ---

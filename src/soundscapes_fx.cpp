@@ -9,6 +9,7 @@ void Soundscapes::process(const ProcessArgs& args) {
     // A. Tick Sequencer Step clocks & handle focused fader locks
     processSequencer(args.sampleTime);
     handleFaderMapping();
+    handleSceneMorph();
 
     // B. Temporary HUD Displays update timers
     for (int i = 0; i < 8; i++) {

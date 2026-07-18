@@ -48,7 +48,9 @@ Soundscapes::Soundscapes() {
     configParam(SCALE_PARAM, 0.0f, 1.0f, 0.0f, "Diatonic Quantizer: Selected Harmonised Scale Degrees");
     configParam(WILDCARD_X_PARAM, 0.0f, 1.0f, 0.5f, "Wildcard Transpose: Reach/Wildness");
     configParam(WILDCARD_Y_PARAM, 0.0f, 1.0f, 0.5f, "Wildcard Transpose: Voice Balance (Bass vs Others)");
-    configParam(CROSSFADER_PARAM, 0.0f, 1.0f, 0.5f, "Crossfader: Channels 1-3 vs 4-6 Morph");
+    configParam(CROSSFADER_PARAM, 0.0f, 1.0f, 0.5f, "Crossfader: Morph Between Scene A and Scene B");
+    configParam(SCENE_A_PARAM, 0.0f, 1.0f, 0.0f, "Capture Current State as Scene A");
+    configParam(SCENE_B_PARAM, 0.0f, 1.0f, 0.0f, "Capture Current State as Scene B");
 
     // 6. Configure Row 4 Step Buttons (unified 16-step row, was 8 melody + 8 chord).
     // In normal operation these are passive playhead/occupied-slot indicators, not
