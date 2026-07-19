@@ -53,7 +53,9 @@ namespace SoundscapesCoords {
                                    // performance button block to stretch into
 
     // Row 4: Step Sequencer Pads & Buttons
-    const float ROW4_MELODY_PAD_Y = 300.0f; // was 288 -- shifted down to use the bottom margin
+    const float ROW4_MELODY_PAD_Y = 318.0f; // was 300 -- aligned with PITCH/PROB row's
+                                             // bottom edge (both center at 318), freeing
+                                             // a much bigger gap above for the crossfader
     const float ROW4_CHORD_PAD_Y = 348.0f;  // was 336
     const float ROW4_BUTTON_ROWS[2] = {318.0f, 348.0f}; // was {306, 336} -- shifted down
 }
@@ -192,6 +194,22 @@ struct Soundscapes : Module {
                                           // recomputed live each step advance -- a
                                           // transient performance layer on top of
                                           // the recorded stepPitch, not baked into it
+
+    // Edge-detection / accumulator state for button and knob handling. These MUST
+    // be per-instance member fields, not function-local `static` variables --
+    // function-static locals are shared across every instance of this module in
+    // the whole Rack session (two Soundscapes modules would corrupt each other's
+    // button state), and persist stale values across a module being deleted and
+    // a fresh one added in its place. That was a real bug: a freshly-added module
+    // could inherit e.g. prevPitch=0 left over from a deleted instance, instead
+    // of correctly starting fresh.
+    float prevPitch = 1.0f, prevProb = 0.0f, prevSave = 0.0f, prevRcl = 0.0f;
+    float prevComp = 0.0f, prevDelay = 0.0f, prevReverb = 0.0f, prevFilter = 0.0f;
+    float prevSceneA = 0.0f, prevSceneB = 0.0f;
+    float clockAccumulator = 0.0f;
+    float lastKnobValue[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+    float lastFaderValue[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+    float lastRootValue = -1.0f, lastScaleValue = -1.0f, lastModeValue = -1.0f;
 
     // PITCH/PROB: latching, multi-armable together. While armed, the channel
     // faders stop controlling amplitude and become live-record inputs instead --

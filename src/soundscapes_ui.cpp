@@ -120,71 +120,6 @@ struct OpaqueDisplay : Widget {
 
             char text[16];
 
-            // 1. Detect fader edits for this channel at the 60Hz UI rate (channelId 6/7
-            // are the master L/R display slots, which have no fader of their own)
-            if (channelId < 6) {
-                float currFader = module->params[Soundscapes::FADER1_PARAM + channelId].getValue();
-                static float lastFader[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
-                if (lastFader[channelId] >= 0.0f && fabs(currFader - lastFader[channelId]) > 0.001f) {
-                    module->displayValueTimer[channelId] = 1.5f;
-                    module->displayValue[channelId] = currFader;
-                    module->displayType[channelId] = 0;
-                }
-                lastFader[channelId] = currFader;
-            }
-
-            // 2. Detect global knob edits (RATE to DYNAMICS) -- show a colorful VU-meter
-            // bargraph fill across the 8 displays instead of spelling out the knob's
-            // function name. The player already knows which knob they're turning;
-            // announcing it every time was distracting and served no real purpose.
-            for (int k = 0; k < 6; k++) {
-                float currKnob = module->params[Soundscapes::RATE_PARAM + k].getValue();
-                static float lastKnob[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
-                if (lastKnob[k] >= 0.0f && fabs(currKnob - lastKnob[k]) > 0.001f) {
-                    for (int c = 0; c < 8; c++) {
-                        module->displayValueTimer[c] = 1.5f;
-                        module->displayValue[c] = currKnob;
-                        module->displayType[c] = 5;
-                    }
-                }
-                lastKnob[k] = currKnob;
-            }
-
-            // 3. Detect root note edits
-            float currRoot = module->params[Soundscapes::ROOT_PARAM].getValue();
-            static float lastRoot = -1.0f;
-            if (lastRoot >= 0.0f && fabs(currRoot - lastRoot) > 0.001f) {
-                module->displayValueTimer[channelId] = 1.5f;
-                module->displayValue[channelId] = currRoot;
-                module->displayType[channelId] = 1;
-            }
-            lastRoot = currRoot;
-
-            // 4. Detect scale edits
-            float currScale = module->params[Soundscapes::SCALE_PARAM].getValue();
-            static float lastScale = -1.0f;
-            if (lastScale >= 0.0f && fabs(currScale - lastScale) > 0.001f) {
-                module->displayValueTimer[channelId] = 1.5f;
-                module->displayValue[channelId] = currScale;
-                module->displayType[channelId] = 2;
-            }
-            lastScale = currScale;
-
-            // 5. Detect 3-way Mode Switch edits
-            float currMode = module->params[Soundscapes::MODE_PARAM].getValue();
-            static float lastMode = -1.0f;
-            if (lastMode >= 0.0f && fabs(currMode - lastMode) > 0.01f) {
-                module->displayValueTimer[channelId] = 1.5f;
-                module->displayValue[channelId] = currMode;
-                module->displayType[channelId] = 3; 
-            }
-            lastMode = currMode;
-
-            // Decrease timer at UI rate (1/60th of a second per frame)
-            if (module->displayValueTimer[channelId] > 0.0f) {
-                module->displayValueTimer[channelId] -= 1.0f / 60.0f; 
-            }
-
             // Route standard channel values vs temporary HUD values
             if (module->displayValueTimer[channelId] > 0.0f) {
                 if (module->displayType[channelId] == 1) {
@@ -1040,21 +975,31 @@ struct XYPadWidget : OpaqueWidget {
     }
 
     void draw(const DrawArgs& args) override {
-        // Background
+        float cx = box.size.x / 2.0f;
+        float cy = box.size.y / 2.0f;
+        float radius = std::min(box.size.x, box.size.y) / 2.0f - 4.0f;
+
+        // Circular socket/gimbal base -- reads as a joystick mount, not a flat pad
         nvgBeginPath(args.vg);
-        nvgRoundedRect(args.vg, 0.0f, 0.0f, box.size.x, box.size.y, 4.0f);
+        nvgCircle(args.vg, cx, cy, radius + 4.0f);
         nvgFillColor(args.vg, nvgRGBA(0x2b, 0x28, 0x24, 0xff));
         nvgFill(args.vg);
         nvgStrokeColor(args.vg, nvgRGBA(0xcb, 0xc4, 0xb5, 0xff));
-        nvgStrokeWidth(args.vg, 1.0f);
+        nvgStrokeWidth(args.vg, 1.5f);
         nvgStroke(args.vg);
 
-        // Center crosshair marks the "off" position
+        // Inner recessed ring, where the stick actually travels
         nvgBeginPath(args.vg);
-        nvgMoveTo(args.vg, box.size.x / 2.0f, 4.0f);
-        nvgLineTo(args.vg, box.size.x / 2.0f, box.size.y - 4.0f);
-        nvgMoveTo(args.vg, 4.0f, box.size.y / 2.0f);
-        nvgLineTo(args.vg, box.size.x - 4.0f, box.size.y / 2.0f);
+        nvgCircle(args.vg, cx, cy, radius);
+        nvgFillColor(args.vg, nvgRGBA(0x1a, 0x18, 0x15, 0xff));
+        nvgFill(args.vg);
+
+        // Center crosshair marks the "off" position (both axes at rest)
+        nvgBeginPath(args.vg);
+        nvgMoveTo(args.vg, cx, cy - radius + 4.0f);
+        nvgLineTo(args.vg, cx, cy + radius - 4.0f);
+        nvgMoveTo(args.vg, cx - radius + 4.0f, cy);
+        nvgLineTo(args.vg, cx + radius - 4.0f, cy);
         nvgStrokeColor(args.vg, nvgRGBA(0x5c, 0x53, 0x46, 0x70));
         nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
@@ -1064,15 +1009,37 @@ struct XYPadWidget : OpaqueWidget {
             x = module->params[Soundscapes::WILDCARD_X_PARAM].getValue();
             y = module->params[Soundscapes::WILDCARD_Y_PARAM].getValue();
         }
-        float px = x * box.size.x;
-        float py = (1.0f - y) * box.size.y;
+        // Handle position constrained to the circular travel radius (not just a
+        // square box), matching a real joystick's range of motion.
+        float dx = (x - 0.5f) * 2.0f;
+        float dy = (y - 0.5f) * 2.0f;
+        float dist = std::sqrt(dx * dx + dy * dy);
+        if (dist > 1.0f) {
+            dx /= dist;
+            dy /= dist;
+        }
+        float px = cx + dx * (radius - 8.0f);
+        float py = cy - dy * (radius - 8.0f); // up = higher Y
 
+        // The stick -- a visible line from center to the handle, so it reads as
+        // something being pushed away from rest, not just a dot that teleports
         nvgBeginPath(args.vg);
-        nvgCircle(args.vg, px, py, 4.0f);
-        nvgFillColor(args.vg, nvgRGBA(0x9b, 0x59, 0xb6, 0xff)); // Purple, matches Compressor accent
+        nvgMoveTo(args.vg, cx, cy);
+        nvgLineTo(args.vg, px, py);
+        nvgStrokeColor(args.vg, nvgRGBA(0x6b, 0x66, 0x5e, 0xff));
+        nvgStrokeWidth(args.vg, 3.0f);
+        nvgStroke(args.vg);
+
+        // The grab handle itself -- bigger and more tactile than a plain dot,
+        // with a bevel so it reads as something you'd actually grab and push
+        NVGpaint handlePaint = nvgRadialGradient(args.vg, px - 2.0f, py - 2.5f, 0.5f, 8.0f,
+            nvgRGBA(0xb8, 0x7b, 0xd1, 0xff), nvgRGBA(0x6a, 0x3d, 0x82, 0xff));
+        nvgBeginPath(args.vg);
+        nvgCircle(args.vg, px, py, 7.0f);
+        nvgFillPaint(args.vg, handlePaint);
         nvgFill(args.vg);
         nvgStrokeColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff));
-        nvgStrokeWidth(args.vg, 1.2f);
+        nvgStrokeWidth(args.vg, 1.4f);
         nvgStroke(args.vg);
     }
 };
@@ -1124,11 +1091,11 @@ struct FaceplateLabels : Widget {
             for (int i = 0; i < 6; i++) {
                 float x = SoundscapesCoords::CH_COLS[i];
                 nvgFontSize(args.vg, 7.0f);
-                nvgTextBold(args.vg, x, 80.0f /* was ROW1_JACK_Y+16=71, which collided with the LED row at y=74 -- moved clear, between LED and display */, std::to_string(i + 1).c_str(), NULL);
+                nvgTextBold(args.vg, x, 90.0f /* was 80, still cramped in the thin 11px LED-to-display gap -- now sits at the display's own top edge (85), reading as printed on the display itself rather than floating with the LEDs */, std::to_string(i + 1).c_str(), NULL);
             }
             nvgFontSize(args.vg, 7.0f);
-            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[6], 80.0f /* was ROW1_JACK_Y+16=71, which collided with the LED row at y=74 -- moved clear, between LED and display */, "L", NULL);
-            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[7], 80.0f /* was ROW1_JACK_Y+16=71, which collided with the LED row at y=74 -- moved clear, between LED and display */, "R", NULL);
+            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[6], 90.0f /* was 80, still cramped in the thin 11px LED-to-display gap -- now sits at the display's own top edge (85), reading as printed on the display itself rather than floating with the LEDs */, "L", NULL);
+            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[7], 90.0f /* was 80, still cramped in the thin 11px LED-to-display gap -- now sits at the display's own top edge (85), reading as printed on the display itself rather than floating with the LEDs */, "R", NULL);
 
             // E. Fader Numbers (1 to 6)
             for (int i = 0; i < 6; i++) {
@@ -1156,8 +1123,8 @@ struct FaceplateLabels : Widget {
             nvgFontSize(args.vg, 6.5f);
             for (int i = 0; i < 8; i++) {
                 float x = SoundscapesCoords::GRID_COLS[i];
-                nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_MELODY_PAD_Y + 18.0f, std::to_string(i + 1).c_str(), NULL);
-                nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_CHORD_PAD_Y + 18.0f, std::to_string(i + 9).c_str(), NULL);
+                nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_MELODY_PAD_Y - 16.0f, std::to_string(i + 1).c_str(), NULL);
+                nvgTextBold(args.vg, x, SoundscapesCoords::ROW4_CHORD_PAD_Y - 16.0f, std::to_string(i + 9).c_str(), NULL);
             }
         }
     }
@@ -1294,14 +1261,14 @@ struct SoundscapesWidget : ModuleWidget {
         // two ends.
         {
             float crossfaderCenterX = (SoundscapesCoords::GRID_COLS[0] + SoundscapesCoords::GRID_COLS[7]) / 2.0f;
-            CrossfaderWidget* crossfader = createParamCentered<CrossfaderWidget>(Vec(crossfaderCenterX, 267.0f), module, Soundscapes::CROSSFADER_PARAM);
+            CrossfaderWidget* crossfader = createParamCentered<CrossfaderWidget>(Vec(crossfaderCenterX, 282.0f), module, Soundscapes::CROSSFADER_PARAM);
             addParam(crossfader);
 
-            SceneButtonWidget* sceneAButton = createParamCentered<SceneButtonWidget>(Vec(crossfaderCenterX - 112.0f, 267.0f), module, Soundscapes::SCENE_A_PARAM);
+            SceneButtonWidget* sceneAButton = createParamCentered<SceneButtonWidget>(Vec(crossfaderCenterX - 112.0f, 282.0f), module, Soundscapes::SCENE_A_PARAM);
             sceneAButton->label = 'A';
             addParam(sceneAButton);
 
-            SceneButtonWidget* sceneBButton = createParamCentered<SceneButtonWidget>(Vec(crossfaderCenterX + 112.0f, 267.0f), module, Soundscapes::SCENE_B_PARAM);
+            SceneButtonWidget* sceneBButton = createParamCentered<SceneButtonWidget>(Vec(crossfaderCenterX + 112.0f, 282.0f), module, Soundscapes::SCENE_B_PARAM);
             sceneBButton->label = 'B';
             addParam(sceneBButton);
         }

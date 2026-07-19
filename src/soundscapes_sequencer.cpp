@@ -26,7 +26,6 @@ void Soundscapes::handleFocusToggle(int channel) {
  * they all just read getValue() to draw themselves, same as a manual drag would.
  */
 void Soundscapes::handleSceneMorph() {
-    static float prevSceneA = 0.0f, prevSceneB = 0.0f;
     float currSceneA = params[SCENE_A_PARAM].getValue();
     float currSceneB = params[SCENE_B_PARAM].getValue();
 
@@ -80,7 +79,6 @@ void Soundscapes::handleFaderMapping() {
     // PITCH, PROB, and RCL off. RCL is exclusive with SAVE only: engaging it
     // forces SAVE off, but PITCH/PROB can still be armed alongside it (so a
     // loaded pattern can be tweaked live without leaving RCL).
-    static float prevPitch = 1.0f, prevProb = 0.0f, prevSave = 0.0f, prevRcl = 0.0f;
     float currPitch = params[PITCH_PARAM].getValue();
     float currProb = params[PROB_PARAM].getValue();
     float currSave = params[SAVE_PARAM].getValue();
@@ -136,7 +134,6 @@ void Soundscapes::handleFaderMapping() {
     rclArmed = currRcl > 0.5f;
 
     // --- Mutually Exclusive Radio Button logic for COMPRESSOR, DELAY, REVERB, and FILTER ---
-    static float prevComp = 0.0f, prevDelay = 0.0f, prevReverb = 0.0f, prevFilter = 0.0f;
     float currComp = params[COMPRESSOR_PARAM].getValue();
     float currDelay = params[DELAY_PARAM].getValue();
     float currReverb = params[REVERB_PARAM].getValue();
@@ -241,7 +238,6 @@ void Soundscapes::processSequencer(float sampleTime) {
         float rateVal = params[RATE_PARAM].getValue();
         float period = 1.0f / (1.0f + rateVal * 19.0f);
 
-        static float clockAccumulator = 0.0f;
         clockAccumulator += sampleTime;
         if (clockAccumulator >= period) {
             clockAccumulator = 0.0f;
@@ -278,11 +274,16 @@ void Soundscapes::processSequencer(float sampleTime) {
             // a simplification, since channels no longer have fixed harmonic roles;
             // if you record your lowest part elsewhere, this balance won't track it.
             bool isBass = (ch == 0);
-            float weight = isBass ? yVal : (1.0f - yVal);
-            float rollProb = reachAmt * weight;
 
-            if (((float)rand() / RAND_MAX) < rollProb) {
-                bool bigLeap = ((float)rand() / RAND_MAX) < reachAmt;
+            // Reach alone drives whether this channel re-rolls this step -- at full
+            // deflection (reachAmt=1), every channel re-rolls every step, so the
+            // effect is unmistakable whenever X is pushed toward an extreme. Y no
+            // longer gates whether anything happens (that diluted the probability
+            // enough that it often didn't audibly trigger) -- it now only biases
+            // which channel group gets the more dramatic leap.
+            if (((float)rand() / RAND_MAX) < reachAmt) {
+                float groupBias = isBass ? yVal : (1.0f - yVal); // 0-1, higher = more extreme for this group
+                bool bigLeap = ((float)rand() / RAND_MAX) < (reachAmt * (0.4f + groupBias * 0.6f));
                 if (bigLeap) {
                     static const int bigIntervals[6] = {-12, -7, -5, 5, 7, 12};
                     channelWildcardOffset[ch] = (float)bigIntervals[rand() % 6];

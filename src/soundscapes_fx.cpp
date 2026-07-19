@@ -18,56 +18,69 @@ void Soundscapes::process(const ProcessArgs& args) {
         }
     }
 
-    // C. Monitor fader movements to display active percentages (00 - 99)
+    // C. Monitor fader movements -- channel fader edits get a 3-segment VU bar
+    // (rendered by OpaqueDisplay for displayType 0), not a plain percentage number.
     for (int i = 0; i < 6; i++) {
-        static float prevFaderVal[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
         float currVal = params[FADER1_PARAM + i].getValue();
-        if (prevFaderVal[i] >= 0.0f && fabs(currVal - prevFaderVal[i]) > 0.001f) {
+        if (lastFaderValue[i] >= 0.0f && fabs(currVal - lastFaderValue[i]) > 0.001f) {
             displayValueTimer[i] = 1.5f;
             displayValue[i] = currVal;
             displayType[i] = 0;
         }
-        prevFaderVal[i] = currVal;
+        lastFaderValue[i] = currVal;
     }
 
-    // D. Monitor macro knobs to display edited levels across all screens
+    // D. Monitor macro knobs -- colorful VU-meter bargraph (displayType 5) across
+    // all 8 displays, FX-bus-colored, rather than spelling out the knob's name.
     for (int k = 0; k < 6; k++) {
-        static float prevKnobVal[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
         float currVal = params[RATE_PARAM + k].getValue();
-        if (prevKnobVal[k] >= 0.0f && fabs(currVal - prevKnobVal[k]) > 0.001f) {
+        if (lastKnobValue[k] >= 0.0f && fabs(currVal - lastKnobValue[k]) > 0.001f) {
             for (int i = 0; i < 8; i++) {
                 displayValueTimer[i] = 1.5f;
                 displayValue[i] = currVal;
-                displayType[i] = 0;
+                displayType[i] = 5;
             }
         }
-        prevKnobVal[k] = currVal;
+        lastKnobValue[k] = currVal;
     }
 
     // E. Monitor ROOT & SCALE edits to display note names and scale abbreviations
-    static float prevRoot = -1.0f;
     float currRoot = params[ROOT_PARAM].getValue();
-    if (prevRoot >= 0.0f && fabs(currRoot - prevRoot) > 0.01f) {
+    if (lastRootValue >= 0.0f && fabs(currRoot - lastRootValue) > 0.001f) {
         for (int i = 0; i < 8; i++) {
             displayValueTimer[i] = 1.5f;
             displayValue[i] = currRoot;
             displayType[i] = 1;
         }
     }
-    prevRoot = currRoot;
+    lastRootValue = currRoot;
 
-    static float prevScale = -1.0f;
     float currScale = params[SCALE_PARAM].getValue();
-    if (prevScale >= 0.0f && fabs(currScale - prevScale) > 0.01f) {
+    if (lastScaleValue >= 0.0f && fabs(currScale - lastScaleValue) > 0.001f) {
         for (int i = 0; i < 8; i++) {
             displayValueTimer[i] = 1.5f;
             displayValue[i] = currScale;
             displayType[i] = 2;
         }
     }
-    prevScale = currScale;
+    lastScaleValue = currScale;
 
-    // F. Call Synthesizer Engine to process raw Voice DSP output signals
+    // F. Monitor the 3-way mode switch (this used to only exist in a duplicate
+    // copy of this whole block that lived in the UI-thread draw() function --
+    // removed, since that duplicate was racing this audio-thread copy and
+    // corrupting displayType/displayValue, which is what caused the VU meter to
+    // show stale/wrong content in the wrong cells).
+    float currMode = params[MODE_PARAM].getValue();
+    if (lastModeValue >= 0.0f && fabs(currMode - lastModeValue) > 0.01f) {
+        for (int i = 0; i < 8; i++) {
+            displayValueTimer[i] = 1.5f;
+            displayValue[i] = currMode;
+            displayType[i] = 3;
+        }
+    }
+    lastModeValue = currMode;
+
+    // G. Call Synthesizer Engine to process raw Voice DSP output signals
     processDSP(args);
 
     // G. Cascade FX Tank Bus Processing

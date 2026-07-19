@@ -16,7 +16,7 @@ static const int SCALES[5][12] = {
  */
 static float quantizePitch(float cvInput, int root, int scaleIdx) {
     cvInput = math::clamp(cvInput, -5.0f, 5.0f);
-    float rawNote = cvInput * 12.0f + 60.0f;
+    float rawNote = cvInput * 12.0f + 48.0f; // Was 60 (middle C) -- dropped one octave, too bright by default
     int octave = std::floor(rawNote / 12.0f);
     int noteInOctave = (int)std::floor(rawNote) % 12;
 
