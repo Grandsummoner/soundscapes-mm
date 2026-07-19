@@ -33,7 +33,8 @@ namespace SoundscapesCoords {
     const float CH_COLS[8] = {79.0f, 123.0f, 167.0f, 211.0f, 254.0f, 298.0f, 342.0f, 386.0f};
     const float ROW1_JACK_Y = 55.0f;
     const float ROW1_LED_Y = 74.0f;       // Spacious gap between jack and LED
-    const float ROW1_DISPLAY_Y = 115.0f;  // Aligned perfectly with SVG backplate Y=115
+    const float ROW1_DISPLAY_Y = 100.0f;  // Moved nearer to the LED row (was 115,
+                                           // a 41px gap from the LED at 74 -- now ~26px)
 
     // Row 2: Centralized Synth Deck
     const float MODE_X = 79.0f;
@@ -52,16 +53,9 @@ namespace SoundscapesCoords {
                                    // performance button block to stretch into
 
     // Row 4: Step Sequencer Pads & Buttons
-    const float ROW4_MELODY_PAD_Y = 288.0f;
-    const float ROW4_CHORD_PAD_Y = 336.0f;
-    const float ROW4_BUTTON_ROWS[2] = {306.0f, 336.0f}; // 2x2 shape preserved (PITCH,
-                                                          // PROB, SAVE, RCL); stretched
-                                                          // down to use the space freed
-                                                          // by ROOT/SCALE now sharing a
-                                                          // row -- bottom row (336, +10
-                                                          // half-height = 346) sits flush
-                                                          // with the step grid's own
-                                                          // bottom edge
+    const float ROW4_MELODY_PAD_Y = 300.0f; // was 288 -- shifted down to use the bottom margin
+    const float ROW4_CHORD_PAD_Y = 348.0f;  // was 336
+    const float ROW4_BUTTON_ROWS[2] = {318.0f, 348.0f}; // was {306, 336} -- shifted down
 }
 
 // A single saved pattern: all 6 channels' pitch + probability across all 16 steps,

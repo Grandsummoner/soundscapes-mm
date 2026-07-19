@@ -1124,11 +1124,11 @@ struct FaceplateLabels : Widget {
             for (int i = 0; i < 6; i++) {
                 float x = SoundscapesCoords::CH_COLS[i];
                 nvgFontSize(args.vg, 7.0f);
-                nvgTextBold(args.vg, x, SoundscapesCoords::ROW1_JACK_Y + 16.0f, std::to_string(i + 1).c_str(), NULL);
+                nvgTextBold(args.vg, x, 80.0f /* was ROW1_JACK_Y+16=71, which collided with the LED row at y=74 -- moved clear, between LED and display */, std::to_string(i + 1).c_str(), NULL);
             }
             nvgFontSize(args.vg, 7.0f);
-            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[6], SoundscapesCoords::ROW1_JACK_Y + 16.0f, "L", NULL);
-            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[7], SoundscapesCoords::ROW1_JACK_Y + 16.0f, "R", NULL);
+            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[6], 80.0f /* was ROW1_JACK_Y+16=71, which collided with the LED row at y=74 -- moved clear, between LED and display */, "L", NULL);
+            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[7], 80.0f /* was ROW1_JACK_Y+16=71, which collided with the LED row at y=74 -- moved clear, between LED and display */, "R", NULL);
 
             // E. Fader Numbers (1 to 6)
             for (int i = 0; i < 6; i++) {

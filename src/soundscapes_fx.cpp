@@ -162,8 +162,17 @@ void Soundscapes::process(const ProcessArgs& args) {
     float revDecayVal = params[DYNAMICS_PARAM].getValue() * revDecayCeiling;
 
     // Reverb loop processing
-    float revInputL = inputBusL + delayOutL * delaySendVal;
-    float revInputR = inputBusR + delayOutR * delaySendVal;
+    // Reverb takes only the dry signal as input -- NOT delay's output. Previously
+    // this was inputBusL + delayOutL*delaySendVal (delay chained into reverb),
+    // which was harmless when Delay/Reverb sends were hard-exclusive (never both
+    // nonzero at once). But the ~40ms crossfade added to fix the on/off jump
+    // creates a brief overlap window where both are nonzero during a switch --
+    // and in that window the delay signal was being counted twice: once directly
+    // in the wet mix, and again indirectly through reverb's own input. That
+    // double-count was the volume spike when switching to Reverb. Making the two
+    // buses genuinely independent removes the compounding regardless of overlap.
+    float revInputL = inputBusL;
+    float revInputR = inputBusR;
 
     // Pitch shift reverb feedback trails for shimmer effect
     float feedbackShiftL = shimmerShiftL.process(fxUnit.reverbState);
