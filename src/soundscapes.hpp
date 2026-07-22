@@ -109,12 +109,12 @@ struct Soundscapes : Module {
         DELAY_PARAM,
         REVERB_PARAM,
         FILTER_PARAM,
-        RATE_PARAM,
-        DENSITY_PARAM,
-        TIMBRE_PARAM,
-        TEXTURE_PARAM,
-        SPREAD_PARAM,
-        DYNAMICS_PARAM,
+        RATE_PARAM,       // Step clock -- moving to joystick Y, this slot becomes PITCH_PARAM
+        DENSITY_PARAM,    // Will become BODY_PARAM
+        TIMBRE_PARAM,     // Will become COLOUR_PARAM
+        TEXTURE_PARAM,    // Will become SPACE_PARAM
+        RELEASE_PARAM,    // Was RELEASE_PARAM -- envelope release (clean, no more Waves feedback overload)
+        ATTACK_PARAM,     // Was ATTACK_PARAM -- envelope attack (clean, no more duck overload)
         FADER1_PARAM, FADER2_PARAM, FADER3_PARAM, FADER4_PARAM,
         FADER5_PARAM, FADER6_PARAM,
         FX_RETURN_PARAM,    // Global fader, col 7: FX wet-return depth
@@ -209,6 +209,7 @@ struct Soundscapes : Module {
     float clockAccumulator = 0.0f;
     float lastKnobValue[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
     float lastFaderValue[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+    float lastFaderRideValue[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
     float lastRootValue = -1.0f, lastScaleValue = -1.0f, lastModeValue = -1.0f;
 
     // PITCH/PROB: latching, multi-armable together. While armed, the channel
@@ -264,8 +265,8 @@ struct Soundscapes : Module {
                 // Always active in Voices mode (VA waveshape), or when Filter
                 // (cutoff) or Compressor (mid-side width) is the active bus.
                 return (activeSynthMode == MODE_VOICES) || filterSendUp || compressorSendUp;
-            case SPREAD_PARAM:
-            case DYNAMICS_PARAM:
+            case RELEASE_PARAM:
+            case ATTACK_PARAM:
                 return true; // Always drive the shared Release/Attack envelope
             default:
                 return true;
@@ -276,39 +277,28 @@ struct Soundscapes : Module {
     // matching that FX button's color for easy visual pairing. 0 = none, 2 = DELAY,
     // 3 = REVERB, 4 = FILTER, 5 = COMPRESSOR.
     int macroAccentGroup(int paramId) {
-        if (activeFaderState == FADER_DELAY_SEND && (paramId == RATE_PARAM || paramId == SPREAD_PARAM)) return 2;
-        if (activeFaderState == FADER_REVERB_SEND && (paramId == TIMBRE_PARAM || paramId == DYNAMICS_PARAM)) return 3;
+        // DELAY: RATE=time, DENSITY=feedback amount
+        if (activeFaderState == FADER_DELAY_SEND && (paramId == RATE_PARAM || paramId == DENSITY_PARAM)) return 2;
+        // REVERB: TIMBRE=shimmer, RELEASE=decay tail length
+        if (activeFaderState == FADER_REVERB_SEND && (paramId == TIMBRE_PARAM || paramId == RELEASE_PARAM)) return 3;
         if (activeFaderState == FADER_FILTER_SEND && (paramId == TEXTURE_PARAM || paramId == TIMBRE_PARAM)) return 4;
-        if (activeFaderState == FADER_FM_SEND && (paramId == TIMBRE_PARAM || paramId == TEXTURE_PARAM)) return 5; // Compressor
+        if (activeFaderState == FADER_FM_SEND && (paramId == TIMBRE_PARAM || paramId == TEXTURE_PARAM)) return 5;
         return 0;
     }
 
-    // Returns an up-to-8-character label describing what a macro knob is currently
-    // doing, spelled one character per display across all 8 7-segment displays when
-    // that knob is turned. Kept honest to the actual current implementation -- a knob
-    // that's inert right now says so via isMacroActive(), not via a hopeful label.
     const char* macroFunctionName(int paramId) {
         switch (paramId) {
-            case RATE_PARAM:
-                return "RATE";
+            case RATE_PARAM:    return "RATE";
             case DENSITY_PARAM:
-                if (activeSynthMode == MODE_VOICES) {
-                    return "NOTEDENS";
-                } else if (activeSynthMode == MODE_WAVES) {
-                    return "CHORUS";
-                } else {
-                    return "DUSTRATE";
-                }
-            case TIMBRE_PARAM:
-                return "TIMBRE";
+                if (activeSynthMode == MODE_VOICES) return "FILL";
+                else if (activeSynthMode == MODE_WAVES) return "BODY";
+                else return "GRAINS";
+            case TIMBRE_PARAM:  return "TIMBRE";
             case TEXTURE_PARAM:
                 return (activeSynthMode == MODE_VOICES) ? "OSCSHAPE" : "TEXTURE";
-            case SPREAD_PARAM:
-                return "RELEASE";
-            case DYNAMICS_PARAM:
-                return "ATTACK";
-            default:
-                return "";
+            case RELEASE_PARAM: return "RELEASE";
+            case ATTACK_PARAM:  return "ATTACK";
+            default:            return "";
         }
     }
 

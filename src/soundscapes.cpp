@@ -35,8 +35,8 @@ Soundscapes::Soundscapes() {
     configParam(DENSITY_PARAM, 0.0f, 1.0f, 0.5f, "Macro 2: Voices Unison Thickness / Noise Dust Rate / Filter Resonance");
     configParam(TIMBRE_PARAM, 0.0f, 1.0f, 0.5f, "Macro 3: FM Harmonic Ratio / Reverb Shimmer Pitch");
     configParam(TEXTURE_PARAM, 0.0f, 1.0f, 0.5f, "Macro 4: FM Index Modulation / Filter Cutoff");
-    configParam(SPREAD_PARAM, 0.0f, 1.0f, 0.5f, "Macro 5: Release Time / Stereo Spatial Detune / Delay Feedback");
-    configParam(DYNAMICS_PARAM, 0.0f, 1.0f, 0.5f, "Macro 6: Attack Time / Filter Envelope / Reverb Decay");
+    configParam(RELEASE_PARAM, 0.0f, 1.0f, 0.5f, "Envelope Release Time");
+    configParam(ATTACK_PARAM, 0.0f, 1.0f, 0.5f, "Envelope Attack Time");
 
     // 5. Configure Row 3 Mixer Faders & Center Quantizers
     for (int i = 0; i < 6; i++) {

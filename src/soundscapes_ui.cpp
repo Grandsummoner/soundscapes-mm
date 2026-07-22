@@ -69,144 +69,166 @@ static NVGcolor shadeColor(NVGcolor c, float amt) {
     }
 }
 
-struct OpaqueDisplay : Widget {
+struct MergedDisplay : Widget {
     Soundscapes* module = nullptr;
-    int channelId = 0; // Range 0 - 7
     std::shared_ptr<Font> font;
+    static const int NUM_CH = 8;
 
-    OpaqueDisplay() {
+    MergedDisplay() {
         font = loadRobustFont();
+        box.size = Vec(266.0f, 30.0f);
     }
 
     void onButton(const event::Button& e) override {
-        Widget::onButton(e);
-        if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
-            if (module && channelId < 6) {
-                module->handleFocusToggle(channelId);
-            }
+        if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT && module) {
+            float chW = box.size.x / NUM_CH;
+            int ch = (int)(e.pos.x / chW);
+            ch = math::clamp(ch, 0, 5);
+            module->handleFocusToggle(ch);
             e.consume(this);
         }
     }
 
     void draw(const DrawArgs& args) override {
-        if (!module) return;
+        float W = box.size.x;
+        float H = box.size.y;
+        float chW = W / NUM_CH;
 
-        bool isFocused = (module->focusedChannel == channelId);
-        
-        // Draw physical glowing aura/outline if focused
-        if (isFocused) {
-            nvgBeginPath(args.vg);
-            nvgRoundedRect(args.vg, -2.0f, -2.0f, box.size.x + 4.0f, box.size.y + 4.0f, 5.0f);
-            nvgStrokeColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff)); // Bright amber
-            nvgStrokeWidth(args.vg, 2.0f);
-            nvgStroke(args.vg);
+        // Unified background
+        nvgBeginPath(args.vg);
+        nvgRoundedRect(args.vg, 0.0f, 0.0f, W, H, 4.0f);
+        nvgFillColor(args.vg, nvgRGBA(0x1a, 0x18, 0x15, 0xff));
+        nvgFill(args.vg);
+        nvgStrokeColor(args.vg, nvgRGBA(0x3a, 0x36, 0x2e, 0xff));
+        nvgStrokeWidth(args.vg, 1.0f);
+        nvgStroke(args.vg);
 
-            // Diffusion blur glow
-            NVGpaint glowPaint = nvgBoxGradient(args.vg, -4.0f, -4.0f, box.size.x + 8.0f, box.size.y + 8.0f, 6.0f, 4.0f, nvgRGBA(0xff, 0x9d, 0x00, 0x7f), nvgRGBA(0, 0, 0, 0));
-            nvgBeginPath(args.vg);
-            nvgRoundedRect(args.vg, -6.0f, -6.0f, box.size.x + 12.0f, box.size.y + 12.0f, 7.0f);
-            nvgFillPaint(args.vg, glowPaint);
-            nvgFill(args.vg);
-        }
+        const char* chLabels[8] = {"1","2","3","4","5","6","L","R"};
+        const char* noteNames[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
+        const char* scaleNames[5] = {"MA","MI","PE","DO","PH"};
+        const char* modeNames[3] = {"VOI","WAV","DST"};
 
-        bool shouldFlash = isFocused && module->displayFlashState;
-        if (shouldFlash) return;
+        for (int i = 0; i < NUM_CH; i++) {
+            float x0 = chW * i;
+            float cx = x0 + chW * 0.5f;
 
-        if (font) {
-            nvgFontFaceId(args.vg, font->handle);
-            nvgFontSize(args.vg, 21.0f);
-            nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-            nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xdf));
-
-            char text[16];
-
-            // Route standard channel values vs temporary HUD values
-            if (module->displayValueTimer[channelId] > 0.0f) {
-                if (module->displayType[channelId] == 1) {
-                    int r = (int)std::round(module->displayValue[channelId] * 11.0f);
-                    r = clamp(r, 0, 11);
-                    const char* notes[12] = {"C ", "C#", "D ", "D#", "E ", "F ", "F#", "G ", "G#", "A ", "A#", "B "};
-                    snprintf(text, sizeof(text), "%s", notes[r]);
-                } else if (module->displayType[channelId] == 2) {
-                    int s = (int)std::round(module->displayValue[channelId] * 4.0f);
-                    s = clamp(s, 0, 4);
-                    const char* scalesText[5] = {"MA", "MI", "PE", "DO", "PH"};
-                    snprintf(text, sizeof(text), "%s", scalesText[s]);
-                } else if (module->displayType[channelId] == 3) {
-                    int m = (int)std::round(module->displayValue[channelId]);
-                    m = clamp(m, 0, 2);
-                    const char* modesText[3] = {"VO", "WA", "DR"};
-                    snprintf(text, sizeof(text), "%s", modesText[m]);
-                } else if (module->displayType[channelId] == 4) {
-                    int len = (int)strlen(module->macroFunctionText);
-                    char c = (channelId < len) ? module->macroFunctionText[channelId] : ' ';
-                    snprintf(text, sizeof(text), "%c", c);
-                } else if (module->displayType[channelId] == 5) {
-                    // VU-meter bargraph: knob-turn HUD. 3 sub-columns per display (24
-                    // segments total across all 8) for finer resolution than a single
-                    // block per cell. Colored to match whichever FX bus is currently
-                    // active (so a Reverb-focused knob turn reads in amber, a Filter one
-                    // in magenta, etc.), in 4 shade depths of that one hue -- easy to
-                    // read and remember at a glance, rather than an unrelated flat color.
-                    NVGcolor baseColor;
-                    int accentGroup = 0;
-                    if (module->activeFaderState == FADER_DELAY_SEND) accentGroup = 2;
-                    else if (module->activeFaderState == FADER_REVERB_SEND) accentGroup = 3;
-                    else if (module->activeFaderState == FADER_FILTER_SEND) accentGroup = 4;
-                    else if (module->activeFaderState == FADER_FM_SEND) accentGroup = 5; // Compressor
-
-                    if (accentGroup == 2) baseColor = nvgRGBA(0x1a, 0xbc, 0x9c, 0xff);      // Delay: Teal
-                    else if (accentGroup == 3) baseColor = nvgRGBA(0xff, 0x9d, 0x00, 0xff); // Reverb: Amber
-                    else if (accentGroup == 4) baseColor = nvgRGBA(0xe9, 0x1e, 0x63, 0xff); // Filter: Magenta
-                    else if (accentGroup == 5) baseColor = nvgRGBA(0x9b, 0x59, 0xb6, 0xff); // Compressor: Purple
-                    else baseColor = nvgRGBA(0x2e, 0xcc, 0x71, 0xff);                       // No FX bus active: Green
-
-                    int totalLit = (int)std::round(module->displayValue[channelId] * 24.0f);
-                    totalLit = clamp(totalLit, 0, 24);
-                    int myLit = clamp(totalLit - channelId * 3, 0, 3);
-
-                    float colW = (box.size.x - 6.0f) / 3.0f;
-                    for (int col = 0; col < myLit; col++) {
-                        int segIdx = channelId * 3 + col;
-                        int shadeBand = clamp(segIdx / 6, 0, 3); // 4 shade bands across 24 segments
-                        // Band 0 (quietest) lightest tint -> band 3 (loudest) darkest/most saturated
-                        float shadeAmt = 0.45f - (float)shadeBand * 0.3f; // 0.45, 0.15, -0.15, -0.45
-                        NVGcolor segColor = shadeColor(baseColor, shadeAmt);
-
-                        nvgBeginPath(args.vg);
-                        nvgRoundedRect(args.vg, 3.0f + col * colW, 4.0f, colW - 1.5f, box.size.y - 8.0f, 1.5f);
-                        nvgFillColor(args.vg, segColor);
-                        nvgFill(args.vg);
-                    }
-                    return; // Filled blocks, not text -- skip the nvgTextBold call below
-                } else {
-                    // Item 3: channel fader edits also get a VU bar instead of a plain
-                    // 00-99 number -- 3 segments, classic green/yellow/red zones, drawn
-                    // within this single cell (this display isn't shared across all 8
-                    // like the knob-turn HUD above, so a simpler 3-step meter fits here).
-                    int litCount = (int)std::round(module->displayValue[channelId] * 3.0f);
-                    litCount = clamp(litCount, 0, 3);
-                    float colW = (box.size.x - 6.0f) / 3.0f;
-                    for (int col = 0; col < litCount; col++) {
-                        NVGcolor segColor;
-                        if (col == 0) segColor = nvgRGBA(0x2e, 0xcc, 0x71, 0xff);      // Green
-                        else if (col == 1) segColor = nvgRGBA(0xf1, 0xc4, 0x0f, 0xff); // Yellow
-                        else segColor = nvgRGBA(0xe7, 0x4c, 0x3c, 0xff);                // Red
-                        nvgBeginPath(args.vg);
-                        nvgRoundedRect(args.vg, 3.0f + col * colW, 4.0f, colW - 1.5f, box.size.y - 8.0f, 1.5f);
-                        nvgFillColor(args.vg, segColor);
-                        nvgFill(args.vg);
-                    }
-                    return; // Filled blocks, not text -- skip the nvgTextBold call below
-                }
-            } else {
-                // Idle: leave dark. Channel/L/R identity is already printed once,
-                // above the display -- repeating it here was redundant, and a
-                // display that's only ever lit when something needs to show is a
-                // clearer signal than one that's always showing something.
-                return;
+            // Channel divider hairline
+            if (i > 0) {
+                nvgBeginPath(args.vg);
+                nvgMoveTo(args.vg, x0, 3.0f);
+                nvgLineTo(args.vg, x0, H - 3.0f);
+                nvgStrokeColor(args.vg, nvgRGBA(0x3a, 0x36, 0x2e, 0xff));
+                nvgStrokeWidth(args.vg, 0.5f);
+                nvgStroke(args.vg);
             }
-            nvgTextBold(args.vg, box.size.x / 2.0f, box.size.y / 2.0f + 1.5f, text, NULL);
+
+            if (!module) {
+                if (font) {
+                    nvgFontFaceId(args.vg, font->handle);
+                    nvgFontSize(args.vg, 9.0f);
+                    nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+                    nvgFillColor(args.vg, nvgRGBA(0x5c, 0x53, 0x46, 0xff));
+                    nvgTextBold(args.vg, cx, H * 0.5f, chLabels[i], NULL);
+                }
+                continue;
+            }
+
+            // Focus highlight -- amber border on focused channel's cell
+            if (i < 6 && module->focusedChannel == i) {
+                nvgBeginPath(args.vg);
+                nvgRect(args.vg, x0 + 1.0f, 1.0f, chW - 2.0f, H - 2.0f);
+                nvgStrokeColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xff));
+                nvgStrokeWidth(args.vg, 1.5f);
+                nvgStroke(args.vg);
+
+                // Flash (blink when focused)
+                if (module->displayFlashState) continue;
+            }
+
+            bool active = module->displayValueTimer[i] > 0.0f;
+            int dtype = module->displayType[i];
+
+            if (active && dtype == 5) {
+                // VU bargraph (knob turn): 3 sub-columns per channel, FX-bus colored in 4 shade depths
+                NVGcolor baseColor;
+                int accentGroup = 0;
+                if (module->activeFaderState == FADER_DELAY_SEND) accentGroup = 2;
+                else if (module->activeFaderState == FADER_REVERB_SEND) accentGroup = 3;
+                else if (module->activeFaderState == FADER_FILTER_SEND) accentGroup = 4;
+                else if (module->activeFaderState == FADER_FM_SEND) accentGroup = 5;
+
+                if (accentGroup == 2) baseColor = nvgRGBA(0x1a, 0xbc, 0x9c, 0xff);
+                else if (accentGroup == 3) baseColor = nvgRGBA(0xff, 0x9d, 0x00, 0xff);
+                else if (accentGroup == 4) baseColor = nvgRGBA(0xe9, 0x1e, 0x63, 0xff);
+                else if (accentGroup == 5) baseColor = nvgRGBA(0x9b, 0x59, 0xb6, 0xff);
+                else baseColor = nvgRGBA(0x2e, 0xcc, 0x71, 0xff);
+
+                int totalLit = (int)std::round(module->displayValue[i] * 24.0f);
+                totalLit = math::clamp(totalLit, 0, 24);
+                int myLit = math::clamp(totalLit - i * 3, 0, 3);
+                float subW = (chW - 6.0f) / 3.0f;
+                for (int col = 0; col < myLit; col++) {
+                    int segIdx = i * 3 + col;
+                    float shadeAmt = 0.45f - (float)(segIdx / 6) * 0.3f;
+                    NVGcolor segColor = shadeColor(baseColor, shadeAmt);
+                    nvgBeginPath(args.vg);
+                    nvgRoundedRect(args.vg, x0 + 3.0f + col * subW, 4.0f, subW - 1.5f, H - 8.0f, 1.5f);
+                    nvgFillColor(args.vg, segColor);
+                    nvgFill(args.vg);
+                }
+                continue;
+            }
+
+            if (active && dtype == 0) {
+                // Fader VU: 3-segment green/yellow/red per channel cell
+                int litCount = (int)std::round(module->displayValue[i] * 3.0f);
+                litCount = math::clamp(litCount, 0, 3);
+                float subW = (chW - 6.0f) / 3.0f;
+                for (int col = 0; col < litCount; col++) {
+                    NVGcolor segColor;
+                    if (col == 0) segColor = nvgRGBA(0x2e, 0xcc, 0x71, 0xff);
+                    else if (col == 1) segColor = nvgRGBA(0xf1, 0xc4, 0x0f, 0xff);
+                    else segColor = nvgRGBA(0xe7, 0x4c, 0x3c, 0xff);
+                    nvgBeginPath(args.vg);
+                    nvgRoundedRect(args.vg, x0 + 3.0f + col * subW, 4.0f, subW - 1.5f, H - 8.0f, 1.5f);
+                    nvgFillColor(args.vg, segColor);
+                    nvgFill(args.vg);
+                }
+                continue;
+            }
+
+            // Text content: root note, scale type, mode name, SAVE/RCL feedback, or idle channel label
+            if (!font) continue;
+            nvgFontFaceId(args.vg, font->handle);
+            nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+
+            if (active) {
+                nvgFontSize(args.vg, 9.5f);
+                nvgFillColor(args.vg, nvgRGBA(0xff, 0x9d, 0x00, 0xdf));
+                char text[16];
+                if (dtype == 1) {
+                    int r = math::clamp((int)std::round(module->displayValue[i] * 11.0f), 0, 11);
+                    snprintf(text, sizeof(text), "%s", noteNames[r]);
+                } else if (dtype == 2) {
+                    int s = math::clamp((int)std::round(module->displayValue[i] * 4.0f), 0, 4);
+                    snprintf(text, sizeof(text), "%s", scaleNames[s]);
+                } else if (dtype == 3) {
+                    int m = math::clamp((int)std::round(module->displayValue[i]), 0, 2);
+                    snprintf(text, sizeof(text), "%s", modeNames[m]);
+                } else if (dtype == 4) {
+                    int len = (int)strlen(module->macroFunctionText);
+                    char c = (i < len) ? module->macroFunctionText[i] : ' ';
+                    snprintf(text, sizeof(text), "%c", c);
+                } else {
+                    snprintf(text, sizeof(text), "%s", chLabels[i]);
+                }
+                nvgTextBold(args.vg, cx, H * 0.5f, text, NULL);
+            } else {
+                // Idle: small dim channel label permanently visible
+                nvgFontSize(args.vg, 8.0f);
+                nvgFillColor(args.vg, nvgRGBA(0x4a, 0x44, 0x3c, 0xff));
+                nvgTextBold(args.vg, cx, H * 0.5f, chLabels[i], NULL);
+            }
         }
     }
 };
@@ -335,47 +357,78 @@ struct StepPadWidget : app::SvgSwitch {
  * 3. Procedural Slide Fader Handle
  */
 struct SoundscapesFader : app::SvgSlider {
-    // Overridable so global faders (FX Return, Master Level) can carry a
-    // different cap color than the 6 neutral channel faders, flagging at a
-    // glance that they're not per-channel controls.
     NVGcolor capFill = nvgRGBA(0xfa, 0xf9, 0xf6, 0xff);   // Silver-cream (default)
     NVGcolor capStroke = nvgRGBA(0xcc, 0xc4, 0xb5, 0xff);
+    NVGcolor ledColor = nvgRGBA(0x2a, 0x28, 0x24, 0xff);  // Unlit state -- dark/placeholder
+                                                            // until we assign a function.
+                                                            // Overridable per subclass so
+                                                            // FX Return / Master faders can
+                                                            // have distinct LED colors later.
 
     SoundscapesFader() {
-        box.size = Vec(14.0f, 46.0f); // Shorter travel
-        speed = 4.0f;                 // Snappier mouse dragging
+        box.size = Vec(14.0f, 46.0f);
+        speed = 4.0f;
     }
 
     void draw(const DrawArgs& args) override {
-        // Draw fader track groove -- plain rect, no rounded end-caps (those read as
-        // small "nips" poking out top/bottom on a groove this thin)
+        // Fader track groove
         nvgBeginPath(args.vg);
         nvgRect(args.vg, box.size.x / 2.0f - 2.0f, 0.0f, 4.0f, box.size.y);
-        nvgFillColor(args.vg, nvgRGBA(13, 12, 11, 255)); // #0d0c0b
+        nvgFillColor(args.vg, nvgRGBA(13, 12, 11, 255));
         nvgFill(args.vg);
 
-        // Position of cap handle relative to travel range
         float value = getParamQuantity() ? getParamQuantity()->getValue() : 0.8f;
         float handleHeight = 16.0f;
         float handleY = (1.0f - value) * (box.size.y - handleHeight);
 
-        // Draw fader handle body
+        // Fader cap body
         nvgBeginPath(args.vg);
         nvgRoundedRect(args.vg, 0.0f, handleY, box.size.x, handleHeight, 2.0f);
         nvgFillColor(args.vg, capFill);
         nvgFill(args.vg);
-
         nvgStrokeColor(args.vg, capStroke);
         nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
 
-        // Center black indicator line
+        // Thin indicator lines above and below the LED (replaces the single
+        // center line -- gives the cap a more tactile, hardware-console look)
+        float midY = handleY + handleHeight / 2.0f;
         nvgBeginPath(args.vg);
-        nvgMoveTo(args.vg, 2.0f, handleY + handleHeight / 2.0f);
-        nvgLineTo(args.vg, box.size.x - 2.0f, handleY + handleHeight / 2.0f);
+        nvgMoveTo(args.vg, 2.0f, midY - 3.0f);
+        nvgLineTo(args.vg, box.size.x - 2.0f, midY - 3.0f);
+        nvgMoveTo(args.vg, 2.0f, midY + 3.0f);
+        nvgLineTo(args.vg, box.size.x - 2.0f, midY + 3.0f);
         nvgStrokeColor(args.vg, nvgRGBA(0x1a, 0x1a, 0x1a, 0xff));
-        nvgStrokeWidth(args.vg, 1.5f);
+        nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
+
+        // LED: small circle centered between the two indicator lines.
+        // Rendered with a soft radial glow when lit (ledColor has meaningful
+        // alpha/brightness), or as a flat dark dot when unlit.
+        float ledR = 2.2f;
+        float ledCX = box.size.x / 2.0f;
+        float ledCY = midY;
+
+        // Outer soft glow (only visible when ledColor is bright)
+        NVGpaint glow = nvgRadialGradient(args.vg, ledCX, ledCY, 0.5f, ledR * 2.8f,
+            nvgRGBAf(ledColor.r, ledColor.g, ledColor.b, ledColor.a * 0.35f),
+            nvgRGBAf(ledColor.r, ledColor.g, ledColor.b, 0.0f));
+        nvgBeginPath(args.vg);
+        nvgCircle(args.vg, ledCX, ledCY, ledR * 2.8f);
+        nvgFillPaint(args.vg, glow);
+        nvgFill(args.vg);
+
+        // LED body
+        nvgBeginPath(args.vg);
+        nvgCircle(args.vg, ledCX, ledCY, ledR);
+        nvgFillColor(args.vg, ledColor);
+        nvgFill(args.vg);
+
+        // Specular highlight on the LED lens
+        nvgBeginPath(args.vg);
+        nvgCircle(args.vg, ledCX - 0.6f, ledCY - 0.7f, ledR * 0.45f);
+        nvgFillColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0x60));
+        nvgFill(args.vg);
     }
 };
 
@@ -598,7 +651,7 @@ struct SoundscapesKnob : app::Knob {
         if (getParamQuantity() && getParamQuantity()->module) {
             Soundscapes* mod = dynamic_cast<Soundscapes*>(getParamQuantity()->module);
             int paramId = getParamQuantity()->paramId;
-            if (mod && paramId >= Soundscapes::RATE_PARAM && paramId <= Soundscapes::DYNAMICS_PARAM) {
+            if (mod && paramId >= Soundscapes::RATE_PARAM && paramId <= Soundscapes::ATTACK_PARAM) {
                 active = mod->isMacroActive(paramId);
             }
         }
@@ -1084,18 +1137,8 @@ struct FaceplateLabels : Widget {
             }
             nvgFillColor(args.vg, nvgRGBA(0x5c, 0x53, 0x46, 0xff)); // Reset to standard charcoal
 
-            // D. Output Jack Column Numbers (1 to 6), then L/R for the master outs.
-            // Printed once, above the 7-seg display (between it and the jack) --
-            // the display itself no longer repeats this when idle (see
-            // OpaqueDisplay::draw), so there's no more duplicate second row below.
-            for (int i = 0; i < 6; i++) {
-                float x = SoundscapesCoords::CH_COLS[i];
-                nvgFontSize(args.vg, 7.0f);
-                nvgTextBold(args.vg, x, 90.0f /* was 80, still cramped in the thin 11px LED-to-display gap -- now sits at the display's own top edge (85), reading as printed on the display itself rather than floating with the LEDs */, std::to_string(i + 1).c_str(), NULL);
-            }
-            nvgFontSize(args.vg, 7.0f);
-            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[6], 90.0f /* was 80, still cramped in the thin 11px LED-to-display gap -- now sits at the display's own top edge (85), reading as printed on the display itself rather than floating with the LEDs */, "L", NULL);
-            nvgTextBold(args.vg, SoundscapesCoords::CH_COLS[7], 90.0f /* was 80, still cramped in the thin 11px LED-to-display gap -- now sits at the display's own top edge (85), reading as printed on the display itself rather than floating with the LEDs */, "R", NULL);
+            // D. Output channel labels (1-6, L, R) are now drawn inside MergedDisplay
+            // as idle-state text per channel cell -- no separate external label needed.
 
             // E. Fader Numbers (1 to 6)
             for (int i = 0; i < 6; i++) {
@@ -1105,7 +1148,7 @@ struct FaceplateLabels : Widget {
             }
 
             // F. Macro Knob Labels
-            const char* knobLabels[6] = {"RATE", "DYNAMICS", "SPREAD", "TIMBRE", "TEXTURE", "DENSITY"};
+            const char* knobLabels[6] = {"RATE", "ATTACK", "RELEASE", "TIMBRE", "TEXTURE", "DENSITY"};
             for (int i = 0; i < 6; i++) {
                 nvgFontSize(args.vg, 7.5f);
                 nvgTextBold(args.vg, SoundscapesCoords::KNOB_COLS[i], SoundscapesCoords::ROW2_KNOB_Y + 21.0f, knobLabels[i], NULL);
@@ -1157,39 +1200,24 @@ struct SoundscapesWidget : ModuleWidget {
             float x = SoundscapesCoords::CH_COLS[i];
             addOutput(createOutputCentered<PJ301MPort>(Vec(x, SoundscapesCoords::ROW1_JACK_Y), module, Soundscapes::CH1_OUTPUT + i));
             addChild(createLightCentered<MediumLight<GreenLight>>(Vec(x, SoundscapesCoords::ROW1_LED_Y), module, Soundscapes::CH1_LED + i));
-
-            // Custom Display overlays
-            OpaqueDisplay* display = new OpaqueDisplay();
-            display->box.pos = Vec(x - 14.0f, SoundscapesCoords::ROW1_DISPLAY_Y - 15.0f);
-            display->box.size = Vec(28.0f, 30.0f); // Height reduced to 75% (was 40) -- frees
-                                                    // vertical room, kept centered on the same Y
-            display->module = module;
-            display->channelId = i;
-            addChild(display);
         }
 
-        // MASTER L/R stereo sum, occupying the jack positions that used to be
-        // channels 7/8 -- no panel repositioning needed, just a different function.
+        // MASTER L/R stereo sum
         addOutput(createOutputCentered<PJ301MPort>(Vec(SoundscapesCoords::CH_COLS[6], SoundscapesCoords::ROW1_JACK_Y), module, Soundscapes::MASTER_L_OUTPUT));
         addChild(createLightCentered<MediumLight<GreenLight>>(Vec(SoundscapesCoords::CH_COLS[6], SoundscapesCoords::ROW1_LED_Y), module, Soundscapes::MASTER_L_LED));
 
         addOutput(createOutputCentered<PJ301MPort>(Vec(SoundscapesCoords::CH_COLS[7], SoundscapesCoords::ROW1_JACK_Y), module, Soundscapes::MASTER_R_OUTPUT));
         addChild(createLightCentered<MediumLight<GreenLight>>(Vec(SoundscapesCoords::CH_COLS[7], SoundscapesCoords::ROW1_LED_Y), module, Soundscapes::MASTER_R_LED));
 
+        // Single merged display spanning all 8 channels -- replaces 8 separate
+        // OpaqueDisplay cells. Sits between the LED row and the channel block row.
         {
-            OpaqueDisplay* masterLDisplay = new OpaqueDisplay();
-            masterLDisplay->box.pos = Vec(SoundscapesCoords::CH_COLS[6] - 14.0f, SoundscapesCoords::ROW1_DISPLAY_Y - 15.0f);
-            masterLDisplay->box.size = Vec(28.0f, 30.0f); // 75% height, see above
-            masterLDisplay->module = module;
-            masterLDisplay->channelId = 6; // 6/7 are the master L/R display slots
-            addChild(masterLDisplay);
-
-            OpaqueDisplay* masterRDisplay = new OpaqueDisplay();
-            masterRDisplay->box.pos = Vec(SoundscapesCoords::CH_COLS[7] - 14.0f, SoundscapesCoords::ROW1_DISPLAY_Y - 15.0f);
-            masterRDisplay->box.size = Vec(28.0f, 30.0f); // 75% height, see above
-            masterRDisplay->module = module;
-            masterRDisplay->channelId = 7;
-            addChild(masterRDisplay);
+            MergedDisplay* display = new MergedDisplay();
+            display->module = module;
+            // Left edge = CH_COLS[0]-14, width=266 covers to CH_COLS[7]+14
+            display->box.pos = Vec(SoundscapesCoords::CH_COLS[0] - 14.0f,
+                                   SoundscapesCoords::ROW1_DISPLAY_Y - 15.0f);
+            addChild(display);
         }
 
         // --- III. Row 2: Centralized Synth Deck (Using discrete 3-way switch) ---
@@ -1218,7 +1246,7 @@ struct SoundscapesWidget : ModuleWidget {
             // Density -- was Rate, Density, Timbre, Texture, Spread, Dynamics.
             // Param identities unchanged, just which column each sits in.
             static const int knobOrder[6] = {
-                Soundscapes::RATE_PARAM, Soundscapes::DYNAMICS_PARAM, Soundscapes::SPREAD_PARAM,
+                Soundscapes::RATE_PARAM, Soundscapes::ATTACK_PARAM, Soundscapes::RELEASE_PARAM,
                 Soundscapes::TIMBRE_PARAM, Soundscapes::TEXTURE_PARAM, Soundscapes::DENSITY_PARAM
             };
             addParam(createParamCentered<SoundscapesKnob>(Vec(SoundscapesCoords::KNOB_COLS[i], SoundscapesCoords::ROW2_KNOB_Y), module, knobOrder[i]));

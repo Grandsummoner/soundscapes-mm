@@ -185,10 +185,20 @@ void Soundscapes::handleFaderMapping() {
     for (int i = 0; i < 6; i++) {
         float faderVal = params[FADER1_PARAM + i].getValue();
 
+        bool faderMoved = (lastFaderRideValue[i] >= 0.0f) && (fabs(faderVal - lastFaderRideValue[i]) > 0.0005f);
+        lastFaderRideValue[i] = faderVal;
+
         if (pitchArmed || probArmed) {
-            float shapedVal = faderVal * faderVal; // Exponential taper, same as the amplitude case below
-            if (pitchArmed) stepPitch[i][currentStep] = shapedVal;
-            if (probArmed) stepProb[i][currentStep] = shapedVal;
+            // Only actually record when the fader is genuinely being moved --
+            // previously this wrote every frame regardless, which meant an
+            // untouched fader (sitting at its default resting position) would
+            // silently overwrite every step the playhead ever passed with that
+            // same value, erasing any melodic variation across the pattern.
+            if (faderMoved) {
+                float shapedVal = faderVal * faderVal; // Exponential taper, same as the amplitude case below
+                if (pitchArmed) stepPitch[i][currentStep] = shapedVal;
+                if (probArmed) stepProb[i][currentStep] = shapedVal;
+            }
         } else if (activeFaderState == FADER_MIXER) {
             channelVolumes[i] = faderVal * faderVal; // Exponential taper: finer low-end control
         } else {

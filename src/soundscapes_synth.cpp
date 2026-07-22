@@ -86,8 +86,8 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
     
     // Remapped Envelopes: DYNAMICS controls Attack, SPREAD controls Release/Decay
     // (swapped from the original mapping -- these names fit the reversed roles better)
-    float attackVal = params[DYNAMICS_PARAM].getValue();
-    float releaseVal = params[SPREAD_PARAM].getValue();
+    float attackVal = params[ATTACK_PARAM].getValue();
+    float releaseVal = params[RELEASE_PARAM].getValue();
 
     // 2. Synthesize 6 Independent Channels + Master L/R Sum
 
@@ -141,9 +141,16 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
         // --- Pitch computation: this channel's own recorded value at the current
         // step, quantized. Raw 0-1 fader value maps across a 2-octave (14-degree)
         // range so live-recording a pitch has real melodic reach.
-        int degreeOffset = (int)std::round(stepPitch[i][currentStep] * 13.0f);
-        int octaveOffset = degreeOffset / 7;
-        int scaleDegreeIndex = degreeOffset % 7;
+        // Was: degreeOffset = round(stepPitch * 13) -- always 0 to 13 (never negative),
+        // meaning the recorded pitch could only ever add UPWARD from the base anchor
+        // note, never below it. That's why dropping the base octave last round didn't
+        // fully fix the brightness complaint -- this was silently adding back up to
+        // +19 semitones on top regardless. Now centered: fader position 0.5 (the
+        // resting/unrecorded default) means NO offset -- exactly the base note --
+        // with a full -7 to +7 scale-degree range above and below as you record.
+        int degreeOffset = (int)std::round((stepPitch[i][currentStep] - 0.5f) * 14.0f); // -7 to +7
+        int octaveOffset = (int)std::floor((float)degreeOffset / 7.0f); // floor division -- correct for negatives
+        int scaleDegreeIndex = ((degreeOffset % 7) + 7) % 7; // positive modulo -- correct for negatives
         int relativeNoteOffset = SCALES[scaleIdx][scaleDegreeIndex] + (octaveOffset * 12);
         float voiceMidiNote = baseMidiNote + relativeNoteOffset + channelWildcardOffset[i];
 
@@ -237,7 +244,7 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             float dampSample = (currentSample + nextSample) * 0.5f;
 
             // Decay speed controlled by the Release macro (SPREAD, Macro 5)
-            float feedbackMult = 0.9f + (releaseVal * 0.098f);
+            float feedbackMult = 0.9f + (params[DENSITY_PARAM].getValue() * 0.098f); // DENSITY = string body in Waves mode
             float feedbackSample = dampSample * feedbackMult;
 
             voice.writeIdx = (voice.writeIdx + 1) & 2047;
@@ -291,7 +298,12 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
         // Apply dynamic CV DUCKING
         if (inputs[DUCK_INPUT].isConnected()) {
             float duckVolts = inputs[DUCK_INPUT].getVoltage();
-            float duckAmount = params[DYNAMICS_PARAM].getValue() * (duckVolts / 10.0f);
+            // Duck depth is now purely CV-driven -- plug in a signal, the louder it
+            // is the more it ducks. No knob needed since sidechain ducking is always
+            // a patching decision, not a fixed performance parameter. Previously
+            // this was stealing ATTACK_PARAM (envelope attack) as a depth control,
+            // which meant turning attack simultaneously changed duck sensitivity.
+            float duckAmount = math::clamp(duckVolts / 10.0f, 0.0f, 1.0f);
             
             float duckAtten = 1.0f - math::clamp(duckAmount, 0.0f, 1.0f);
             channelOutputSignal *= duckAtten;

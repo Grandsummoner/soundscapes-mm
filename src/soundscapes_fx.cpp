@@ -107,7 +107,7 @@ void Soundscapes::process(const ProcessArgs& args) {
         fxUnit.smoothedDelaySend += (delaySendVal - fxUnit.smoothedDelaySend) * smoothCoeff;
         delaySendVal = fxUnit.smoothedDelaySend;
     }
-    float fbackVal = params[SPREAD_PARAM].getValue() * 0.95f; // Max feedback clamp: 95%
+    float fbackVal = params[DENSITY_PARAM].getValue() * 0.95f; // DENSITY = delay feedback in Delay mode
     float delayTimeVal = params[RATE_PARAM].getValue();
 
     // Mode-dependent delay character (unannounced -- same DELAY button/knobs,
@@ -172,7 +172,7 @@ void Soundscapes::process(const ProcessArgs& args) {
     } else {
         revDecayCeiling = 0.95f; shimmerCeiling = 0.45f; // Voices: original character
     }
-    float revDecayVal = params[DYNAMICS_PARAM].getValue() * revDecayCeiling;
+    float revDecayVal = params[RELEASE_PARAM].getValue() * revDecayCeiling; // RELEASE = reverb tail length
 
     // Reverb loop processing
     // Reverb takes only the dry signal as input -- NOT delay's output. Previously
