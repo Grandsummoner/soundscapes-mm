@@ -321,8 +321,22 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
         // this individual channel jack isn't patched -- the FX/master-bus stage
         // reads this value back to build the Master L/R sum, which should work
         // standalone without every individual channel also needing to be patched.
-        outputs[CH1_OUTPUT + i].setVoltage(channelOutputSignal * 5.0f); // 5V Eurorack peak-to-peak audio output
+        outputs[CH1_OUTPUT + i].setVoltage(channelOutputSignal * 5.0f);
 
-        lights[CH1_LED + i].setBrightness(voice.env);
+        // Fader cap LED -- mode-aware so it communicates something useful at a glance:
+        // PITCH mode: brightness = recorded pitch at current step (low note = dim, high = bright)
+        // PROB mode: brightness = recorded probability at current step (sparse = dim, dense = bright)
+        // Normal: pulses with the envelope (classic VCA-style trigger indicator)
+        float ledBrightness;
+        if (pitchArmed) {
+            // Map stored pitch (0-1, centered at 0.5=base note) to brightness
+            // Clamp to 0.1-1.0 so there's always a faint glow even on low notes
+            ledBrightness = 0.1f + stepPitch[i][currentStep] * 0.9f;
+        } else if (probArmed) {
+            ledBrightness = stepProb[i][currentStep];
+        } else {
+            ledBrightness = voice.env;
+        }
+        lights[CH1_LED + i].setBrightness(ledBrightness);
     }
 }

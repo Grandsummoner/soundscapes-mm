@@ -76,7 +76,7 @@ struct MergedDisplay : Widget {
 
     MergedDisplay() {
         font = loadRobustFont();
-        box.size = Vec(266.0f, 30.0f);
+        box.size = Vec(335.0f, 40.0f); // matches SVG bronze display rects exactly
     }
 
     void onButton(const event::Button& e) override {
@@ -261,6 +261,9 @@ struct StepPadWidget : app::SvgSwitch {
                 slot.occupied = true;
                 mod->params[Soundscapes::SAVE_PARAM].setValue(0.0f);
                 mod->saveArmed = false;
+                // Restore PITCH mode -- one of PITCH/PROB must always be active
+                mod->params[Soundscapes::PITCH_PARAM].setValue(1.0f);
+                mod->pitchArmed = true;
 
                 char buf[9];
                 snprintf(buf, sizeof(buf), "SAVE%02d", padId + 1);
@@ -1074,8 +1077,22 @@ struct XYPadWidget : OpaqueWidget {
         float px = cx + dx * (radius - 8.0f);
         float py = cy - dy * (radius - 8.0f); // up = higher Y
 
-        // The stick -- a visible line from center to the handle, so it reads as
-        // something being pushed away from rest, not just a dot that teleports
+        // Axis labels -- show current function based on arm state
+        const char* xLabel = "GATE";
+        const char* yLabel = "RATE";
+        if (module) {
+            if (module->pitchArmed) xLabel = "PITCH";
+            else if (module->probArmed) xLabel = "PROB";
+        }
+        if (font) {
+            nvgFontFaceId(args.vg, font->handle);
+            nvgFontSize(args.vg, 6.0f);
+            nvgFillColor(args.vg, nvgRGBA(0x9b, 0x59, 0xb6, 0xff));
+            nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+            nvgText(args.vg, 3.0f, cy, xLabel, NULL);
+            nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
+            nvgText(args.vg, cx, 3.0f, yLabel, NULL);
+        }
         nvgBeginPath(args.vg);
         nvgMoveTo(args.vg, cx, cy);
         nvgLineTo(args.vg, px, py);
@@ -1209,14 +1226,15 @@ struct SoundscapesWidget : ModuleWidget {
         addOutput(createOutputCentered<PJ301MPort>(Vec(SoundscapesCoords::CH_COLS[7], SoundscapesCoords::ROW1_JACK_Y), module, Soundscapes::MASTER_R_OUTPUT));
         addChild(createLightCentered<MediumLight<GreenLight>>(Vec(SoundscapesCoords::CH_COLS[7], SoundscapesCoords::ROW1_LED_Y), module, Soundscapes::MASTER_R_LED));
 
-        // Single merged display spanning all 8 channels -- replaces 8 separate
-        // OpaqueDisplay cells. Sits between the LED row and the channel block row.
+        // Single merged display -- aligned exactly to the SVG's bronze display
+        // rects (y=95, height=40, x=65 to x=400). Previously the widget was at
+        // y=85/h=30 which didn't match the SVG's y=95/h=40, leaving the SVG
+        // rects poking out and creating the "piano keys" visual artifact.
         {
             MergedDisplay* display = new MergedDisplay();
             display->module = module;
-            // Left edge = CH_COLS[0]-14, width=266 covers to CH_COLS[7]+14
-            display->box.pos = Vec(SoundscapesCoords::CH_COLS[0] - 14.0f,
-                                   SoundscapesCoords::ROW1_DISPLAY_Y - 15.0f);
+            display->box.pos = Vec(65.0f, 95.0f);
+            display->box.size = Vec(335.0f, 40.0f); // matches SVG: 8 cells × 28px + margins = 335
             addChild(display);
         }
 

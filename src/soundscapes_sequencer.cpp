@@ -85,29 +85,26 @@ void Soundscapes::handleFaderMapping() {
     float currRcl = params[RCL_PARAM].getValue();
 
     bool pitchPressed = (currPitch > 0.5f && prevPitch <= 0.5f);
-    bool probPressed = (currProb > 0.5f && prevProb <= 0.5f);
-    bool probReleased = (currProb <= 0.5f && prevProb > 0.5f); // User-driven unlatch, read
-                                                                // before SAVE/RCL can force
-                                                                // PROB off below, so a SAVE
-                                                                // press doesn't also look like
-                                                                // a genuine PROB release here
-    bool savePressed = (currSave > 0.5f && prevSave <= 0.5f);
-    bool rclPressed = (currRcl > 0.5f && prevRcl <= 0.5f);
+    bool probPressed  = (currProb  > 0.5f && prevProb  <= 0.5f);
+    bool savePressed  = (currSave  > 0.5f && prevSave  <= 0.5f);
+    bool rclPressed   = (currRcl   > 0.5f && prevRcl   <= 0.5f);
 
-    // PITCH <-> PROB: mutually exclusive with each other, with PROB-unlatch
-    // auto-restoring PITCH.
-    if (pitchPressed) {
+    // PITCH/PROB: mutually exclusive radio toggle -- one is always on.
+    // Pressing the active one has no effect (you can't turn both off).
+    // Pressing the inactive one switches mode and forces the other off.
+    if (pitchPressed && !pitchArmed) {
         params[PROB_PARAM].setValue(0.0f);
-        currProb = 0.0f;
-    }
-    if (probPressed) {
-        params[PITCH_PARAM].setValue(0.0f);
-        currPitch = 0.0f;
-    } else if (probReleased) {
         params[PITCH_PARAM].setValue(1.0f);
-        currPitch = 1.0f;
+        currProb = 0.0f; currPitch = 1.0f;
+    }
+    if (probPressed && !probArmed) {
+        params[PITCH_PARAM].setValue(0.0f);
+        params[PROB_PARAM].setValue(1.0f);
+        currPitch = 0.0f; currProb = 1.0f;
     }
 
+    // SAVE: exclusive -- forces everything else off while slot-picking.
+    // After slot pick, PITCH restores (handled in StepPadWidget::onButton).
     if (savePressed) {
         params[PITCH_PARAM].setValue(0.0f);
         params[PROB_PARAM].setValue(0.0f);
@@ -118,20 +115,20 @@ void Soundscapes::handleFaderMapping() {
         params[SAVE_PARAM].setValue(0.0f);
         currSave = 0.0f;
     }
-    if ((pitchPressed || probPressed) && currSave > 0.5f) {
-        params[SAVE_PARAM].setValue(0.0f);
-        currSave = 0.0f;
-    }
 
-    prevPitch = currPitch;
-    prevProb = currProb;
-    prevSave = currSave;
-    prevRcl = currRcl;
+    prevPitch = currPitch; prevProb = currProb;
+    prevSave  = currSave;  prevRcl  = currRcl;
 
     pitchArmed = currPitch > 0.5f;
-    probArmed = currProb > 0.5f;
-    saveArmed = currSave > 0.5f;
-    rclArmed = currRcl > 0.5f;
+    probArmed  = currProb  > 0.5f;
+    saveArmed  = currSave  > 0.5f;
+    rclArmed   = currRcl   > 0.5f;
+
+    // Ensure one of PITCH/PROB is always on (except during SAVE slot-picking)
+    if (!saveArmed && !pitchArmed && !probArmed) {
+        params[PITCH_PARAM].setValue(1.0f);
+        pitchArmed = true;
+    }
 
     // --- Mutually Exclusive Radio Button logic for COMPRESSOR, DELAY, REVERB, and FILTER ---
     float currComp = params[COMPRESSOR_PARAM].getValue();
@@ -185,22 +182,12 @@ void Soundscapes::handleFaderMapping() {
     for (int i = 0; i < 6; i++) {
         float faderVal = params[FADER1_PARAM + i].getValue();
 
-        bool faderMoved = (lastFaderRideValue[i] >= 0.0f) && (fabs(faderVal - lastFaderRideValue[i]) > 0.0005f);
-        lastFaderRideValue[i] = faderVal;
-
-        if (pitchArmed || probArmed) {
-            // Only actually record when the fader is genuinely being moved --
-            // previously this wrote every frame regardless, which meant an
-            // untouched fader (sitting at its default resting position) would
-            // silently overwrite every step the playhead ever passed with that
-            // same value, erasing any melodic variation across the pattern.
-            if (faderMoved) {
-                float shapedVal = faderVal * faderVal; // Exponential taper, same as the amplitude case below
-                if (pitchArmed) stepPitch[i][currentStep] = shapedVal;
-                if (probArmed) stepProb[i][currentStep] = shapedVal;
-            }
-        } else if (activeFaderState == FADER_MIXER) {
-            channelVolumes[i] = faderVal * faderVal; // Exponential taper: finer low-end control
+        // Faders ALWAYS control amplitude -- regardless of PITCH/PROB arm state.
+        // This was the core design conflict: PITCH armed was stealing the faders
+        // for pitch recording, leaving no way to control amplitude. Now faders
+        // are permanently the amplitude control; joystick handles pitch/prob recording.
+        if (activeFaderState == FADER_MIXER) {
+            channelVolumes[i] = faderVal * faderVal; // Exponential taper
         } else {
             int fxIndex = (int)activeFaderState - 1;
             fxSends[fxIndex][i] = faderVal;
@@ -258,6 +245,23 @@ void Soundscapes::processSequencer(float sampleTime) {
     if (nextStep) {
         stepTimeElapsed = 0.0f;
         currentStep = (currentStep + 1) % 16;
+
+        // Joystick-to-step recording: when PITCH or PROB is armed, the joystick's
+        // X position gets written into the current step for all 6 channels as the
+        // playhead advances. This replaces the old fader-riding approach -- faders
+        // are now permanently amplitude controls, and the joystick is the recording
+        // input. Move the joystick to a position before the step arrives, and it
+        // stamps that value into the pattern as the clock passes.
+        float joystickX = params[WILDCARD_X_PARAM].getValue(); // 0-1, center=0.5
+        if (pitchArmed) {
+            for (int ch = 0; ch < 6; ch++) {
+                stepPitch[ch][currentStep] = joystickX;
+            }
+        } else if (probArmed) {
+            for (int ch = 0; ch < 6; ch++) {
+                stepProb[ch][currentStep] = joystickX;
+            }
+        }
 
         // Roll each channel's probability for the step it's now on. Probability
         // doubles as the on/off flag -- a step at/near 0% is effectively silent,
