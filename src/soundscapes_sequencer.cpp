@@ -124,12 +124,6 @@ void Soundscapes::handleFaderMapping() {
     saveArmed  = currSave  > 0.5f;
     rclArmed   = currRcl   > 0.5f;
 
-    // Ensure one of PITCH/PROB is always on (except during SAVE slot-picking)
-    if (!saveArmed && !pitchArmed && !probArmed) {
-        params[PITCH_PARAM].setValue(1.0f);
-        pitchArmed = true;
-    }
-
     // --- Mutually Exclusive Radio Button logic for COMPRESSOR, DELAY, REVERB, and FILTER ---
     float currComp = params[COMPRESSOR_PARAM].getValue();
     float currDelay = params[DELAY_PARAM].getValue();
@@ -246,21 +240,16 @@ void Soundscapes::processSequencer(float sampleTime) {
         stepTimeElapsed = 0.0f;
         currentStep = (currentStep + 1) % 16;
 
-        // Joystick-to-step recording: when PITCH or PROB is armed, the joystick's
-        // X position gets written into the current step for all 6 channels as the
-        // playhead advances. This replaces the old fader-riding approach -- faders
-        // are now permanently amplitude controls, and the joystick is the recording
-        // input. Move the joystick to a position before the step arrives, and it
-        // stamps that value into the pattern as the clock passes.
-        float joystickX = params[WILDCARD_X_PARAM].getValue(); // 0-1, center=0.5
-        if (pitchArmed) {
-            for (int ch = 0; ch < 6; ch++) {
-                stepPitch[ch][currentStep] = joystickX;
-            }
-        } else if (probArmed) {
-            for (int ch = 0; ch < 6; ch++) {
-                stepProb[ch][currentStep] = joystickX;
-            }
+        // Joystick always records -- no arming needed.
+        // Y axis = pitch (push up = higher pitch recorded into current step)
+        // X axis = probability (push right = higher probability)
+        // Dead center (0.5,0.5) writes neutral values which is fine --
+        // the pattern was already seeded with 0.5 pitch and 0.5 prob defaults.
+        float joystickX = params[WILDCARD_X_PARAM].getValue(); // 0-1, right=more prob
+        float joystickY = params[WILDCARD_Y_PARAM].getValue(); // 0-1, up=higher pitch
+        for (int ch = 0; ch < 6; ch++) {
+            stepPitch[ch][currentStep] = joystickY;
+            stepProb[ch][currentStep]  = joystickX;
         }
 
         // Roll each channel's probability for the step it's now on. Probability

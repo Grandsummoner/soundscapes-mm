@@ -323,19 +323,15 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
         // standalone without every individual channel also needing to be patched.
         outputs[CH1_OUTPUT + i].setVoltage(channelOutputSignal * 5.0f);
 
-        // Fader cap LED -- mode-aware so it communicates something useful at a glance:
-        // PITCH mode: brightness = recorded pitch at current step (low note = dim, high = bright)
-        // PROB mode: brightness = recorded probability at current step (sparse = dim, dense = bright)
-        // Normal: pulses with the envelope (classic VCA-style trigger indicator)
+        // Fader cap LED: shows step content and trigger activity.
+        // When a note is firing (env > 0): bright pulse (classic trigger indicator).
+        // When silent: dim glow proportional to recorded pitch at this step --
+        // gives a visual melody shape across the 6 fader caps at a glance.
         float ledBrightness;
-        if (pitchArmed) {
-            // Map stored pitch (0-1, centered at 0.5=base note) to brightness
-            // Clamp to 0.1-1.0 so there's always a faint glow even on low notes
-            ledBrightness = 0.1f + stepPitch[i][currentStep] * 0.9f;
-        } else if (probArmed) {
-            ledBrightness = stepProb[i][currentStep];
+        if (voice.env > 0.05f) {
+            ledBrightness = voice.env; // Pulse on trigger
         } else {
-            ledBrightness = voice.env;
+            ledBrightness = 0.08f + stepPitch[i][currentStep] * 0.25f; // Dim pitch indicator
         }
         lights[CH1_LED + i].setBrightness(ledBrightness);
     }

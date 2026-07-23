@@ -360,13 +360,12 @@ struct StepPadWidget : app::SvgSwitch {
  * 3. Procedural Slide Fader Handle
  */
 struct SoundscapesFader : app::SvgSlider {
-    NVGcolor capFill = nvgRGBA(0xfa, 0xf9, 0xf6, 0xff);   // Silver-cream (default)
+    NVGcolor capFill   = nvgRGBA(0xfa, 0xf9, 0xf6, 0xff); // Silver-cream (default)
     NVGcolor capStroke = nvgRGBA(0xcc, 0xc4, 0xb5, 0xff);
-    NVGcolor ledColor = nvgRGBA(0x2a, 0x28, 0x24, 0xff);  // Unlit state -- dark/placeholder
-                                                            // until we assign a function.
-                                                            // Overridable per subclass so
-                                                            // FX Return / Master faders can
-                                                            // have distinct LED colors later.
+    NVGcolor ledOnColor  = nvgRGBA(0x2e, 0xcc, 0x71, 0xff); // Green when lit
+    NVGcolor ledOffColor = nvgRGBA(0x2a, 0x28, 0x24, 0xff); // Dark when unlit
+    Soundscapes* module = nullptr;
+    int ledLightId = -1; // Index into module->lights[] driving this LED
 
     SoundscapesFader() {
         box.size = Vec(14.0f, 46.0f);
@@ -405,16 +404,24 @@ struct SoundscapesFader : app::SvgSlider {
         nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
 
-        // LED: small circle centered between the two indicator lines.
-        // Rendered with a soft radial glow when lit (ledColor has meaningful
-        // alpha/brightness), or as a flat dark dot when unlit.
+        // LED: reads brightness from module light system for live animation
         float ledR = 2.2f;
         float ledCX = box.size.x / 2.0f;
         float ledCY = midY;
 
-        // Outer soft glow (only visible when ledColor is bright)
+        float brightness = 0.0f;
+        if (module && ledLightId >= 0) {
+            brightness = math::clamp(module->lights[ledLightId].getBrightness(), 0.0f, 1.0f);
+        }
+        NVGcolor ledColor = nvgRGBAf(
+            ledOffColor.r + (ledOnColor.r - ledOffColor.r) * brightness,
+            ledOffColor.g + (ledOnColor.g - ledOffColor.g) * brightness,
+            ledOffColor.b + (ledOnColor.b - ledOffColor.b) * brightness,
+            1.0f);
+
+        // Outer soft glow
         NVGpaint glow = nvgRadialGradient(args.vg, ledCX, ledCY, 0.5f, ledR * 2.8f,
-            nvgRGBAf(ledColor.r, ledColor.g, ledColor.b, ledColor.a * 0.35f),
+            nvgRGBAf(ledColor.r, ledColor.g, ledColor.b, brightness * 0.35f),
             nvgRGBAf(ledColor.r, ledColor.g, ledColor.b, 0.0f));
         nvgBeginPath(args.vg);
         nvgCircle(args.vg, ledCX, ledCY, ledR * 2.8f);
@@ -427,7 +434,7 @@ struct SoundscapesFader : app::SvgSlider {
         nvgFillColor(args.vg, ledColor);
         nvgFill(args.vg);
 
-        // Specular highlight on the LED lens
+        // Specular highlight
         nvgBeginPath(args.vg);
         nvgCircle(args.vg, ledCX - 0.6f, ledCY - 0.7f, ledR * 0.45f);
         nvgFillColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0x60));
@@ -981,9 +988,11 @@ struct FXButtonWidget : SoundscapesButton {
 struct XYPadWidget : OpaqueWidget {
     Soundscapes* module = nullptr;
     Vec dragPos;
+    std::shared_ptr<Font> font;
 
     XYPadWidget() {
         box.size = Vec(50.0f, 50.0f);
+        font = loadRobustFont();
     }
 
     void setFromLocalPos(Vec pos) {
@@ -1077,21 +1086,15 @@ struct XYPadWidget : OpaqueWidget {
         float px = cx + dx * (radius - 8.0f);
         float py = cy - dy * (radius - 8.0f); // up = higher Y
 
-        // Axis labels -- show current function based on arm state
-        const char* xLabel = "GATE";
-        const char* yLabel = "RATE";
-        if (module) {
-            if (module->pitchArmed) xLabel = "PITCH";
-            else if (module->probArmed) xLabel = "PROB";
-        }
+        // Axis labels -- permanent meanings, no arm state needed
         if (font) {
             nvgFontFaceId(args.vg, font->handle);
             nvgFontSize(args.vg, 6.0f);
             nvgFillColor(args.vg, nvgRGBA(0x9b, 0x59, 0xb6, 0xff));
             nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-            nvgText(args.vg, 3.0f, cy, xLabel, NULL);
+            nvgText(args.vg, 3.0f, cy, "PROB", NULL); // X axis
             nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
-            nvgText(args.vg, cx, 3.0f, yLabel, NULL);
+            nvgText(args.vg, cx, 3.0f, "PITCH", NULL); // Y axis
         }
         nvgBeginPath(args.vg);
         nvgMoveTo(args.vg, cx, cy);
@@ -1274,7 +1277,10 @@ struct SoundscapesWidget : ModuleWidget {
         // 6 Volume/Live-Record Faders centered over track positions (neutral cap)
         for (int i = 0; i < 6; i++) {
             float x = SoundscapesCoords::GRID_COLS[i];
-            addParam(createParamCentered<SoundscapesFader>(Vec(x, SoundscapesCoords::ROW3_FADER_Y), module, Soundscapes::FADER1_PARAM + i));
+            SoundscapesFader* fader = createParamCentered<SoundscapesFader>(Vec(x, SoundscapesCoords::ROW3_FADER_Y), module, Soundscapes::FADER1_PARAM + i);
+            fader->module = module;
+            fader->ledLightId = Soundscapes::CH1_LED + i;
+            addParam(fader);
         }
 
         // 2 Global Faders (previously blank strips at columns 7-8): FX Return and
