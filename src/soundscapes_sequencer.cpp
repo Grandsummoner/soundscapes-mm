@@ -36,7 +36,7 @@ void Soundscapes::handleSceneMorph() {
         for (int i = 0; i < 6; i++) sceneA.fader[i] = params[FADER1_PARAM + i].getValue();
         sceneA.fxReturn = params[FX_RETURN_PARAM].getValue();
         sceneA.masterLevel = params[MASTER_LEVEL_PARAM].getValue();
-        for (int i = 0; i < 6; i++) sceneA.macro[i] = params[RATE_PARAM + i].getValue();
+        for (int i = 0; i < 6; i++) sceneA.macro[i] = params[TEMPO_PARAM + i].getValue();
         sceneA.root = params[ROOT_PARAM].getValue();
         sceneA.scaleParam = params[SCALE_PARAM].getValue();
         sceneA.captured = true;
@@ -45,7 +45,7 @@ void Soundscapes::handleSceneMorph() {
         for (int i = 0; i < 6; i++) sceneB.fader[i] = params[FADER1_PARAM + i].getValue();
         sceneB.fxReturn = params[FX_RETURN_PARAM].getValue();
         sceneB.masterLevel = params[MASTER_LEVEL_PARAM].getValue();
-        for (int i = 0; i < 6; i++) sceneB.macro[i] = params[RATE_PARAM + i].getValue();
+        for (int i = 0; i < 6; i++) sceneB.macro[i] = params[TEMPO_PARAM + i].getValue();
         sceneB.root = params[ROOT_PARAM].getValue();
         sceneB.scaleParam = params[SCALE_PARAM].getValue();
         sceneB.captured = true;
@@ -62,7 +62,7 @@ void Soundscapes::handleSceneMorph() {
         params[FX_RETURN_PARAM].setValue(sceneA.fxReturn + (sceneB.fxReturn - sceneA.fxReturn) * pos);
         params[MASTER_LEVEL_PARAM].setValue(sceneA.masterLevel + (sceneB.masterLevel - sceneA.masterLevel) * pos);
         for (int i = 0; i < 6; i++) {
-            params[RATE_PARAM + i].setValue(sceneA.macro[i] + (sceneB.macro[i] - sceneA.macro[i]) * pos);
+            params[TEMPO_PARAM + i].setValue(sceneA.macro[i] + (sceneB.macro[i] - sceneA.macro[i]) * pos);
         }
         params[ROOT_PARAM].setValue(sceneA.root + (sceneB.root - sceneA.root) * pos);
         params[SCALE_PARAM].setValue(sceneA.scaleParam + (sceneB.scaleParam - sceneA.scaleParam) * pos);
@@ -209,96 +209,129 @@ void Soundscapes::processSequencer(float sampleTime) {
     // CLK input is unpatched). No PLAY button: the module free-runs by default:
     // an external CLK connection takes over advancement, and turning RATE all the
     // way down functions as "stop" (period approaches infinity).
+    // Real BPM clock: TEMPO_PARAM maps 0-1 to 5-180 BPM exponentially
+    // so the lower half of the knob covers the ambient 5-60 range and the
+    // upper half covers 60-180. External CLK input overrides completely.
     bool nextStep = false;
     bool externalClockConnected = inputs[CLK_INPUT].isConnected();
     bool externalReset = resetTrigger.process(inputs[RST_INPUT].getVoltage());
 
     if (externalReset) {
         currentStep = 0;
+        currentBar = 0;
+        for (int i = 0; i < 16; i++) passCount[i] = 0;
     }
-
-    // RATE turned all the way down = stop. The previous formula (1/(1+rateVal*19))
-    // only ever reached a 1-second period at rateVal=0 -- never actually stopped,
-    // despite the comment above claiming it approached infinity. Below this
-    // threshold, freeze the playhead outright instead of just running very slowly.
-    bool clockStopped = !externalClockConnected && (params[RATE_PARAM].getValue() < 0.02f);
 
     if (externalClockConnected) {
         nextStep = clockTrigger.process(inputs[CLK_INPUT].getVoltage());
-    } else if (!clockStopped) {
-        float rateVal = params[RATE_PARAM].getValue();
-        float period = 1.0f / (1.0f + rateVal * 19.0f);
+    } else {
+        float tempoVal = params[TEMPO_PARAM].getValue();
+        // Exponential mapping: 0->5 BPM, 0.5->~30 BPM, 1.0->180 BPM
+        float bpm = 5.0f * std::pow(36.0f, tempoVal); // 5 * 36^0 = 5, 5 * 36^1 = 180
+        bpm = math::clamp(bpm, 5.0f, 180.0f);
+        float stepPeriod = 60.0f / (bpm * 4.0f); // 16th note period
 
-        clockAccumulator += sampleTime;
-        if (clockAccumulator >= period) {
+        if (tempoVal < 0.01f) {
+            // Fully left = stopped
             clockAccumulator = 0.0f;
-            nextStep = true;
+        } else {
+            clockAccumulator += sampleTime;
+            if (clockAccumulator >= stepPeriod) {
+                clockAccumulator -= stepPeriod;
+                nextStep = true;
+            }
         }
+    }
+
+    // Process channel focus mask from top-row buttons (multi-select toggles)
+    static float prevFocusBtn[6] = {};
+    for (int i = 0; i < 6; i++) {
+        float curr = params[CH_FOCUS_PARAM_START + i].getValue();
+        if (curr > 0.5f && prevFocusBtn[i] <= 0.5f) {
+            // Toggle this channel's bit in the mask
+            channelFocusMask ^= (1 << i);
+            // Update legacy single-channel focus for display compat
+            focusedChannel = (channelFocusMask == (1 << i)) ? i : -1;
+        }
+        prevFocusBtn[i] = curr;
+    }
+
+    // REV: reverse playback direction for focused channels (or all if none focused)
+    static float prevRev = 0.0f;
+    float currRev = params[REV_PARAM].getValue();
+    if (currRev > 0.5f && prevRev <= 0.5f) reverseActive = !reverseActive;
+    prevRev = currRev;
+
+    // INV: invert firing (fill with inverse pattern) for focused channels
+    static float prevInv = 0.0f;
+    float currInv = params[INV_PARAM].getValue();
+    fillActive = currInv > 0.5f;
+    prevInv = currInv;
+
+    // Condition buttons (bottom row): set condition for all focused channels
+    static float prevCond[8] = {};
+    for (int c = 0; c < 8; c++) {
+        float curr = params[COND_PARAM_START + c].getValue();
+        if (curr > 0.5f && prevCond[c] <= 0.5f) {
+            uint8_t mask = channelFocusMask ? channelFocusMask : 0x3F; // all if none focused
+            for (int ch = 0; ch < 6; ch++) {
+                if (mask & (1 << ch)) channelCondition[ch] = (uint8_t)c;
+            }
+        }
+        prevCond[c] = curr;
     }
 
     if (nextStep) {
         stepTimeElapsed = 0.0f;
-        currentStep = (currentStep + 1) % 16;
 
-        // Joystick always records -- no arming needed.
-        // Y axis = pitch (push up = higher pitch recorded into current step)
-        // X axis = probability (push right = higher probability)
-        // Dead center (0.5,0.5) writes neutral values which is fine --
-        // the pattern was already seeded with 0.5 pitch and 0.5 prob defaults.
-        float joystickX = params[WILDCARD_X_PARAM].getValue(); // 0-1, right=more prob
-        float joystickY = params[WILDCARD_Y_PARAM].getValue(); // 0-1, up=higher pitch
+        // Advance playhead (respects REV direction)
+        if (reverseActive) {
+            currentStep = (currentStep + 15) % 16; // step back
+        } else {
+            currentStep = (currentStep + 1) % 16;
+        }
+
+        // Bar counter: increment every 16 steps
+        if (currentStep == 0) {
+            currentBar++;
+            for (int i = 0; i < 16; i++) passCount[i] = 0;
+        }
+        passCount[currentStep]++;
+
+        // Joystick Y=pitch, X=prob: write into current step for all channels
+        float joystickX = params[WILDCARD_X_PARAM].getValue();
+        float joystickY = params[WILDCARD_Y_PARAM].getValue();
         for (int ch = 0; ch < 6; ch++) {
             stepPitch[ch][currentStep] = joystickY;
             stepProb[ch][currentStep]  = joystickX;
         }
 
-        // Roll each channel's probability for the step it's now on. Probability
-        // doubles as the on/off flag -- a step at/near 0% is effectively silent,
-        // no separate "active" flag needed.
-        float globalDensityScale = 1.0f;
-        if (activeSynthMode == MODE_VOICES) {
-            float densityVal = params[DENSITY_PARAM].getValue();
-            globalDensityScale = 0.2f + densityVal * 1.6f;
-        }
+        // Per-channel probability roll respecting conditions, density, and INV
+        float globalDensityScale = 0.2f + params[DENSITY_PARAM].getValue() * 1.6f;
         for (int ch = 0; ch < 6; ch++) {
             float prob = math::clamp(stepProb[ch][currentStep] * globalDensityScale, 0.0f, 1.0f);
-            channelTriggerActive[ch] = ((float)rand() / RAND_MAX) < prob;
-        }
+            bool wouldFire = ((float)rand() / RAND_MAX) < prob;
 
-        // --- X-Y Wildcard Transpose (live performance pad) ---
-        // reachAmt: 0 at pad center, 1 at either edge -- how likely and how big a
-        // leap is. yBias: -1..1, which voice group gets more of the movement.
-        float xVal = params[WILDCARD_X_PARAM].getValue();
-        float yVal = params[WILDCARD_Y_PARAM].getValue();
-        float reachAmt = std::fabs(xVal - 0.5f) * 2.0f;
-
-        for (int ch = 0; ch < 6; ch++) {
-            // Channel 0 is treated as the nominal "bass" voice for this feature --
-            // a simplification, since channels no longer have fixed harmonic roles;
-            // if you record your lowest part elsewhere, this balance won't track it.
-            bool isBass = (ch == 0);
-
-            // Reach alone drives whether this channel re-rolls this step -- at full
-            // deflection (reachAmt=1), every channel re-rolls every step, so the
-            // effect is unmistakable whenever X is pushed toward an extreme. Y no
-            // longer gates whether anything happens (that diluted the probability
-            // enough that it often didn't audibly trigger) -- it now only biases
-            // which channel group gets the more dramatic leap.
-            if (((float)rand() / RAND_MAX) < reachAmt) {
-                float groupBias = isBass ? yVal : (1.0f - yVal); // 0-1, higher = more extreme for this group
-                bool bigLeap = ((float)rand() / RAND_MAX) < (reachAmt * (0.4f + groupBias * 0.6f));
-                if (bigLeap) {
-                    static const int bigIntervals[6] = {-12, -7, -5, 5, 7, 12};
-                    channelWildcardOffset[ch] = (float)bigIntervals[rand() % 6];
-                } else {
-                    static const int smallIntervals[5] = {-2, -1, 0, 1, 2};
-                    channelWildcardOffset[ch] = (float)smallIntervals[rand() % 5];
-                }
+            // Playback condition for this channel
+            bool condPass = true;
+            switch (channelCondition[ch]) {
+                case 1: condPass = (currentBar % 2 == 0); break;           // 1:2
+                case 2: condPass = (currentBar % 2 == 1); break;           // 2:2
+                case 3: condPass = (currentBar % 4 == 0); break;           // 1:4
+                case 4: condPass = (currentBar % 4 == 1); break;           // 2:4
+                case 5: condPass = (currentBar % 4 == 2); break;           // 3:4
+                case 6: condPass = (currentBar % 8 == 0); break;           // RARE
+                case 7: condPass = ((float)rand()/RAND_MAX) > 0.5f; break; // RND
+                default: condPass = true; break;                            // ALL
             }
-            // If the roll fails, this channel simply keeps whatever offset (if
-            // any) it already had -- offsets persist across steps rather than
-            // resetting to 0 every time, so a wildcard move sticks until the next
-            // one overwrites it, similar to how a recorded pitch stays put.
+
+            bool fires = wouldFire && condPass;
+
+            // INV: invert firing for focused channels
+            bool chFocused = channelFocusMask ? (channelFocusMask & (1 << ch)) != 0 : true;
+            if (fillActive && chFocused) fires = !fires;
+
+            channelTriggerActive[ch] = fires;
         }
     } else {
         stepTimeElapsed += sampleTime;

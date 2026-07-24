@@ -80,14 +80,13 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
     float baseMidiNote = quantizePitch(rootCV, rootNote, scaleIdx);
 
     // Parse macro parameter control dials
-    float rateVal = params[RATE_PARAM].getValue();
     float densityVal = params[DENSITY_PARAM].getValue();
-    float textureVal = params[TEXTURE_PARAM].getValue();
+    float textureVal = params[SPACE_PARAM].getValue();
     
     // Remapped Envelopes: DYNAMICS controls Attack, SPREAD controls Release/Decay
     // (swapped from the original mapping -- these names fit the reversed roles better)
-    float attackVal = params[ATTACK_PARAM].getValue();
-    float releaseVal = params[RELEASE_PARAM].getValue();
+    float attackVal = params[DENSITY_PARAM].getValue();
+    float releaseVal = params[EVOLVE_PARAM].getValue();
 
     // 2. Synthesize 6 Independent Channels + Master L/R Sum
 
@@ -122,19 +121,13 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             // as a chord stab -- e.g. a keyboard's GATE OUT into GATE_INPUT plays the
             // whole harmonized chord on each keypress.
             voiceGate = inputs[GATE_INPUT].getVoltage() > 1.0f;
-        } else if (!inputs[CLK_INPUT].isConnected() && rateVal < 0.02f) {
-            // RATE turned all the way down = stop: gate off unconditionally, so
-            // voices release naturally instead of staying stuck sounding on
-            // whatever step the playhead was frozen on (see processSequencer).
-            voiceGate = false;
         } else {
-            float stepPeriod = 1.0f / (1.0f + rateVal * 19.0f);
-            float activeGateDuration = stepPeriod * 0.50f; // 50% gate duration
+            float tempoVal = params[TEMPO_PARAM].getValue();
+            float bpm = 5.0f * std::pow(36.0f, tempoVal);
+            bpm = math::clamp(bpm, 5.0f, 180.0f);
+            float stepPeriod = 60.0f / (bpm * 4.0f);
+            float activeGateDuration = stepPeriod * 0.50f;
             bool isGateActive = (stepTimeElapsed < activeGateDuration);
-
-            // All 6 channels share one playhead (currentStep), but each has its own
-            // probability roll at that step (channelTriggerActive[i], re-rolled every
-            // time the playhead advances -- see processSequencer).
             voiceGate = isGateActive && channelTriggerActive[i];
         }
 
@@ -244,7 +237,7 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             float dampSample = (currentSample + nextSample) * 0.5f;
 
             // Decay speed controlled by the Release macro (SPREAD, Macro 5)
-            float feedbackMult = 0.9f + (params[DENSITY_PARAM].getValue() * 0.098f); // DENSITY = string body in Waves mode
+            float feedbackMult = 0.9f + (params[TIMBRE_PARAM].getValue() * 0.098f); // TIMBRE = string body/brightness in Waves mode
             float feedbackSample = dampSample * feedbackMult;
 
             voice.writeIdx = (voice.writeIdx + 1) & 2047;
@@ -301,7 +294,7 @@ void Soundscapes::processDSP(const ProcessArgs& args) {
             // Duck depth is now purely CV-driven -- plug in a signal, the louder it
             // is the more it ducks. No knob needed since sidechain ducking is always
             // a patching decision, not a fixed performance parameter. Previously
-            // this was stealing ATTACK_PARAM (envelope attack) as a depth control,
+            // this was stealing DENSITY_PARAM (envelope attack) as a depth control,
             // which meant turning attack simultaneously changed duck sensitivity.
             float duckAmount = math::clamp(duckVolts / 10.0f, 0.0f, 1.0f);
             

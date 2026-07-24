@@ -31,12 +31,12 @@ Soundscapes::Soundscapes() {
     configParam(REVERB_PARAM, 0.0f, 1.0f, 0.0f, "Reverb Send Edit Select");
     configParam(FILTER_PARAM, 0.0f, 1.0f, 0.0f, "Filter Send Edit Select");
 
-    configParam(RATE_PARAM, 0.0f, 1.0f, 0.5f, "Macro 1: Sequencer Rate / Delay Time");
-    configParam(DENSITY_PARAM, 0.0f, 1.0f, 0.5f, "Macro 2: Voices Unison Thickness / Noise Dust Rate / Filter Resonance");
-    configParam(TIMBRE_PARAM, 0.0f, 1.0f, 0.5f, "Macro 3: FM Harmonic Ratio / Reverb Shimmer Pitch");
-    configParam(TEXTURE_PARAM, 0.0f, 1.0f, 0.5f, "Macro 4: FM Index Modulation / Filter Cutoff");
-    configParam(RELEASE_PARAM, 0.0f, 1.0f, 0.5f, "Envelope Release Time");
-    configParam(ATTACK_PARAM, 0.0f, 1.0f, 0.5f, "Envelope Attack Time");
+    configParam(TEMPO_PARAM,   0.0f, 1.0f, 0.3f, "Tempo: 5-180 BPM (overridden by CLK input)");
+    configParam(ROLE_PARAM,    0.0f, 1.0f, 0.0f, "Role Rotation: shifts harmonic role per channel");
+    configParam(TIMBRE_PARAM,  0.0f, 1.0f, 0.5f, "Timbre: synthesis character per mode");
+    configParam(SPACE_PARAM,   0.0f, 1.0f, 0.5f, "Space: stereo width / harmonic voicing spread");
+    configParam(EVOLVE_PARAM,  0.0f, 1.0f, 0.0f, "Evolve: rate of pattern variation over time");
+    configParam(DENSITY_PARAM, 0.0f, 1.0f, 0.5f, "Density: global note density / probability scale");
 
     // 5. Configure Row 3 Mixer Faders & Center Quantizers
     for (int i = 0; i < 6; i++) {
@@ -60,13 +60,24 @@ Soundscapes::Soundscapes() {
         configParam(STEP_PARAM_START + i, 0.0f, 1.0f, 0.0f, string::f("Step Pad %d / Memory Slot %d", i + 1, i + 1));
     }
 
-    // Performance section: 4 buttons (was 8 -- PLAY/SHFT/ARP/FRZ retired: PLAY
-    // because the module free-runs by default and RATE-down-to-zero already
-    // serves as "stop"; SHFT/ARP/FRZ were never wired to anything audible).
-    configParam(PITCH_PARAM, 0.0f, 1.0f, 1.0f, "Arm Faders: Live-Record Step Pitch"); // Default ON -- immediate, no button press needed first
-    configParam(PROB_PARAM, 0.0f, 1.0f, 0.0f, "Arm Faders: Live-Record Step Probability");
-    configParam(SAVE_PARAM, 0.0f, 1.0f, 0.0f, "Save Pattern to Memory Slot (pick a step pad)");
-    configParam(RCL_PARAM, 0.0f, 1.0f, 0.0f, "Recall Pattern from Memory Slot (browse step pads)");
+    // Top row: CH1-CH6 focus toggles (multi-select), INV (invert firing), REV (reverse)
+    for (int i = 0; i < 6; i++) {
+        configParam(CH_FOCUS_PARAM_START + i, 0.0f, 1.0f, 0.0f, string::f("Channel %d Focus", i + 1));
+    }
+    configParam(INV_PARAM, 0.0f, 1.0f, 0.0f, "INV: Invert firing for focused channels");
+    configParam(REV_PARAM, 0.0f, 1.0f, 0.0f, "REV: Reverse playback for focused channels");
+
+    // Bottom row: 8 playback condition buttons (ALL,1:2,2:2,1:4,2:4,3:4,RARE,RND)
+    const char* condNames[8] = {"ALL","1:2","2:2","1:4","2:4","3:4","RARE","RND"};
+    for (int i = 0; i < 8; i++) {
+        configParam(COND_PARAM_START + i, 0.0f, 1.0f, 0.0f, string::f("Condition: %s", condNames[i]));
+    }
+
+    // Performance section buttons
+    configParam(PITCH_PARAM, 0.0f, 1.0f, 1.0f, "Pitch mode (joystick Y writes pitch)");
+    configParam(PROB_PARAM,  0.0f, 1.0f, 0.0f, "Prob mode (joystick X writes probability)");
+    configParam(SAVE_PARAM,  0.0f, 1.0f, 0.0f, "Save Pattern to Memory Slot");
+    configParam(RCL_PARAM,   0.0f, 1.0f, 0.0f, "Recall Pattern from Memory Slot");
 
     // Clear and zero out voice buffers to guarantee clean startup
     for (int i = 0; i < 6; i++) {

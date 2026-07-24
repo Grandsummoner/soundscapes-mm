@@ -109,12 +109,12 @@ struct Soundscapes : Module {
         DELAY_PARAM,
         REVERB_PARAM,
         FILTER_PARAM,
-        RATE_PARAM,       // Step clock -- moving to joystick Y, this slot becomes PITCH_PARAM
-        DENSITY_PARAM,    // Will become BODY_PARAM
-        TIMBRE_PARAM,     // Will become COLOUR_PARAM
-        TEXTURE_PARAM,    // Will become SPACE_PARAM
-        RELEASE_PARAM,    // Was RELEASE_PARAM -- envelope release (clean, no more Waves feedback overload)
-        ATTACK_PARAM,     // Was ATTACK_PARAM -- envelope attack (clean, no more duck overload)
+        TEMPO_PARAM,      // BPM clock (5-180), overridden by CLK input
+        ROLE_PARAM,       // Role rotation 0-5 (Bass/Pad/Stab/Riff/Arp/Texture)
+        TIMBRE_PARAM,     // Synthesis character per mode
+        SPACE_PARAM,      // Stereo width / harmonic voicing spread
+        EVOLVE_PARAM,     // Rate of pattern variation over time
+        DENSITY_PARAM,    // Global note density / probability scale
         FADER1_PARAM, FADER2_PARAM, FADER3_PARAM, FADER4_PARAM,
         FADER5_PARAM, FADER6_PARAM,
         FX_RETURN_PARAM,    // Global fader, col 7: FX wet-return depth
@@ -137,7 +137,19 @@ struct Soundscapes : Module {
         // for live-record; SAVE/RCL repurpose the 16 step pads as a slot picker.
         // Exclusivity: SAVE forces PITCH/PROB/RCL off; RCL forces SAVE off (but
         // allows PITCH/PROB to combine with it); PITCH/PROB force SAVE off.
-        PITCH_PARAM, PROB_PARAM,
+        // Top row buttons: CH1-CH6 focus toggles, INV (invert firing), REV (reverse)
+        CH_FOCUS_PARAM_START,  // CH1 focus
+        // CH2..CH6 = CH_FOCUS_PARAM_START+1..+5
+        INV_PARAM = CH_FOCUS_PARAM_START + 6,  // Invert firing (was FILL, renamed to avoid confusion with condition slot)
+        REV_PARAM,                               // Reverse playback
+
+        // Bottom row: playback condition selector for focused channel(s)
+        // Conditions: ALL, 1:2, 2:2, 1:4, 2:4, 3:4, RARE, RND
+        COND_PARAM_START,
+        // COND_PARAM_START+0..+7 = 8 condition buttons
+
+        PITCH_PARAM = COND_PARAM_START + 8,
+        PROB_PARAM,
         SAVE_PARAM, RCL_PARAM,
         STEP_PARAM_START,
         STEP_PARAM_END = STEP_PARAM_START + 16, // Unified 16-step row (was 8 melody + 8 chord)
@@ -207,6 +219,19 @@ struct Soundscapes : Module {
     float prevComp = 0.0f, prevDelay = 0.0f, prevReverb = 0.0f, prevFilter = 0.0f;
     float prevSceneA = 0.0f, prevSceneB = 0.0f;
     float clockAccumulator = 0.0f;
+    int currentBar = 0;            // Bar counter (increments every 16 steps)
+    int passCount[16] = {};        // How many times each step has been visited this bar cycle
+    bool fillActive = false;       // INV button state (inverts firing, scoped to focused channels)
+    bool reverseActive = false;    // REV button state (reverses playback, scoped to focused channels)
+
+    // Per-channel step playback conditions (0=ALL,1=1:2,2=2:2,3=1:4,4=2:4,5=3:4,6=RARE,7=RND)
+    uint8_t channelCondition[6] = {0,0,0,0,0,0};
+
+    // Per-channel ADSR (ms for A/D/R, 0-1 for S) -- role-appropriate defaults set in constructor
+    float chAttack[6]  = {10,800,2,8,5,1};
+    float chDecay[6]   = {0,0,50,100,80,20};
+    float chSustain[6] = {1.0f,1.0f,0.0f,0.6f,0.0f,0.0f};
+    float chRelease[6] = {500,1200,30,150,50,15};
     float lastKnobValue[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
     float lastFaderValue[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
     float lastFaderRideValue[6] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
@@ -231,7 +256,8 @@ struct Soundscapes : Module {
     // without leaving RCL. Exclusive with SAVE only.
     bool rclArmed = false;
 
-    int focusedChannel = -1;       // Range: -1 (Global Mixer) to 0-5 (Focus 1-6)
+    int focusedChannel = -1;       // Legacy single-channel focus (kept for display compat)
+    uint8_t channelFocusMask = 0;  // Bitmask: bit 0=CH1...bit 5=CH6, multi-select allowed
     SynthMode activeSynthMode = MODE_VOICES;
     FaderState activeFaderState = FADER_MIXER;
 
@@ -250,7 +276,7 @@ struct Soundscapes : Module {
         bool compressorSendUp = params[COMPRESSOR_PARAM].getValue() > 0.001f;
 
         switch (paramId) {
-            case RATE_PARAM:
+            case TEMPO_PARAM:
                 return true; // Always drives sequencer step timing (and delay time)
             case DENSITY_PARAM:
                 // Always does something now: note density (Voices), string
@@ -261,12 +287,12 @@ struct Soundscapes : Module {
                 // active at once): Reverb (shimmer amount), Filter (resonance),
                 // Compressor (comp+tilt strength).
                 return reverbSendUp || filterSendUp || compressorSendUp;
-            case TEXTURE_PARAM:
+            case SPACE_PARAM:
                 // Always active in Voices mode (VA waveshape), or when Filter
                 // (cutoff) or Compressor (mid-side width) is the active bus.
                 return (activeSynthMode == MODE_VOICES) || filterSendUp || compressorSendUp;
-            case RELEASE_PARAM:
-            case ATTACK_PARAM:
+            case EVOLVE_PARAM:
+            case DENSITY_PARAM:
                 return true; // Always drive the shared Release/Attack envelope
             default:
                 return true;
@@ -278,26 +304,23 @@ struct Soundscapes : Module {
     // 3 = REVERB, 4 = FILTER, 5 = COMPRESSOR.
     int macroAccentGroup(int paramId) {
         // DELAY: RATE=time, DENSITY=feedback amount
-        if (activeFaderState == FADER_DELAY_SEND && (paramId == RATE_PARAM || paramId == DENSITY_PARAM)) return 2;
+        if (activeFaderState == FADER_DELAY_SEND && (paramId == TEMPO_PARAM || paramId == DENSITY_PARAM)) return 2;
         // REVERB: TIMBRE=shimmer, RELEASE=decay tail length
-        if (activeFaderState == FADER_REVERB_SEND && (paramId == TIMBRE_PARAM || paramId == RELEASE_PARAM)) return 3;
-        if (activeFaderState == FADER_FILTER_SEND && (paramId == TEXTURE_PARAM || paramId == TIMBRE_PARAM)) return 4;
-        if (activeFaderState == FADER_FM_SEND && (paramId == TIMBRE_PARAM || paramId == TEXTURE_PARAM)) return 5;
+        if (activeFaderState == FADER_REVERB_SEND && (paramId == TIMBRE_PARAM || paramId == EVOLVE_PARAM)) return 3;
+        if (activeFaderState == FADER_FILTER_SEND && (paramId == SPACE_PARAM || paramId == TIMBRE_PARAM)) return 4;
+        if (activeFaderState == FADER_FM_SEND && (paramId == TIMBRE_PARAM || paramId == SPACE_PARAM)) return 5;
         return 0;
     }
 
     const char* macroFunctionName(int paramId) {
         switch (paramId) {
-            case RATE_PARAM:    return "RATE";
-            case DENSITY_PARAM:
-                if (activeSynthMode == MODE_VOICES) return "FILL";
-                else if (activeSynthMode == MODE_WAVES) return "BODY";
-                else return "GRAINS";
+            case TEMPO_PARAM:    return "RATE";
+            case ROLE_PARAM:    return "ROLE";
             case TIMBRE_PARAM:  return "TIMBRE";
-            case TEXTURE_PARAM:
+            case SPACE_PARAM:
                 return (activeSynthMode == MODE_VOICES) ? "OSCSHAPE" : "TEXTURE";
-            case RELEASE_PARAM: return "RELEASE";
-            case ATTACK_PARAM:  return "ATTACK";
+            case EVOLVE_PARAM: return "RELEASE";
+            case DENSITY_PARAM:  return "ATTACK";
             default:            return "";
         }
     }

@@ -33,7 +33,7 @@ void Soundscapes::process(const ProcessArgs& args) {
     // D. Monitor macro knobs -- colorful VU-meter bargraph (displayType 5) across
     // all 8 displays, FX-bus-colored, rather than spelling out the knob's name.
     for (int k = 0; k < 6; k++) {
-        float currVal = params[RATE_PARAM + k].getValue();
+        float currVal = params[TEMPO_PARAM + k].getValue();
         if (lastKnobValue[k] >= 0.0f && fabs(currVal - lastKnobValue[k]) > 0.001f) {
             for (int i = 0; i < 8; i++) {
                 displayValueTimer[i] = 1.5f;
@@ -107,8 +107,8 @@ void Soundscapes::process(const ProcessArgs& args) {
         fxUnit.smoothedDelaySend += (delaySendVal - fxUnit.smoothedDelaySend) * smoothCoeff;
         delaySendVal = fxUnit.smoothedDelaySend;
     }
-    float fbackVal = params[DENSITY_PARAM].getValue() * 0.95f; // DENSITY = delay feedback in Delay mode
-    float delayTimeVal = params[RATE_PARAM].getValue();
+    float fbackVal = params[SPACE_PARAM].getValue() * 0.95f; // SPACE = delay feedback amount
+    float delayTimeVal = params[TEMPO_PARAM].getValue();
 
     // Mode-dependent delay character (unannounced -- same DELAY button/knobs,
     // different algorithm underneath): Voices keeps the original ping-pong delay
@@ -172,7 +172,7 @@ void Soundscapes::process(const ProcessArgs& args) {
     } else {
         revDecayCeiling = 0.95f; shimmerCeiling = 0.45f; // Voices: original character
     }
-    float revDecayVal = params[RELEASE_PARAM].getValue() * revDecayCeiling; // RELEASE = reverb tail length
+    float revDecayVal = params[EVOLVE_PARAM].getValue() * revDecayCeiling; // RELEASE = reverb tail length
 
     // Reverb loop processing
     // Reverb takes only the dry signal as input -- NOT delay's output. Previously
@@ -210,7 +210,7 @@ void Soundscapes::process(const ProcessArgs& args) {
         fxUnit.smoothedFilterSend += (filterSendVal - fxUnit.smoothedFilterSend) * smoothCoeff;
         filterSendVal = fxUnit.smoothedFilterSend;
     }
-    float cutoffVal = expMap(params[TEXTURE_PARAM].getValue(), 80.0f, 12000.0f); // Exponential: was linear 100Hz-12.1kHz
+    float cutoffVal = expMap(params[SPACE_PARAM].getValue(), 80.0f, 12000.0f); // Exponential: was linear 100Hz-12.1kHz
     // Resonance: was a fixed 0.35 constant -- now a real second knob (TIMBRE),
     // safe to share with Reverb's shimmer control since Reverb/Filter/Compressor
     // are mutually exclusive (only one bus active at a time).
@@ -234,7 +234,7 @@ void Soundscapes::process(const ProcessArgs& args) {
         compressorSendVal = fxUnit.smoothedCompressorSend;
     }
     float strengthVal = params[TIMBRE_PARAM].getValue();
-    float widthVal = params[TEXTURE_PARAM].getValue();
+    float widthVal = params[SPACE_PARAM].getValue();
 
     float rmsIn = std::sqrt((inputBusL * inputBusL + inputBusR * inputBusR) * 0.5f);
     float compAttackCoeff = 1.0f - std::exp(-1.0f / (0.005f * sampleRate));  // ~5ms

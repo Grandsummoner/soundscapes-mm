@@ -234,10 +234,13 @@ struct MergedDisplay : Widget {
 };
 
 /**
- * 2. Procedural Step Sequencer Pad Widget
+ * 2. Step Pad Widget -- dual-role based on row:
+ *    Top row (padId 0-7):  CH1-6 focus toggles (0-5), INV (6), REV (7)
+ *    Bottom row (padId 8-15): playback condition selector for focused channels
+ *    When SAVE/RCL armed: both rows act as memory slot pickers (original behaviour)
  */
 struct StepPadWidget : app::SvgSwitch {
-    int padId = 0; // Range 0 - 15
+    int padId = 0; // 0-7 = top row, 8-15 = bottom row
 
     StepPadWidget() {
         momentary = false;
@@ -246,116 +249,153 @@ struct StepPadWidget : app::SvgSwitch {
 
     void onButton(const event::Button& e) override {
         Soundscapes* mod = dynamic_cast<Soundscapes*>(this->module);
-        if (mod && e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
-            if (mod->saveArmed) {
-                // SAVE: pressing a pad writes the current live pattern (all 6
-                // channels' pitch+probability across all 16 steps) into this slot,
-                // then SAVE auto-unlatches immediately.
-                PatternSlot& slot = mod->slots[padId];
-                for (int ch = 0; ch < 6; ch++) {
-                    for (int s = 0; s < 16; s++) {
-                        slot.pitch[ch][s] = mod->stepPitch[ch][s];
-                        slot.prob[ch][s] = mod->stepProb[ch][s];
-                    }
-                }
-                slot.occupied = true;
-                mod->params[Soundscapes::SAVE_PARAM].setValue(0.0f);
-                mod->saveArmed = false;
-                // Restore PITCH mode -- one of PITCH/PROB must always be active
-                mod->params[Soundscapes::PITCH_PARAM].setValue(1.0f);
-                mod->pitchArmed = true;
-
-                char buf[9];
-                snprintf(buf, sizeof(buf), "SAVE%02d", padId + 1);
-                snprintf(mod->macroFunctionText, sizeof(mod->macroFunctionText), "%s", buf);
-                mod->macroFunctionActive = true;
-                for (int c = 0; c < 8; c++) {
-                    mod->displayValueTimer[c] = 1.5f;
-                    mod->displayType[c] = 4;
-                }
-                e.consume(this);
-                return;
-            }
-
-            if (mod->rclArmed) {
-                // RCL: pressing a pad loads that slot into the live pattern (if
-                // occupied) and stays latched -- lets you keep punching through
-                // slots to audition/perform across memory without leaving RCL.
-                PatternSlot& slot = mod->slots[padId];
-                if (slot.occupied) {
-                    for (int ch = 0; ch < 6; ch++) {
-                        for (int s = 0; s < 16; s++) {
-                            mod->stepPitch[ch][s] = slot.pitch[ch][s];
-                            mod->stepProb[ch][s] = slot.prob[ch][s];
-                        }
-                    }
-                }
-
-                char buf[9];
-                snprintf(buf, sizeof(buf), slot.occupied ? "RCL%02d" : "EMPTY%02d", padId + 1);
-                snprintf(mod->macroFunctionText, sizeof(mod->macroFunctionText), "%s", buf);
-                mod->macroFunctionActive = slot.occupied;
-                for (int c = 0; c < 8; c++) {
-                    mod->displayValueTimer[c] = 1.5f;
-                    mod->displayType[c] = 4;
-                }
-                e.consume(this);
-                return;
-            }
-
-            // Normal state: pads are a passive playhead indicator only, not
-            // click-to-edit -- step content is set by riding the channel faders
-            // with PITCH/PROB armed (see handleFaderMapping), not by clicking pads.
-            e.consume(this);
+        if (!mod || e.action != GLFW_PRESS || e.button != GLFW_MOUSE_BUTTON_LEFT) {
+            SvgSwitch::onButton(e);
             return;
         }
-        SvgSwitch::onButton(e);
+
+        // SAVE/RCL slot picker mode (overrides all other row behaviour)
+        if (mod->saveArmed) {
+            PatternSlot& slot = mod->slots[padId];
+            for (int ch = 0; ch < 6; ch++)
+                for (int s = 0; s < 16; s++) {
+                    slot.pitch[ch][s] = mod->stepPitch[ch][s];
+                    slot.prob[ch][s]  = mod->stepProb[ch][s];
+                }
+            slot.occupied = true;
+            mod->params[Soundscapes::SAVE_PARAM].setValue(0.0f);
+            mod->saveArmed = false;
+            for (int c = 0; c < 8; c++) { mod->displayValueTimer[c] = 1.5f; mod->displayType[c] = 4; }
+            e.consume(this); return;
+        }
+        if (mod->rclArmed) {
+            PatternSlot& slot = mod->slots[padId];
+            if (slot.occupied)
+                for (int ch = 0; ch < 6; ch++)
+                    for (int s = 0; s < 16; s++) {
+                        mod->stepPitch[ch][s] = slot.pitch[ch][s];
+                        mod->stepProb[ch][s]  = slot.prob[ch][s];
+                    }
+            for (int c = 0; c < 8; c++) { mod->displayValueTimer[c] = 1.5f; mod->displayType[c] = 4; }
+            e.consume(this); return;
+        }
+
+        if (padId < 8) {
+            // Top row
+            if (padId < 6) {
+                // CH1-6 focus toggle
+                mod->channelFocusMask ^= (1 << padId);
+                mod->focusedChannel = (mod->channelFocusMask == (1u << padId)) ? padId : -1;
+            } else if (padId == 6) {
+                // INV: toggle fill/invert
+                mod->fillActive = !mod->fillActive;
+                mod->params[Soundscapes::INV_PARAM].setValue(mod->fillActive ? 1.0f : 0.0f);
+            } else {
+                // REV: toggle reverse
+                mod->reverseActive = !mod->reverseActive;
+                mod->params[Soundscapes::REV_PARAM].setValue(mod->reverseActive ? 1.0f : 0.0f);
+            }
+        } else {
+            // Bottom row: set condition for focused channels (or all if none focused)
+            int condIdx = padId - 8; // 0-7
+            uint8_t mask = mod->channelFocusMask ? mod->channelFocusMask : 0x3F;
+            for (int ch = 0; ch < 6; ch++)
+                if (mask & (1 << ch)) mod->channelCondition[ch] = (uint8_t)condIdx;
+            for (int c = 0; c < 8; c++) { mod->displayValueTimer[c] = 1.5f; mod->displayType[c] = 6; }
+        }
+        e.consume(this);
     }
 
     void draw(const DrawArgs& args) override {
-        Soundscapes* module = dynamic_cast<Soundscapes*>(this->module);
-        bool isPlayhead = false;
-        bool slotOccupied = false;
-        bool pickerMode = false;
+        Soundscapes* mod = dynamic_cast<Soundscapes*>(this->module);
 
-        if (module) {
-            pickerMode = module->saveArmed || module->rclArmed;
-            if (pickerMode) {
-                slotOccupied = module->slots[padId].occupied;
+        static const char* condLabels[8] = {"ALL","1:2","2:2","1:4","2:4","3:4","RARE","RND"};
+        static const char* topLabels[8]  = {"1","2","3","4","5","6","INV","REV"};
+
+        // Determine state and colour
+        NVGcolor fillColor = nvgRGBA(0xff, 0xff, 0xff, 0xff);
+        NVGcolor textColor = nvgRGBA(0x3a, 0x35, 0x2e, 0xff);
+        const char* label = "";
+        bool showLabel = true;
+
+        if (mod) {
+            // SAVE/RCL slot picker
+            if (mod->saveArmed || mod->rclArmed) {
+                bool occupied = mod->slots[padId].occupied;
+                bool isSave = mod->saveArmed;
+                fillColor = occupied ? (isSave ? nvgRGBA(0xff,0x9d,0x00,0xff) : nvgRGBA(0x9b,0x59,0xb6,0xff))
+                                     : nvgRGBA(0xff,0xff,0xff,0xff);
+                label = "";
+            } else if (padId < 8) {
+                // Top row
+                label = topLabels[padId];
+                if (padId < 6) {
+                    // Channel focus buttons
+                    bool focused = (mod->channelFocusMask & (1 << padId)) != 0;
+                    bool isPlayhead = (mod->currentStep == padId || mod->currentStep == padId + 8);
+                    if (focused) {
+                        fillColor = nvgRGBA(0x34, 0x98, 0xdb, 0xff); // Blue = focused
+                        textColor = nvgRGBA(0xff, 0xff, 0xff, 0xff);
+                    } else if (isPlayhead) {
+                        fillColor = nvgRGBA(0x2e, 0xcc, 0x71, 0xff); // Green = playhead
+                    }
+                } else if (padId == 6) {
+                    // INV
+                    if (mod->fillActive) {
+                        fillColor = nvgRGBA(0xe7, 0x4c, 0x3c, 0xff); // Red = active
+                        textColor = nvgRGBA(0xff, 0xff, 0xff, 0xff);
+                    }
+                } else {
+                    // REV
+                    if (mod->reverseActive) {
+                        fillColor = nvgRGBA(0xe7, 0x4c, 0x3c, 0xff);
+                        textColor = nvgRGBA(0xff, 0xff, 0xff, 0xff);
+                    }
+                }
             } else {
-                isPlayhead = (module->currentStep == padId);
+                // Bottom row: condition buttons
+                int condIdx = padId - 8;
+                label = condLabels[condIdx];
+                // Check if any focused channel has this condition active
+                uint8_t mask = mod->channelFocusMask ? mod->channelFocusMask : 0x3F;
+                bool anyActive = false;
+                for (int ch = 0; ch < 6; ch++)
+                    if ((mask & (1 << ch)) && mod->channelCondition[ch] == condIdx) anyActive = true;
+                if (anyActive) {
+                    fillColor = nvgRGBA(0xff, 0x9d, 0x00, 0xff); // Amber = active condition
+                    textColor = nvgRGBA(0xff, 0xff, 0xff, 0xff);
+                }
             }
         }
 
-        // Draw soft button shadow
+        // Shadow
         nvgBeginPath(args.vg);
         nvgRoundedRect(args.vg, 0.0f, 1.0f, box.size.x, box.size.y, 3.5f);
-        nvgFillColor(args.vg, nvgRGBA(0x00, 0x00, 0x00, 0x0c));
+        nvgFillColor(args.vg, nvgRGBA(0x00,0x00,0x00,0x0c));
         nvgFill(args.vg);
 
-        // Draw button body
+        // Body
         nvgBeginPath(args.vg);
         nvgRoundedRect(args.vg, 0.0f, 0.0f, box.size.x, box.size.y, 3.5f);
-
-        if (pickerMode) {
-            // SAVE/RCL slot picker: tint by whether a saved pattern lives here.
-            // SAVE tints amber (matches the SAVE button), RCL tints purple.
-            bool isSave = module && module->saveArmed;
-            NVGcolor occupiedColor = isSave ? nvgRGBA(0xff, 0x9d, 0x00, 0xff) : nvgRGBA(155, 89, 182, 255);
-            nvgFillColor(args.vg, slotOccupied ? occupiedColor : nvgRGBA(0xff, 0xff, 0xff, 0xff));
-        } else if (isPlayhead) {
-            nvgFillColor(args.vg, nvgRGBA(0x2e, 0xcc, 0x71, 0xff)); // Active green playhead
-        } else {
-            nvgFillColor(args.vg, nvgRGBA(0xff, 0xff, 0xff, 0xff)); // Clean white, passive
-        }
+        nvgFillColor(args.vg, fillColor);
         nvgFill(args.vg);
-
-        nvgStrokeColor(args.vg, nvgRGBA(0xd5, 0xcf, 0xc5, 0xff));
+        nvgStrokeColor(args.vg, nvgRGBA(0xd5,0xcf,0xc5,0xff));
         nvgStrokeWidth(args.vg, 1.0f);
         nvgStroke(args.vg);
+
+        // Label text
+        if (showLabel && label[0] != '\0') {
+            auto font = loadRobustFont();
+            if (font) {
+                nvgFontFaceId(args.vg, font->handle);
+                nvgFontSize(args.vg, 6.5f);
+                nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+                nvgFillColor(args.vg, textColor);
+                nvgTextBold(args.vg, box.size.x / 2.0f, box.size.y / 2.0f, label, NULL);
+            }
+        }
     }
 };
-
 /**
  * 3. Procedural Slide Fader Handle
  */
@@ -661,7 +701,7 @@ struct SoundscapesKnob : app::Knob {
         if (getParamQuantity() && getParamQuantity()->module) {
             Soundscapes* mod = dynamic_cast<Soundscapes*>(getParamQuantity()->module);
             int paramId = getParamQuantity()->paramId;
-            if (mod && paramId >= Soundscapes::RATE_PARAM && paramId <= Soundscapes::ATTACK_PARAM) {
+            if (mod && paramId >= Soundscapes::TEMPO_PARAM && paramId <= Soundscapes::DENSITY_PARAM) {
                 active = mod->isMacroActive(paramId);
             }
         }
@@ -1168,7 +1208,7 @@ struct FaceplateLabels : Widget {
             }
 
             // F. Macro Knob Labels
-            const char* knobLabels[6] = {"RATE", "ATTACK", "RELEASE", "TIMBRE", "TEXTURE", "DENSITY"};
+            const char* knobLabels[6] = {"TEMPO", "ROLE", "TIMBRE", "SPACE", "EVOLVE", "DENSITY"};
             for (int i = 0; i < 6; i++) {
                 nvgFontSize(args.vg, 7.5f);
                 nvgTextBold(args.vg, SoundscapesCoords::KNOB_COLS[i], SoundscapesCoords::ROW2_KNOB_Y + 21.0f, knobLabels[i], NULL);
@@ -1267,8 +1307,8 @@ struct SoundscapesWidget : ModuleWidget {
             // Density -- was Rate, Density, Timbre, Texture, Spread, Dynamics.
             // Param identities unchanged, just which column each sits in.
             static const int knobOrder[6] = {
-                Soundscapes::RATE_PARAM, Soundscapes::ATTACK_PARAM, Soundscapes::RELEASE_PARAM,
-                Soundscapes::TIMBRE_PARAM, Soundscapes::TEXTURE_PARAM, Soundscapes::DENSITY_PARAM
+                Soundscapes::TEMPO_PARAM, Soundscapes::DENSITY_PARAM, Soundscapes::EVOLVE_PARAM,
+                Soundscapes::TIMBRE_PARAM, Soundscapes::SPACE_PARAM, Soundscapes::DENSITY_PARAM
             };
             addParam(createParamCentered<SoundscapesKnob>(Vec(SoundscapesCoords::KNOB_COLS[i], SoundscapesCoords::ROW2_KNOB_Y), module, knobOrder[i]));
         }
